@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>アルカンパズル 入門ガイド</title>
+<style>
+  :root{
+    --paper:#faf8f0;
+    --paper-card:#fffdf6;
+    --grid-line: rgba(90,150,190,0.18);
+    --border:#ddd6c1;
+    --border-strong:#c7bd9e;
+    --ink:#33302a;
+    --ink-soft:#786f5c;
+    --accent:#2a9d8f;
+    --accent-deep:#1c7a6e;
+    --accent-soft:#d7f0ec;
+    --stamp-red:#d63b2e;
+    --tape:#f2e6a3;
+    --tape-edge:#d9c76e;
+    --cat-number-bg:#e3f0fb; --cat-number-bd:#6fa8d6;
+    --cat-mult-bg:#f1e8fb; --cat-mult-bd:#a883d6;
+    --cat-sub-bg:#e6f6ea; --cat-sub-bd:#5fb579;
+    --cat-base-bg:#fdf0e0; --cat-base-bd:#d99a3f;
+    --halogen-f-bg:#fbf0c8; --halogen-f-bd:#c9a93f;
+    --shadow: rgba(60,52,32,0.18);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#211e18;
+      --paper-card:#2a2620;
+      --grid-line: rgba(120,180,220,0.10);
+      --border:#4d4636;
+      --border-strong:#645a44;
+      --ink:#f3ede0;
+      --ink-soft:#b8ae98;
+      --accent:#4fc0af;
+      --accent-deep:#7fd9c9;
+      --accent-soft:#25423d;
+      --stamp-red:#ff7a68;
+      --tape:#4a4326;
+      --tape-edge:#665a2e;
+      --cat-number-bg:#22303d; --cat-number-bd:#5f93c2;
+      --cat-mult-bg:#2e2638; --cat-mult-bd:#9b7bc4;
+      --cat-sub-bg:#1f3324; --cat-sub-bd:#579a6c;
+      --cat-base-bg:#332619; --cat-base-bd:#c98a3a;
+      --halogen-f-bg:#3b3320; --halogen-f-bd:#b79a45;
+      --shadow: rgba(0,0,0,0.45);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#211e18;
+    --paper-card:#2a2620;
+    --grid-line: rgba(120,180,220,0.10);
+    --border:#4d4636;
+    --border-strong:#645a44;
+    --ink:#f3ede0;
+    --ink-soft:#b8ae98;
+    --accent:#4fc0af;
+    --accent-deep:#7fd9c9;
+    --accent-soft:#25423d;
+    --stamp-red:#ff7a68;
+    --tape:#4a4326;
+    --tape-edge:#665a2e;
+    --cat-number-bg:#22303d; --cat-number-bd:#5f93c2;
+    --cat-mult-bg:#2e2638; --cat-mult-bd:#9b7bc4;
+    --cat-sub-bg:#1f3324; --cat-sub-bd:#579a6c;
+    --cat-base-bg:#332619; --cat-base-bd:#c98a3a;
+    --halogen-f-bg:#3b3320; --halogen-f-bd:#b79a45;
+    --shadow: rgba(0,0,0,0.45);
+    color-scheme: dark;
+  }
+  :root[data-theme="light"]{
+    --paper:#faf8f0;
+    --paper-card:#fffdf6;
+    --grid-line: rgba(90,150,190,0.18);
+    --border:#ddd6c1;
+    --border-strong:#c7bd9e;
+    --ink:#33302a;
+    --ink-soft:#786f5c;
+    --accent:#2a9d8f;
+    --accent-deep:#1c7a6e;
+    --accent-soft:#d7f0ec;
+    --stamp-red:#d63b2e;
+    --tape:#f2e6a3;
+    --tape-edge:#d9c76e;
+    --cat-number-bg:#e3f0fb; --cat-number-bd:#6fa8d6;
+    --cat-mult-bg:#f1e8fb; --cat-mult-bd:#a883d6;
+    --cat-sub-bg:#e6f6ea; --cat-sub-bd:#5fb579;
+    --cat-base-bg:#fdf0e0; --cat-base-bd:#d99a3f;
+    --halogen-f-bg:#fbf0c8; --halogen-f-bd:#c9a93f;
+    --shadow: rgba(60,52,32,0.18);
+    color-scheme: light;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/28px 28px,
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/28px 28px,
+      var(--paper);
+    color:var(--ink);
+    font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic',-apple-system,BlinkMacSystemFont,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  .page{
+    max-width:760px;
+    margin:0 auto;
+    padding:40px 20px 90px;
+    display:flex;
+    flex-direction:column;
+    gap:64px;
+  }
+  h1,h2,h3{
+    font-family:'Hiragino Maru Gothic ProN','Hiragino Maru Gothic Pro','UD Digi Kyokasho N-B','Yu Gothic',sans-serif;
+    text-wrap:balance;
+    margin:0;
+    color:var(--ink);
+  }
+  p{margin:0; line-height:1.85; color:var(--ink);}
+  .lead{color:var(--ink-soft); line-height:1.8;}
+
+  /* ---------- shared bits ---------- */
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:12.5px;
+    font-weight:700;
+    letter-spacing:.08em;
+    color:var(--accent-deep);
+    background:var(--accent-soft);
+    border:1.5px solid var(--accent);
+    border-radius:999px;
+    padding:5px 14px;
+    width:fit-content;
+  }
+  .card{
+    background:var(--paper-card);
+    border:1.5px solid var(--border);
+    border-radius:16px;
+    box-shadow:2px 3px 0 var(--shadow);
+  }
+  .tape{
+    position:absolute;
+    width:70px; height:24px;
+    background:var(--tape);
+    border:1px solid var(--tape-edge);
+    opacity:.85;
+    box-shadow:0 2px 4px var(--shadow);
+  }
+
+  /* ---------- hero ---------- */
+  .hero{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    gap:18px;
+    padding-top:8px;
+  }
+  .hero h1{
+    font-size:clamp(34px,7vw,52px);
+    font-weight:800;
+    line-height:1.15;
+    position:relative;
+  }
+  .hero h1 .hl{
+    background:linear-gradient(transparent 62%, var(--accent-soft) 62%);
+    padding:0 4px;
+  }
+  .hero .lead{
+    font-size:17px;
+    max-width:46ch;
+  }
+  .hero .sub{
+    font-size:14.5px;
+    color:var(--ink-soft);
+    max-width:44ch;
+  }
+  .video-hero{
+    position:relative;
+    display:block;
+    width:min(240px,62vw);
+    aspect-ratio:61/90;
+    margin:6px 0;
+    padding:0;
+    border:1.5px solid var(--border-strong);
+    border-radius:16px;
+    overflow:hidden;
+    background:var(--paper-card);
+    box-shadow:3px 4px 0 var(--shadow);
+    cursor:pointer;
+  }
+  .video-hero img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .video-hero iframe{
+    width:100%;
+    height:100%;
+    display:block;
+    border:0;
+  }
+  .video-hero .play-circle{
+    position:absolute;
+    inset:0;
+    margin:auto;
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    background:var(--accent);
+    box-shadow:2px 3px 0 var(--accent-deep);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:transform .15s ease;
+  }
+  .video-hero:hover .play-circle,
+  .video-hero:focus-visible .play-circle{
+    transform:scale(1.07);
+  }
+  .video-hero:focus-visible{
+    outline:3px solid var(--accent-deep);
+    outline-offset:3px;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .video-hero .play-circle{ transition:none; }
+  }
+  .scrolldown{
+    font-size:13px;
+    color:var(--ink-soft);
+    font-weight:700;
+    letter-spacing:.04em;
+  }
+
+  /* ---------- section heading ---------- */
+  .section-head{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:22px;
+  }
+  .section-head h2{
+    font-size:clamp(22px,4.4vw,28px);
+    font-weight:800;
+  }
+
+  /* ---------- intro note ---------- */
+  .sticky-note{
+    position:relative;
+    background:var(--paper-card);
+    border:1.5px solid var(--border);
+    border-radius:4px 14px 4px 14px;
+    padding:22px 24px;
+    box-shadow:3px 4px 0 var(--shadow);
+    transform:rotate(-0.6deg);
+  }
+  .sticky-note .tape{ top:-14px; left:50%; transform:translateX(-50%) rotate(-3deg); }
+  .sticky-note p + p{ margin-top:10px; }
+  .sticky-note .stamp-inline{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    font-weight:800;
+    color:var(--stamp-red);
+    border:2.5px solid var(--stamp-red);
+    border-radius:50%;
+    width:30px; height:30px;
+    font-size:12px;
+    transform:rotate(-6deg);
+    margin:0 3px -6px 1px;
+  }
+
+  /* ---------- operation cards ---------- */
+  .op-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:14px;
+  }
+  .op-card{
+    padding:18px 16px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+    text-align:center;
+  }
+  .op-card .icon{
+    width:46px; height:46px;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--accent-deep);
+  }
+  .op-card .key{
+    font-weight:800;
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    font-size:15px;
+  }
+  .op-card .desc{
+    font-size:13px;
+    color:var(--ink-soft);
+    line-height:1.6;
+  }
+
+  /* ---------- two-mode spread ---------- */
+  .spread{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:22px;
+  }
+  @media (max-width:620px){
+    .spread{ grid-template-columns:1fr; }
+  }
+  .mode-page{
+    padding:22px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .mode-page .mode-title{
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+  }
+  .mode-page .mode-title .badge{
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    font-weight:800;
+    font-size:19px;
+    color:var(--accent-deep);
+  }
+  .mode-page .mode-title .tag{
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  .mode-page .desc{ font-size:14px; color:var(--ink-soft); line-height:1.75; }
+
+  /* ---------- mini app preview ---------- */
+  .preview{
+    background:var(--paper);
+    border:1.5px solid var(--border-strong);
+    border-radius:12px;
+    padding:12px;
+    position:relative;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size:14px 14px;
+  }
+  .preview .bar{
+    display:flex; gap:6px; align-items:center;
+    font-size:11px; font-weight:700; color:var(--ink-soft);
+    margin-bottom:10px;
+  }
+  .preview .bar .pill{
+    background:var(--paper-card); border:1px solid var(--border);
+    border-radius:999px; padding:2px 10px;
+  }
+  .preview .objective{
+    background:var(--paper-card);
+    border:1.5px solid var(--accent);
+    border-radius:10px;
+    padding:10px 10px 12px;
+    font-size:12.5px;
+    color:var(--accent-deep);
+    font-weight:700;
+    margin-bottom:10px;
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+  }
+  .preview .obj-buttons{
+    display:flex;
+    gap:6px;
+  }
+  .preview .mini-btn{
+    font-size:11px;
+    font-weight:800;
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    padding:5px 12px;
+    border-radius:999px;
+    background:var(--paper-card);
+    border:1.5px solid var(--border-strong);
+    color:var(--ink-soft);
+  }
+  .preview .mini-btn.primary{
+    background:var(--accent);
+    border-color:var(--accent-deep);
+    color:#fff;
+  }
+  .preview .mini-grid{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:5px;
+    margin-bottom:10px;
+  }
+  .preview .cell{
+    aspect-ratio:1;
+    border:1.5px dashed var(--border-strong);
+    border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--paper-card);
+  }
+  .preview .cell.filled{ border-style:solid; }
+  .atom-c{ width:60%; height:60%; }
+  .atom-halogen{
+    width:70%; height:70%;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:800;
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    color:var(--ink);
+  }
+  .halogen-cl{ background:var(--cat-sub-bg); border:1.5px solid var(--cat-sub-bd); }
+  .halogen-i{ background:var(--cat-mult-bg); border:1.5px solid var(--cat-mult-bd); }
+
+  .stamp-wrap{
+    position:relative;
+    background:var(--accent);
+    color:#fff;
+    border-radius:10px;
+    padding:14px;
+    text-align:center;
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    font-weight:800;
+    font-size:13.5px;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:10px;
+  }
+  .stamp-circle{
+    width:38px; height:38px;
+    border:3px solid var(--stamp-red);
+    border-radius:50%;
+    color:var(--stamp-red);
+    background:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:800;
+    transform:rotate(-8deg);
+    flex-shrink:0;
+  }
+
+  .preview .answer-strip{
+    background:var(--paper-card);
+    border:1.5px dashed var(--border-strong);
+    border-radius:10px;
+    padding:10px 12px;
+    text-align:center;
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    font-weight:800;
+    font-size:15px;
+    letter-spacing:.02em;
+    margin-bottom:10px;
+  }
+  .preview .answer-strip .num{ color:var(--cat-number-bd); }
+  .preview .answer-strip .mult{ color:var(--cat-mult-bd); }
+  .preview .answer-strip .sub{ color:var(--cat-sub-bd); }
+  .preview .answer-strip .base{ color:var(--cat-base-bd); }
+
+  .chip-row{
+    display:flex; flex-wrap:wrap; gap:6px;
+    justify-content:center;
+  }
+  .chip{
+    font-size:11.5px;
+    font-weight:700;
+    padding:5px 10px;
+    border-radius:999px;
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+  }
+  .chip.number{ background:var(--cat-number-bg); border:1.5px solid var(--cat-number-bd); color:var(--ink); }
+  .chip.mult{ background:var(--cat-mult-bg); border:1.5px solid var(--cat-mult-bd); color:var(--ink); }
+  .chip.sub{ background:var(--cat-sub-bg); border:1.5px solid var(--cat-sub-bd); color:var(--ink); }
+  .chip.base{ background:var(--cat-base-bg); border:1.5px solid var(--cat-base-bd); color:var(--ink); }
+  .chip.ghost{ opacity:.4; }
+
+  .legend{
+    display:flex; flex-wrap:wrap; gap:10px;
+    font-size:11.5px; color:var(--ink-soft);
+    margin-top:2px;
+  }
+  .legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .legend i{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+
+  .preview-note{
+    font-size:11px;
+    color:var(--ink-soft);
+    text-align:center;
+    margin-top:2px;
+  }
+
+  /* ---------- difficulty path ---------- */
+  .path{
+    display:flex;
+    flex-direction:column;
+    gap:0;
+  }
+  .path-step{
+    display:grid;
+    grid-template-columns:44px 1fr;
+    gap:16px;
+  }
+  .path-step .rail{
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .path-step .dot{
+    width:44px; height:44px;
+    border-radius:50%;
+    background:var(--accent);
+    color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    font-weight:800;
+    font-size:16px;
+    flex-shrink:0;
+    box-shadow:2px 2px 0 var(--shadow);
+  }
+  .path-step .line{
+    width:3px;
+    flex:1;
+    background:repeating-linear-gradient(var(--border-strong),var(--border-strong) 5px,transparent 5px,transparent 10px);
+    min-height:34px;
+  }
+  .path-step:last-child .line{ display:none; }
+  .path-step .content{
+    padding:16px 18px 26px;
+  }
+  .path-step .content h3{
+    font-size:16.5px;
+    font-weight:800;
+    margin-bottom:4px;
+  }
+  .path-step .content p{
+    font-size:13.5px;
+    color:var(--ink-soft);
+  }
+
+  /* ---------- tip note ---------- */
+  .tip{
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+    padding:20px 22px;
+    background:var(--accent-soft);
+    border:1.5px solid var(--accent);
+    border-radius:14px;
+  }
+  .tip .mark{
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    font-weight:800;
+    font-size:13px;
+    background:var(--accent);
+    color:#fff;
+    border-radius:8px;
+    padding:4px 10px;
+    flex-shrink:0;
+  }
+  .tip p{ font-size:14.5px; }
+
+  /* ---------- cta ---------- */
+  .cta{
+    position:relative;
+    text-align:center;
+    padding:38px 24px;
+    background:var(--paper-card);
+    border:2px dashed var(--accent);
+    border-radius:20px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:14px;
+  }
+  .cta h2{
+    font-size:clamp(24px,5vw,30px);
+    font-weight:800;
+  }
+  .cta p{ color:var(--ink-soft); font-size:14.5px; max-width:40ch; }
+  .cta .go{
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    font-weight:800;
+    font-size:16px;
+    color:#fff;
+    background:var(--accent);
+    border-radius:999px;
+    padding:14px 30px;
+    box-shadow:2px 3px 0 var(--accent-deep);
+    display:inline-block;
+    text-decoration:none;
+    cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .cta .go:hover{
+    transform:translateY(-2px);
+    box-shadow:2px 5px 0 var(--accent-deep);
+  }
+  .cta .go:active{
+    transform:translateY(1px);
+    box-shadow:1px 2px 0 var(--accent-deep);
+  }
+  .cta .go:focus-visible{
+    outline:3px solid var(--accent-deep);
+    outline-offset:3px;
+  }
+  /* ---------- detailed manual (collapsible) ---------- */
+  .manual{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .manual > .section-head{ margin-bottom:8px; }
+  .manual details{
+    background:var(--paper-card);
+    border:1.5px solid var(--border);
+    border-radius:16px;
+    box-shadow:2px 3px 0 var(--shadow);
+    overflow:hidden;
+  }
+  .manual summary{
+    list-style:none;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:16px 18px;
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    font-weight:800;
+    font-size:16px;
+    color:var(--ink);
+  }
+  .manual summary::-webkit-details-marker{ display:none; }
+  .manual summary .mode-no{
+    flex-shrink:0;
+    width:26px; height:26px;
+    border-radius:50%;
+    background:var(--accent);
+    color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px;
+  }
+  .manual summary .mode-sub{
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--ink-soft);
+  }
+  .manual summary .chev{
+    margin-left:auto;
+    flex-shrink:0;
+    color:var(--ink-soft);
+    transition:transform .2s ease;
+  }
+  .manual details[open] summary .chev{ transform:rotate(180deg); }
+  .manual .steps{
+    list-style:none;
+    margin:0;
+    padding:0 18px 18px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    counter-reset:step;
+  }
+  .manual .steps > li{
+    position:relative;
+    padding-left:38px;
+    font-size:14px;
+    line-height:1.75;
+    color:var(--ink);
+    counter-increment:step;
+  }
+  .manual .steps > li::before{
+    content:counter(step);
+    position:absolute;
+    left:0; top:1px;
+    width:26px; height:26px;
+    border-radius:50%;
+    background:var(--accent-soft);
+    border:1.5px solid var(--accent);
+    color:var(--accent-deep);
+    font-family:'Hiragino Maru Gothic ProN',sans-serif;
+    font-weight:800;
+    font-size:13px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .manual .steps > li.steps-note-item{
+    padding-left:0;
+    counter-increment:none;
+  }
+  .manual .steps > li.steps-note-item::before{ display:none; }
+  .manual .steps > li .k{
+    font-weight:800;
+    color:var(--accent-deep);
+  }
+  .manual .color-key{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:6px;
+  }
+  .manual .color-key .chip{ font-size:11px; padding:4px 9px; }
+  .manual .note-line{
+    margin-top:6px;
+    padding:10px 12px;
+    background:var(--accent-soft);
+    border:1.5px solid var(--accent);
+    border-radius:10px;
+    font-size:13px;
+    line-height:1.7;
+    color:var(--ink);
+  }
+  .manual .note-list{
+    margin:0;
+    padding-left:1.1em;
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+  }
+  .manual .note-list li{
+    padding-left:2px;
+  }
+  .manual .note-list li::marker{
+    color:var(--accent-deep);
+  }
+  footer{
+    text-align:center;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- HERO -->
+  <section class="hero">
+    <h1>アルカンパズルで、<br><span class="hl">分子を組んで、名前をつけよう。</span></h1>
+
+    <button type="button" class="video-hero" id="heroVideo" aria-label="「アルカンパズル」の紹介動画を再生する">
+      <img src="https://i.ytimg.com/vi/AOsvukzxLjo/hqdefault.jpg" alt="" loading="lazy">
+      <span class="play-circle">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M8 5v14l11-7-11-7z" fill="#fff"/></svg>
+      </span>
+    </button>
+
+    <p class="lead">画面の中で炭素や水素、ハロゲンをつなげて分子をつくったり、できた分子に名前をつけたり。指先だけで、有機化学の「なるほど」が体験できる練習アプリです。</p>
+    <p class="sub">タップ・ドラッグで遊びながら、アルカンの命名ルールが自然と身につきます。</p>
+    <span class="scrolldown">くわしい遊び方 ↓</span>
+  </section>
+
+  <!-- WHAT IS THIS -->
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">これって何？</span>
+      <h2>ノートに分子を描くみたいに、遊びながら組み立てる。</h2>
+    </div>
+    <div class="sticky-note">
+      <div class="tape"></div>
+      <p>アルカンパズルは、<strong>「分子を組み立てるモード」</strong>と<strong>「分子に名前をつけるモード」</strong>の2種類で遊べる練習アプリです。</p>
+      <p>正解すると<span class="stamp-inline">正解</span>のハンコがドン！と押されます。まちがえても平気、何度でも挑戦できます。</p>
+    </div>
+  </section>
+
+  <!-- BASIC OPERATIONS -->
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">まずは操作から</span>
+      <h2>覚えることは、たったこれだけ。</h2>
+    </div>
+    <div class="op-grid">
+      <div class="op-card card">
+        <div class="icon">
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><path d="M23.5,8.47 A11,11 0 1 1 8.47,12.5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M8.33,19.35 L8.47,12.5 L2.61,16.05" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        </div>
+        <div class="key">タップ 1回</div>
+        <div class="desc">原子をまわして<br>向きを変える</div>
+      </div>
+      <div class="op-card card">
+        <div class="icon">
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><path d="M12.5,8.47 A11,11 0 1 0 27.53,12.5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M27.67,19.35 L27.53,12.5 L33.39,16.05" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        </div>
+        <div class="key">タップ 2回</div>
+        <div class="desc">逆向きに<br>まわす</div>
+      </div>
+      <div class="op-card card">
+        <div class="icon">
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="13" stroke="currentColor" stroke-width="3"/><path d="M13 13l10 10M23 13L13 23" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        </div>
+        <div class="key">タップ 3回</div>
+        <div class="desc">その原子を<br>けす</div>
+      </div>
+      <div class="op-card card">
+        <div class="icon">
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><rect x="8" y="8" width="14" height="14" rx="3" stroke="currentColor" stroke-width="3"/><path d="M20 20l9 9M29 22v7h-7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="key">ドラッグ</div>
+        <div class="desc">つまんで<br>おく・うごかす</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TWO MODES -->
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">遊び方は2つ</span>
+      <h2>「組む」も「名づける」も、どっちも主役。</h2>
+    </div>
+
+    <div class="spread">
+
+      <!-- MODE 1 -->
+      <div class="mode-page card">
+        <div class="mode-title">
+          <span class="badge">① 並べる</span>
+          <span class="tag">お題を見て組み立てる</span>
+        </div>
+        <p class="desc">出されたお題の名前(たとえば「2-クロロペンタン」)を見て、原子パネルをドラッグしながら同じ分子を組み立てます。</p>
+
+        <div class="preview">
+          <div class="bar"><span class="pill">並べる・やさしめ</span></div>
+          <div class="objective">
+            お題：2-クロロペンタン
+            <div class="obj-buttons">
+              <span class="mini-btn primary">チェック</span>
+              <span class="mini-btn">クリア</span>
+            </div>
+          </div>
+          <div class="mini-grid">
+            <div class="cell"></div>
+            <div class="cell filled">
+              <svg class="atom-c" viewBox="0 0 40 40"><line x1="20" y1="22" x2="20" y2="34" stroke="var(--ink)" stroke-width="2.4"/><circle cx="20" cy="13" r="9" fill="var(--cat-sub-bg)" stroke="var(--cat-sub-bd)" stroke-width="1.5"/><text x="20" y="17.5" text-anchor="middle" font-family="'Hiragino Maru Gothic ProN',sans-serif" font-weight="800" font-size="10" fill="var(--ink)">Cl</text></svg>
+            </div>
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+            <div class="cell filled">
+              <svg class="atom-c" viewBox="0 0 40 40"><line x1="20" y1="20" x2="34" y2="20" stroke="var(--ink)" stroke-width="2.4"/><circle cx="20" cy="6" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="6" cy="20" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="34" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="20" r="7" fill="var(--ink)"/></svg>
+            </div>
+            <div class="cell filled">
+              <svg class="atom-c" viewBox="0 0 40 40"><line x1="6" y1="20" x2="34" y2="20" stroke="var(--ink)" stroke-width="2.4"/><line x1="20" y1="6" x2="20" y2="20" stroke="var(--ink)" stroke-width="2.4"/><circle cx="20" cy="34" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="20" r="7" fill="var(--ink)"/></svg>
+            </div>
+            <div class="cell filled">
+              <svg class="atom-c" viewBox="0 0 40 40"><line x1="6" y1="20" x2="34" y2="20" stroke="var(--ink)" stroke-width="2.4"/><circle cx="20" cy="6" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="34" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="20" r="7" fill="var(--ink)"/></svg>
+            </div>
+            <div class="cell filled">
+              <svg class="atom-c" viewBox="0 0 40 40"><line x1="6" y1="20" x2="34" y2="20" stroke="var(--ink)" stroke-width="2.4"/><circle cx="20" cy="6" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="34" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="20" r="7" fill="var(--ink)"/></svg>
+            </div>
+            <div class="cell filled">
+              <svg class="atom-c" viewBox="0 0 40 40"><line x1="6" y1="20" x2="20" y2="20" stroke="var(--ink)" stroke-width="2.4"/><circle cx="20" cy="6" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="34" cy="20" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="34" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="20" r="7" fill="var(--ink)"/></svg>
+            </div>
+          </div>
+          <p class="preview-note">実機の画面をもとに再現したイメージ（組み立て中）</p>
+        </div>
+      </div>
+
+      <!-- MODE 2 -->
+      <div class="mode-page card">
+        <div class="mode-title">
+          <span class="badge">② 名付ける</span>
+          <span class="tag">分子を見て名前をつくる</span>
+        </div>
+        <p class="desc">できあがった分子を見て、「数字」「メチルなどの置換基」「幹の名前」のパーツをタップし、正しい順番で名前を完成させます。</p>
+
+        <div class="preview">
+          <div class="bar"><span class="pill">名付ける・やさしめ</span></div>
+          <div class="mini-grid">
+            <div class="cell"></div><div class="cell"></div>
+            <div class="cell filled">
+              <svg class="atom-c" viewBox="0 0 40 40"><line x1="20" y1="22" x2="20" y2="34" stroke="var(--ink)" stroke-width="2.4"/><circle cx="20" cy="13" r="9" fill="var(--halogen-f-bg)" stroke="var(--halogen-f-bd)" stroke-width="1.5"/><text x="20" y="17.5" text-anchor="middle" font-family="'Hiragino Maru Gothic ProN',sans-serif" font-weight="800" font-size="11" fill="var(--ink)">F</text></svg>
+            </div>
+            <div class="cell"></div><div class="cell"></div>
+            <div class="cell"></div>
+            <div class="cell filled">
+              <svg class="atom-c" viewBox="0 0 40 40"><line x1="20" y1="20" x2="34" y2="20" stroke="var(--ink)" stroke-width="2.4"/><circle cx="20" cy="6" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="6" cy="20" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="34" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="20" r="7" fill="var(--ink)"/></svg>
+            </div>
+            <div class="cell filled">
+              <svg class="atom-c" viewBox="0 0 40 40"><line x1="6" y1="20" x2="34" y2="20" stroke="var(--ink)" stroke-width="2.4"/><line x1="20" y1="6" x2="20" y2="34" stroke="var(--ink)" stroke-width="2.4"/><circle cx="20" cy="20" r="7" fill="var(--ink)"/></svg>
+            </div>
+            <div class="cell filled">
+              <svg class="atom-c" viewBox="0 0 40 40"><line x1="6" y1="20" x2="18" y2="20" stroke="var(--ink)" stroke-width="2.4"/><circle cx="27" cy="20" r="9" fill="var(--halogen-f-bg)" stroke="var(--halogen-f-bd)" stroke-width="1.5"/><text x="27" y="24.5" text-anchor="middle" font-family="'Hiragino Maru Gothic ProN',sans-serif" font-weight="800" font-size="11" fill="var(--ink)">F</text></svg>
+            </div>
+            <div class="cell"></div>
+            <div class="cell"></div><div class="cell"></div>
+            <div class="cell filled">
+              <svg class="atom-c" viewBox="0 0 40 40"><line x1="20" y1="6" x2="20" y2="20" stroke="var(--ink)" stroke-width="2.4"/><circle cx="6" cy="20" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="34" cy="20" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="34" r="2.6" fill="none" stroke="var(--ink-soft)" stroke-width="1.6"/><circle cx="20" cy="20" r="7" fill="var(--ink)"/></svg>
+            </div>
+            <div class="cell"></div><div class="cell"></div>
+          </div>
+          <div class="stamp-wrap">
+            <span class="stamp-circle">正解</span>
+            正解！ 2,2-ジフルオロプロパン
+          </div>
+          <div class="answer-strip"><span class="num">2,2</span> <span class="mult">ジ</span> <span class="sub">フルオロ</span> <span class="base">プロパン</span></div>
+          <div class="chip-row">
+            <span class="chip number">2</span>
+            <span class="chip mult">ジ</span>
+            <span class="chip sub">フルオロ</span>
+            <span class="chip base">プロパン</span>
+            <span class="chip sub ghost">クロロ</span>
+            <span class="chip base ghost">ヘキサン</span>
+          </div>
+          <p class="preview-note">実機の画面をもとに再現したイメージ（正解！）</p>
+        </div>
+
+        <div class="legend">
+          <span><i style="background:var(--cat-number-bd)"></i>数字＝位置</span>
+          <span><i style="background:var(--cat-mult-bd)"></i>紫＝いくつ分</span>
+          <span><i style="background:var(--cat-sub-bd)"></i>緑＝置換基</span>
+          <span><i style="background:var(--cat-base-bd)"></i>橙＝幹の名前</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- DIFFICULTY PATH -->
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">難易度でレベルアップ</span>
+      <h2>「練習」から始めて、少しずつ強くなる。</h2>
+    </div>
+    <div class="path">
+      <div class="path-step">
+        <div class="rail"><div class="dot">1</div><div class="line"></div></div>
+        <div class="content card">
+          <h3>練習</h3>
+          <p>お題なし。自由に原子を組み合わせて、分子の形と名前の対応をながめてみる段階。</p>
+        </div>
+      </div>
+      <div class="path-step">
+        <div class="rail"><div class="dot">2</div><div class="line"></div></div>
+        <div class="content card">
+          <h3>やさしめ</h3>
+          <p>短い名前・シンプルな分子からスタート。「並べる」も「名付ける」もここが入り口。</p>
+        </div>
+      </div>
+      <div class="path-step">
+        <div class="rail"><div class="dot">3</div><div class="line"></div></div>
+        <div class="content card">
+          <h3>まあまあ</h3>
+          <p>枝分かれや置換基の数が増え、位置番号の付け方までしっかり問われる。</p>
+        </div>
+      </div>
+      <div class="path-step">
+        <div class="rail"><div class="dot">4</div></div>
+        <div class="content card">
+          <h3>そこそこ</h3>
+          <p>複雑な主鎖・複数の置換基。命名ルールを一通り使いこなせているか試される段階。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TIP -->
+  <section>
+    <div class="tip">
+      <span class="mark">コツ</span>
+      <p>まちがえても、出るのは「誤」のハンコだけ。<strong>「再挑戦」ボタンですぐやり直せる</strong>ので、正解を覚えるまで気軽にトライ&amp;エラーしよう。</p>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <h2>さあ、最初の1問を組んでみよう。</h2>
+    <p>「並べる」の練習モードから、まずは分子をひとつ組み立ててみるのがおすすめ。</p>
+    <a class="go" href="index.html">アルカンパズルを開く →</a>
+  </section>
+
+  <!-- DETAILED MANUAL (collapsible) -->
+  <section class="manual">
+    <div class="section-head">
+      <span class="eyebrow">もっとくわしく</span>
+      <h2>モード別・くわしい操作の流れ</h2>
+    </div>
+
+    <!-- ① 並べる -->
+    <details>
+      <summary>
+        <span class="mode-no">①</span>
+        並べる
+        <span class="mode-sub">お題の分子を組み立てる</span>
+        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </summary>
+      <ol class="steps">
+        <li>お題の分子名を確認する。<span class="k">やさしめ</span>は「お題：」つき、<span class="k">まあまあ・そこそこ</span>は名前だけが出ます。</li>
+        <li>下のパレットから<span class="k">炭素（黒丸）</span>をドラッグして盤面に置く。</li>
+        <li class="steps-note-item"><div class="note-line">原子の置き方はいろいろ選べます。
+          <ul class="note-list">
+            <li>パレットをドラッグして、マスに1つずつ置く</li>
+            <li>パレットをタップして選ぶと、あとは盤面をタップするだけで連続して置ける（<span class="k">3マス以上</span>をなぞると選択は解除される）</li>
+            <li>空いているマスからドラッグすると、なぞった通りに主鎖をつなげて置くことができる</li>
+          </ul>
+        </div></li>
+        <li>タップで結合の向きを回す（<span class="k">1タップ＝順回転／2タップ＝逆回転</span>）。<span class="k">3タップ</span>で消す、ドラッグで動かす。</li>
+        <li>炭素をつないで主鎖や枝をつくり、<span class="k">ハロゲン（F・Cl・Br・I）</span>を必要な位置にドラッグして付ける。</li>
+        <li><span class="k">「チェック」</span>で答え合わせ。「正解」ハンコが出たら画面をタップして次の問題へ。</li>
+        <li class="steps-note-item"><div class="note-line"><strong>練習モード</strong>は、お題なしで自由に組むと分子の名前がリアルタイムで表示されます。「クリア」はいつでも押せます。</div></li>
+      </ol>
+    </details>
+
+    <!-- ② 名付ける -->
+    <details>
+      <summary>
+        <span class="mode-no">②</span>
+        名付ける
+        <span class="mode-sub">できた分子に名前をつける</span>
+        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </summary>
+      <ol class="steps">
+        <li>盤面に、完成した分子（お題）が表示される。</li>
+        <li>語群のパーツを<span class="k">正しい順番でタップ</span>して、上の解答欄に名前を組み立てる。パーツは4系統に色分けされています。
+          <div class="color-key">
+            <span class="chip number">青＝位置番号</span>
+            <span class="chip mult">紫＝倍数（ジ・トリ…）</span>
+            <span class="chip sub">緑＝置換基</span>
+            <span class="chip base">橙＝母体名</span>
+          </div>
+        </li>
+        <li><span class="k">「1つ戻す」</span>で直前の1手を取り消し、<span class="k">「クリア」</span>で全部消す。</li>
+        <li><span class="k">「回答する」</span>で判定。不正解なら<span class="k">「再挑戦」</span>か<span class="k">「正答を見る」</span>を選べます。</li>
+        <li class="steps-note-item"><div class="note-line">置換基が2種類以上あるときの詳しい決まり（主鎖の選び方・位置番号の付け方・アルファベット順）は、アプリ内の<strong>「命名ルール」</strong>ボタンから読めます。</div></li>
+      </ol>
+    </details>
+  </section>
+
+  <footer>アルカンパズル・入門ガイド</footer>
+
+</div>
+
+<script>
+  (function(){
+    var btn = document.getElementById('heroVideo');
+    if(!btn) return;
+    btn.addEventListener('click', function(){
+      var frame = document.createElement('div');
+      frame.className = 'video-hero';
+      var iframe = document.createElement('iframe');
+      iframe.src = 'https://www.youtube.com/embed/AOsvukzxLjo?autoplay=1&rel=0';
+      iframe.title = 'アルカンパズル 紹介動画';
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+      iframe.allowFullscreen = true;
+      frame.appendChild(iframe);
+      btn.replaceWith(frame);
+    }, { once:true });
+  })();
+</script>
+</body>
+</html>
