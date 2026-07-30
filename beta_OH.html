@@ -128,6 +128,7 @@
     box-shadow:1px 2px 0 var(--shadow);
   }
   .status .name{color:var(--accent-ink);font-size:20px;font-weight:800;font-family:inherit;display:inline-block;margin-top:2px;}
+  .common-name{font-size:.72em;color:var(--text-muted);font-weight:700;white-space:nowrap;}
   .status button, .objective button, .wordbank button{font-family:var(--font-hand);}
   .status button{
     margin-top:8px;font-size:14px;font-weight:800;padding:7px 18px;
@@ -328,11 +329,11 @@
   .diff-tabs-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
   .diff-tabs-row .diff-tabs{flex:1;margin-bottom:0;}
   .hydroxyl-toggle{
-    flex:0 0 38px;align-self:stretch;width:38px;height:auto;padding:0;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
-    border-radius:10px;border:2px solid var(--border);background:var(--surface);box-shadow:1px 2px 0 var(--shadow);
+    flex:0 0 38px;align-self:stretch;width:38px;height:auto;padding:0;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;
+    border-radius:10px;border:1.5px solid var(--border);background:var(--surface);box-shadow:1px 2px 0 var(--shadow);
     transition:transform .08s ease, box-shadow .08s ease, opacity .12s ease;
   }
-  .hydroxyl-toggle svg{width:100%;height:100%;display:block;}
+  .hydroxyl-toggle svg{width:100%;height:100%;display:block;transform:scale(2);transform-origin:center;}
   .hydroxyl-toggle.on{border-color:var(--accent);background:#fff5f3;}
   .hydroxyl-toggle.off{opacity:.38;filter:grayscale(.6);}
   .hydroxyl-toggle:active:not(:disabled){transform:translate(1px,2px);box-shadow:0 0 0 var(--shadow);}
@@ -899,6 +900,18 @@
 
   function buildName(baseName, locantedSubstituents) {
     return buildSubstituentPrefix(locantedSubstituents) + baseName;
+  }
+
+  // 判定用の名称は変えず、表示だけに代表的な慣用名を添える。
+  const COMMON_ALCOHOL_NAME = {
+    '1,2-エタンジオール': 'エチレングリコール',
+    '1,2,3-プロパントリオール': 'グリセリン',
+    '1,2,3,4-ブタンテトラオール': 'エリスリトール',
+    '1,2,3,4,5-ペンタンペンタオール': 'キシリトール',
+  };
+  function displayCompoundName(name) {
+    const commonName = COMMON_ALCOHOL_NAME[name];
+    return commonName ? `${name}<span class="common-name">（${commonName}）</span>` : name;
   }
   function compareLocantArrays(a, b) {
     const len = Math.max(a.length, b.length);
@@ -2248,7 +2261,7 @@
     } else if (islands.size > 0) {
       statusEl.textContent = `孤立フラグメントがあります(${islands.size}マス)\nひとつの分子になるよう繋げてください`;
     } else if (nameResult && nameResult.ok) {
-      statusEl.innerHTML = `<span class="name">${nameResult.name}</span>`;
+      statusEl.innerHTML = `<span class="name">${displayCompoundName(nameResult.name)}</span>`;
     } else if (nameResult) {
       statusEl.textContent = `判定エラー: ${nameResult.error}`;
     }
@@ -2341,7 +2354,7 @@
     } else if (analyzed.length === 0) {
       statusEl.textContent = '原子を並べてください';
     } else if (activeComp && activeComp.status === 'valid') {
-      statusEl.innerHTML = `<span class="name">${activeComp.name}</span>`;
+      statusEl.innerHTML = `<span class="name">${displayCompoundName(activeComp.name)}</span>`;
     } else {
       statusEl.textContent = '組み立て中';
     }
@@ -2840,17 +2853,17 @@
     // 「お題：」ラベルはやさしめだけ表示する(まあまあ・そこそこは名前だけ見せる)
     const objectiveLabel = difficulty === 'easy' ? 'お題：' : '';
     if (game1Checked === 'correct') {
-      obj.innerHTML = `<span class="stamp tappable" id="correct-stamp1">${correctStampSVG()}</span>正解です！<br><span class="name">${targetName}</span>`;
+      obj.innerHTML = `<span class="stamp tappable" id="correct-stamp1">${correctStampSVG()}</span>正解です！<br><span class="name">${displayCompoundName(targetName)}</span>`;
       const stamp = document.getElementById('correct-stamp1');
       if (stamp) stamp.addEventListener('click', startGame1);
     } else if (game1Checked === 'incorrect') {
       // 不正解スタンプを表示。チェックボタンは出さず、枠の右側に次の問題へ進むボタンを置く
       // (パネルを操作した場合は自動で消えてチェックボタンが再表示される)
       obj.innerHTML = `<span class="stamp" id="wrong-stamp1">${wrongStampSVG()}</span>`
-        + `<div class="objective-row">${objectiveLabel}<span class="name">${targetName}</span><button id="next-btn1" class="secondary">次の問題へ</button></div>`;
+        + `<div class="objective-row">${objectiveLabel}<span class="name">${displayCompoundName(targetName)}</span><button id="next-btn1" class="secondary">次の問題へ</button></div>`;
       document.getElementById('next-btn1').addEventListener('click', () => { playUiClickSound(); startGame1(); });
     } else {
-      obj.innerHTML = `${objectiveLabel}<span class="name">${targetName}</span><div class="objective-actions"><button id="check-btn1">チェック</button></div>`;
+      obj.innerHTML = `${objectiveLabel}<span class="name">${displayCompoundName(targetName)}</span><div class="objective-actions"><button id="check-btn1">チェック</button></div>`;
       document.getElementById('check-btn1').addEventListener('click', checkGame1Answer);
       document.querySelector('.objective-actions').appendChild(resetBtn);
     }
@@ -3014,7 +3027,7 @@
     if (correct) {
       playCorrectSound();
       // スタンプは右側にずらして、解答の文字が隠れないようにする
-      preview.innerHTML = `<span class="stamp tappable stamp-side" id="correct-stamp2">${correctStampSVG()}</span>正解！ <span class="name">${targetName}</span>`;
+      preview.innerHTML = `<span class="stamp tappable stamp-side" id="correct-stamp2">${correctStampSVG()}</span>正解！ <span class="name">${displayCompoundName(targetName)}</span>`;
       const stamp = document.getElementById('correct-stamp2');
       if (stamp) stamp.addEventListener('click', startGame2);
       return;
@@ -3036,7 +3049,7 @@
     document.getElementById('reveal-answer-btn2').addEventListener('click', () => {
       playUiClickSound();
       // ボタン類と「誤」スタンプを消すが、自分の回答はそのまま残し、正答と次の問題へ進むボタンを添える
-      preview.innerHTML = `${message}<br>正答：<span class="name">${targetName}</span>`
+      preview.innerHTML = `${message}<br>正答：<span class="name">${displayCompoundName(targetName)}</span>`
         + `<div class="answer-actions"><button id="next-btn2" class="secondary">次の問題へ</button></div>`;
       document.getElementById('next-btn2').addEventListener('click', () => { playUiClickSound(); startGame2(); });
     });
