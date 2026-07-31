@@ -2776,11 +2776,16 @@
   }
 
   function playTraceCloseSound(carbonCount) {
-    const lift = 1 + Math.min(carbonCount, 12) * 0.02;
-    playTraceHit({ freq: 1450 * lift, volume: 0.07, duration: 0.04, q: 1.2 });
-    playTraceHit({ freq: 1850 * lift, volume: 0.065, duration: 0.04, delay: 0.035, q: 1.35 });
-    playTraceHit({ freq: 2350 * lift, volume: 0.06, duration: 0.045, delay: 0.07, q: 1.5 });
-    playTone({ freqStart: 740, freqEnd: 880, duration: 0.11, type: 'triangle', volume: 0.045, delay: 0.065 });
+    // 環の閉鎖は、配置音やロールより低い「ドドン！」で締める。
+    // 低域だけでは小型スピーカーで埋もれるため、控えめな胴鳴りも重ねる。
+    const depth = Math.min(carbonCount, 12) * 1.5;
+    const playKick = (delay, strength) => {
+      playTraceHit({ freq: 300, volume: 0.055 * strength, duration: 0.06, delay, q: 0.68 });
+      playTone({ freqStart: 126 + depth, freqEnd: 72, duration: 0.13, type: 'sine', volume: 0.085 * strength, delay });
+      playTone({ freqStart: 225, freqEnd: 145, duration: 0.075, type: 'triangle', volume: 0.026 * strength, delay });
+    };
+    playKick(0, 0.72);
+    playKick(0.105, 1);
   }
   // 構造が正常になった瞬間: 明るい2音の上昇チャイム + ふわっと軽いきらめき
   function playValidSound() {
