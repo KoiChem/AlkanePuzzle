@@ -307,9 +307,12 @@
   /* 数字以外は縦の押しやすさを保ったまま、横だけ少しコンパクトにする */
   .wordbank .row.cat-multiplier button,
   .wordbank .row.cat-subname button,
-  .wordbank .row.cat-basename button{padding-inline:5px;}
-  /* シクロとオールは、主鎖名に近い淡いアプリコットで共通表示する */
-  .wordbank .row.cat-basename button.special-affix{background:#fbe7d0;border-color:#e4ad74;}
+  .wordbank .row.cat-basename button{padding-inline:3px;}
+  .wordbank .row.cat-multiplier,
+  .wordbank .row.cat-subname,
+  .wordbank .row.cat-basename{gap:4px;}
+  /* シクロとオールは、主鎖名と同程度に淡いローズベージュで共通表示する */
+  .wordbank .row.cat-basename button.special-affix{background:#f5e6e8;border-color:#d7a7ad;}
   .wordbank.answered .row button{opacity:.4;pointer-events:none;}
   .wordbank .control-row{margin-top:0;margin-bottom:12px;gap:8px;}
   .wordbank .control-row button{padding:7px 16px;}
