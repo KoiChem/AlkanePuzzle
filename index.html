@@ -1799,6 +1799,7 @@
   let dragState = null;
   let paletteSelection = null; // クリック配置で選択中のパネル { type, element, rotation } | null
   let selectedCardEl = null;   // 選択中のパレットカード要素(見た目の押下表示用)
+  const pendingPalettePlacements = new Map(); // 同じマスのダブルタップで選択解除できるよう、配置を短時間だけ保留する
   let traceState = null; // なぞって描く操作の進行状態: null | { path:[{r,c},...], closed:boolean }
   let traceSnapshot = null; // なぞり開始前のgridの退避(取り消し・キャンセル用)
   let interactionsEnabled = true; // ゲーム②(読み取り専用表示)ではfalseにする
@@ -2713,6 +2714,8 @@
   }
 
   function clearPaletteSelection() {
+    for (const pending of pendingPalettePlacements.values()) clearTimeout(pending.timer);
+    pendingPalettePlacements.clear();
     if (selectedCardEl) selectedCardEl.classList.remove('selected');
     selectedCardEl = null;
     paletteSelection = null;
@@ -2724,6 +2727,15 @@
     grid[r][c] = { type, rotation: rotation || 0, element }; // 既にパネルがあっても確認なしで上書き
     playPlaceSound();
     refreshAll();
+  }
+
+  function queueSelectedPlacement(r, c, selectionAtTap) {
+    const key = `${r},${c}`;
+    const timer = setTimeout(() => {
+      pendingPalettePlacements.delete(key);
+      if (paletteSelection === selectionAtTap) placeSelectedAt(r, c);
+    }, TAP_TIMEOUT);
+    pendingPalettePlacements.set(key, { timer, selection: selectionAtTap });
   }
 
   function onDragMove(e) {
@@ -2798,6 +2810,17 @@
       if (!interactionsEnabled) return;
       selectionOnlyThisGesture = false;
       if (paletteSelection) {
+        const key = `${r},${c}`;
+        const pending = pendingPalettePlacements.get(key);
+        if (pending) {
+          // 同じマスを素早く2回タップしたときは、1回目の配置を取り消して選択だけを解除する。
+          clearTimeout(pending.timer);
+          pendingPalettePlacements.delete(key);
+          clearPaletteSelection();
+          playUiClickSound();
+          e.preventDefault();
+          return;
+        }
         // 配置モード: このマスをタップ(移動なしでpointerup)したら選択中のパネルを置く。
         // 回転・移動・なぞって描くなど他の操作は配置モード中は行わない。
         // ただし3マス以上をなぞる(スワイプする)と、選択を解除する。
@@ -2822,7 +2845,7 @@
         const onPlaceUp = () => {
           window.removeEventListener('pointermove', onPlaceMove);
           window.removeEventListener('pointerup', onPlaceUp);
-          if (!placeMoved && !deselected) placeSelectedAt(r, c);
+          if (!placeMoved && !deselected) queueSelectedPlacement(r, c, paletteSelection);
         };
         window.addEventListener('pointermove', onPlaceMove);
         window.addEventListener('pointerup', onPlaceUp);
