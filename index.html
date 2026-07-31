@@ -2741,12 +2741,26 @@
     if (carbonCount >= 5) {
       playTraceHit({ freq: freq * 1.12, volume: 0.036, duration: 0.032, delay: 0.03, q: 1.25 });
     }
-    if (carbonCount % 4 === 0) {
+    if (carbonCount % 4 === 0 && carbonCount % 8 !== 0) {
       playTraceHit({ freq: 2200 + carbonCount * 35, volume: 0.055, duration: 0.035, delay: 0.012, q: 1.6 });
     }
-    if (carbonCount >= 8 && carbonCount % 4 === 0) {
-      playTone({ freqStart: 659.25, freqEnd: 740, duration: 0.075, type: 'triangle', volume: 0.035, delay: 0.035 });
-    }
+    if (carbonCount >= 8 && carbonCount % 8 === 0) playTraceMilestoneSound(carbonCount);
+  }
+
+  // 8炭素ごとの節目は、軽い木琴音ではなく胴鳴りのあるドラム音で強調する。
+  // 8・24…炭素は「タン！」、16・32…炭素は「タタン！」と交互に鳴らす。
+  function playTraceMilestoneSound(carbonCount) {
+    const doubleHit = (carbonCount / 8) % 2 === 0;
+    const playStroke = (delay, strength) => {
+      playTraceHit({ freq: 820, volume: 0.11 * strength, duration: 0.085, delay, q: 0.72 });
+      playTraceHit({ freq: 1750, volume: 0.065 * strength, duration: 0.045, delay: delay + 0.006, q: 1.35 });
+      playTone({
+        freqStart: 190, freqEnd: 132, duration: 0.105, type: 'triangle',
+        volume: 0.075 * strength, delay,
+      });
+    };
+    if (doubleHit) playStroke(0, 0.72);
+    playStroke(doubleHit ? 0.075 : 0, 1);
   }
 
   function playTraceBacktrackSound() {
