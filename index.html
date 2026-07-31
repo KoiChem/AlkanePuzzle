@@ -289,6 +289,20 @@
   /* 回答確定後(結果表示中)は高さを固定せず、正解スタンプがはみ出して見えるようにする */
   .wordbank .preview.result{height:auto;min-height:44px;overflow:visible;padding-right:104px;}
   .wordbank .preview .name{color:var(--accent-ink);}
+  .wordbank .preview.editing{display:flex;align-content:center;align-items:center;flex-wrap:wrap;gap:3px;text-align:left;touch-action:none;}
+  /* 入力チップも語群のボタンと同じ寸法・色にして、パーツをそのまま並べ替える感覚にする */
+  .answer-chip{display:inline-flex;align-items:center;font-size:14px;font-weight:700;padding:3px 7px;border:2px solid var(--border);border-radius:10px 8px 11px 9px;background:var(--surface);box-shadow:1px 2px 0 var(--shadow);cursor:grab;touch-action:none;}
+  .answer-chip.cat-number{background:var(--cat-number-bg);border-color:var(--cat-number-border);}
+  .answer-chip.cat-multiplier{background:var(--cat-multiplier-bg);border-color:var(--cat-multiplier-border);padding-inline:3px;}
+  .answer-chip.cat-subname{background:var(--cat-subname-bg);border-color:var(--cat-subname-border);padding-inline:3px;}
+  .answer-chip.cat-basename{background:var(--cat-basename-bg);border-color:var(--cat-basename-border);padding-inline:3px;}
+  .answer-chip.special-affix{background:#f5e6e8;border-color:#d7a7ad;}
+  .answer-chip:active{cursor:grabbing;}
+  .answer-chip-drag-origin{opacity:.3;filter:saturate(.2) grayscale(.4) brightness(1.06);box-shadow:none;border-style:dashed;}
+  .answer-chip-dragging{position:fixed;z-index:1000;pointer-events:none;opacity:.92;transform:translate(-50%,-50%) rotate(-3deg) scale(1.08);box-shadow:2px 4px 0 var(--shadow);}
+  .answer-insert-marker{width:3px;height:31px;background:var(--accent);border-radius:3px;box-shadow:0 0 0 1px var(--accent-ink);}
+  .answer-trash{display:none;position:absolute;right:7px;top:7px;padding:2px 6px;border-radius:8px;background:#f8d9d7;color:#a83d36;border:1.5px solid #d36b63;font-size:14px;line-height:1;}
+  .wordbank .preview.delete-armed .answer-trash{display:block;}
   .wordbank .preview button{
     margin-top:10px;font-size:14px;font-weight:800;padding:8px 20px;
     border-radius:14px 12px 15px 11px;border:2.5px solid var(--accent-ink);
@@ -322,6 +336,7 @@
   .wordbank .row.cat-basename{gap:4px;}
   /* シクロとオールは、主鎖名と同程度に淡いローズベージュで共通表示する */
   .wordbank .row.cat-basename button.special-affix{background:#f5e6e8;border-color:#d7a7ad;}
+  .wordbank .row:not(.control-row) button{cursor:grab;touch-action:none;}
   .wordbank.answered .row button{opacity:.4;pointer-events:none;}
   .wordbank .control-row{margin-top:0;margin-bottom:12px;gap:8px;}
   .wordbank .control-row button{padding:7px 16px;}
@@ -3151,6 +3166,7 @@
     targetName = name;
     grid = g;
     answerTokens = [];
+    answerInsertIndex = null;
     wasStructureValid = false;
     highlightStartTime = 0;
     stopHighlightAnimation();
@@ -3159,15 +3175,158 @@
     refreshAll();
   }
 
-  function updateAnswerPreview() {
+  const ANSWER_DRAG_THRESHOLD = 8;
+  const ANSWER_DELETE_DISTANCE = 27;
+  let answerDragState = null;
+  let answerInsertIndex = null;
+
+  function answerInsertionIndexAt(clientX, clientY) {
+    const chips = [...document.querySelectorAll('#answer-preview .answer-chip')];
+    for (const chip of chips) {
+      const rect = chip.getBoundingClientRect();
+      if (clientY < rect.top || (clientY <= rect.bottom && clientX < rect.left + rect.width / 2)) return Number(chip.dataset.index);
+    }
+    return answerTokens.length;
+  }
+
+  function answerChipCategory(token) {
+    if (/^\d+$/.test(token)) return 'cat-number';
+    if (MULTIPLIER_SET.has(token)) return 'cat-multiplier';
+    if (SUB_NAME_SET.has(token)) return 'cat-subname';
+    return 'cat-basename';
+  }
+
+  function updateAnswerPreview(markerIndex = answerInsertIndex) {
     const preview = document.getElementById('answer-preview');
     if (!preview) return;
     if (preview.classList.contains('result')) return; // 結果表示中(誤スタンプ・正解スタンプ)は上書きしない
-    // 組み立て中はトークンをそのまま並べて見せる(カンマ・ハイフンの自動補完は回答確定時に行う)
-    preview.textContent = answerTokens.join(' ');
+    preview.classList.add('editing');
+    preview.classList.remove('delete-armed');
+    preview.innerHTML = '';
+    const addMarker = () => { const marker = document.createElement('span'); marker.className = 'answer-insert-marker'; preview.appendChild(marker); };
+    answerTokens.forEach((token, index) => {
+      if (markerIndex === index) addMarker();
+      const chip = document.createElement('span');
+      chip.className = `answer-chip ${answerChipCategory(token)}`;
+      if (token === CYCLO_TOKEN || token === ALCOHOL_TOKEN) chip.classList.add('special-affix');
+      if (answerDragState?.dragging && answerDragState.fromIndex === index) chip.classList.add('answer-chip-drag-origin');
+      chip.textContent = token; chip.dataset.index = index;
+      chip.title = 'タップで挿入位置を指定／ドラッグで移動・削除';
+      chip.addEventListener('pointerdown', (event) => beginAnswerPointer(event, token, index));
+      preview.appendChild(chip);
+    });
+    if (markerIndex === answerTokens.length) addMarker();
+    const trash = document.createElement('span'); trash.className = 'answer-trash'; trash.textContent = '🗑 削除'; preview.appendChild(trash);
+  }
+
+  function beginAnswerPointer(event, token, fromIndex = null) {
+    if (event.button !== undefined && event.button !== 0) return;
+    if (answerDragState) return;
+    event.preventDefault();
+    const preview = document.getElementById('answer-preview');
+    const sourceRect = event.currentTarget.getBoundingClientRect();
+    const state = {
+      token, fromIndex, preview, sourceRect,
+      pointerId: event.pointerId, startX: event.clientX, startY: event.clientY,
+      previousInsertIndex: answerInsertIndex,
+      dragging: false, ghost: null, markerIndex: answerTokens.length, deleteArmed: false,
+    };
+    answerDragState = state;
+    try { preview.setPointerCapture(event.pointerId); } catch (_) {}
+
+    const cleanup = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+      try {
+        if (preview.hasPointerCapture(state.pointerId)) preview.releasePointerCapture(state.pointerId);
+      } catch (_) {}
+    };
+
+    const startDrag = (ev) => {
+      state.dragging = true;
+      answerInsertIndex = null;
+      const ghost = document.createElement('span');
+      ghost.className = `answer-chip ${answerChipCategory(token)} answer-chip-dragging`;
+      if (token === CYCLO_TOKEN || token === ALCOHOL_TOKEN) ghost.classList.add('special-affix');
+      ghost.textContent = token;
+      document.body.appendChild(ghost);
+      state.ghost = ghost;
+      updateAnswerPreview(null);
+      move(ev);
+    };
+
+    const move = (ev) => {
+      if (ev.pointerId !== state.pointerId || answerDragState !== state) return;
+      ev.preventDefault();
+      if (!state.dragging) {
+        if (Math.hypot(ev.clientX - state.startX, ev.clientY - state.startY) < ANSWER_DRAG_THRESHOLD) return;
+        startDrag(ev);
+        return;
+      }
+      state.ghost.style.left = `${ev.clientX}px`; state.ghost.style.top = `${ev.clientY}px`;
+      const rect = preview.getBoundingClientRect();
+      const deleteArmed = fromIndex !== null && (ev.clientY < rect.top - ANSWER_DELETE_DISTANCE || ev.clientY > rect.bottom + ANSWER_DELETE_DISTANCE);
+      state.deleteArmed = deleteArmed;
+      preview.classList.toggle('delete-armed', deleteArmed);
+      if (!deleteArmed && ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
+        state.markerIndex = answerInsertionIndexAt(ev.clientX, ev.clientY);
+        updateAnswerPreview(state.markerIndex);
+        preview.classList.add('editing');
+      }
+    };
+
+    const up = (ev) => {
+      if (ev.pointerId !== state.pointerId || answerDragState !== state) return;
+      ev.preventDefault();
+      cleanup();
+      answerDragState = null;
+      if (!state.dragging) {
+        if (fromIndex === null) {
+          const target = answerInsertIndex === null ? answerTokens.length : Math.max(0, Math.min(answerInsertIndex, answerTokens.length));
+          answerTokens.splice(target, 0, token);
+          answerInsertIndex = null;
+          playPlaceSound();
+        } else {
+          answerInsertIndex = state.startX < sourceRect.left + sourceRect.width / 2 ? fromIndex : fromIndex + 1;
+        }
+        updateAnswerPreview();
+        return;
+      }
+
+      state.ghost.remove();
+      const rect = state.preview.getBoundingClientRect();
+      const droppedInPreview = ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom;
+      if (state.deleteArmed) answerTokens.splice(state.fromIndex, 1);
+      else if (droppedInPreview) {
+        let target = state.markerIndex;
+        if (state.fromIndex !== null) { answerTokens.splice(state.fromIndex, 1); if (target > state.fromIndex) target--; }
+        answerTokens.splice(target, 0, state.token);
+      }
+      answerInsertIndex = null;
+      updateAnswerPreview();
+    };
+
+    const cancel = (ev) => {
+      if (ev.pointerId !== state.pointerId || answerDragState !== state) return;
+      cleanup();
+      if (state.ghost) state.ghost.remove();
+      answerDragState = null;
+      answerInsertIndex = state.previousInsertIndex;
+      updateAnswerPreview();
+    };
+
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+  }
+
+  function bindWordBankTokenDrag(button, token) {
+    button.addEventListener('pointerdown', (event) => beginAnswerPointer(event, token));
   }
 
   function submitGame2Answer() {
+    answerInsertIndex = null;
     const reconstructed = reconstructNameFromTokens(answerTokens);
     const preview = document.getElementById('answer-preview');
     const correct = reconstructed !== null && reconstructed === targetName;
@@ -3194,7 +3353,6 @@
       playUiClickSound();
       document.getElementById('wordbank').classList.remove('answered');
       preview.classList.remove('result');
-      answerTokens = [];
       updateAnswerPreview();
     });
     document.getElementById('reveal-answer-btn2').addEventListener('click', () => {
@@ -3221,11 +3379,11 @@
     const undoBtn = document.createElement('button');
     undoBtn.textContent = '1つ戻す';
     undoBtn.className = 'secondary';
-    undoBtn.addEventListener('click', () => { playUiClickSound(); answerTokens.pop(); updateAnswerPreview(); });
+    undoBtn.addEventListener('click', () => { playUiClickSound(); answerInsertIndex = null; answerTokens.pop(); updateAnswerPreview(); });
     const clearBtn = document.createElement('button');
     clearBtn.textContent = 'クリア';
     clearBtn.className = 'secondary';
-    clearBtn.addEventListener('click', () => { playUiClickSound(); answerTokens = []; updateAnswerPreview(); });
+    clearBtn.addEventListener('click', () => { playUiClickSound(); answerInsertIndex = null; answerTokens = []; updateAnswerPreview(); });
     const submitBtn = document.createElement('button');
     submitBtn.textContent = '回答する';
     submitBtn.className = 'primary';
@@ -3248,12 +3406,9 @@
       for (const token of tokens) {
         const btn = document.createElement('button');
         btn.textContent = token;
+        btn.title = 'タップで末尾または縦線位置に追加／ドラッグで途中に追加';
         if (token === CYCLO_TOKEN || token === ALCOHOL_TOKEN) btn.classList.add('special-affix');
-        btn.addEventListener('click', () => {
-          answerTokens.push(token);
-          updateAnswerPreview();
-          playPlaceSound();
-        });
+        bindWordBankTokenDrag(btn, token);
         rowEl.appendChild(btn);
       }
       wb.appendChild(rowEl);
