@@ -1834,6 +1834,7 @@
   const pendingPalettePlacements = new Map(); // 同じマスのダブルタップで選択解除できるよう、配置を短時間だけ保留する
   let traceState = null; // なぞって描く操作の進行状態: null | { path:[{r,c},...], closed:boolean }
   let traceSnapshot = null; // なぞり開始前のgridの退避(取り消し・キャンセル用)
+  let suppressNextTraceValidSound = false; // 環を閉じた直後だけ、締め音と通常の正常構造音を重ねない
   let interactionsEnabled = true; // ゲーム②(読み取り専用表示)ではfalseにする
   let wasStructureValid = false; // 直前が「正常」だったかどうか(不正→正常の遷移でのみ音を鳴らすため)
   let currentMode = 'game1'; // 'game1' | 'game2'
@@ -2263,11 +2264,13 @@
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
       const path = traceState ? traceState.path : [];
+      const closedTrace = !!traceState?.closed;
       if (path.length < 2) {
         grid = traceSnapshot.map((row) => row.slice()); // 実質タップのみ = 何もしない
       }
       traceState = null;
       traceSnapshot = null;
+      if (closedTrace) suppressNextTraceValidSound = true;
       refreshAll();
     };
     const onUp = () => finish();
@@ -2358,11 +2361,15 @@
       mismatchMap.get(key).push(m.dir);
     }
     lastMismatchMap = mismatchMap;
+    // 環を閉じたときは、既にその瞬間の締め音を鳴らしている。
+    // ドラッグ完了後の正常構造判定では、今回だけ通常のチャイムを鳴らさない。
+    const suppressValidSound = !traceState && suppressNextTraceValidSound;
+    if (!traceState) suppressNextTraceValidSound = false;
 
     // 練習(アルカン並べ「練習」)は盤面全体を1分子とみなさず、複数分子を同時に認識する
     // 専用ロジックへ委譲する(クイズ・ゲーム②は以下の従来ロジックのまま)。
     if (isPracticeTier()) {
-      refreshPractice(mismatchMap);
+      refreshPractice(mismatchMap, suppressValidSound);
       return;
     }
 
@@ -2389,7 +2396,7 @@
     if (isNewValid) {
       if (currentMode !== 'game2') {
         highlightCells = null; // 盤面全体を対象にする(クイズは常に単一分子のため)
-        playValidSound();
+        if (!suppressValidSound) playValidSound();
         highlightStartTime = Date.now();
         startHighlightAnimation();
       }
@@ -2430,7 +2437,7 @@
     practiceMoleculeOrder.set(sig, practiceSeqCounter);
   }
 
-  function refreshPractice(mismatchMap) {
+  function refreshPractice(mismatchMap, suppressValidSound = false) {
     const graph = buildGraph(grid);
     const components = findComponents(graph);
     const analyzed = components.map((comp) => analyzeComponent(graph, mismatchMap, comp));
@@ -2459,7 +2466,7 @@
         highlightCells = new Set(newest.cells);
         highlightStartTime = Date.now();
         startHighlightAnimation();
-        playValidSound();
+        if (!suppressValidSound) playValidSound();
         statusPopAnimation();
       } else if (practiceActiveCells) {
         // 直前のアクティブ分子が今も存在するか(マスの重なりで判定。回転等では形が変わらない)
@@ -3382,7 +3389,7 @@
       preview.appendChild(chip);
     });
     if (markerIndex === answerTokens.length) addMarker();
-    const trash = document.createElement('span'); trash.className = 'answer-trash'; trash.textContent = '🗑 削除'; preview.appendChild(trash);
+    const trash = document.createElement('span'); trash.className = 'answer-trash'; trash.textContent = '削除'; preview.appendChild(trash);
   }
 
   function beginAnswerPointer(event, token, fromIndex = null) {
