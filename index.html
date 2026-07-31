@@ -288,7 +288,9 @@
   }
   /* 回答確定後(結果表示中)は高さを固定せず、正解スタンプがはみ出して見えるようにする */
   .wordbank .preview.result{height:auto;min-height:44px;overflow:visible;padding-right:104px;}
+  .wordbank .preview.result.result-centered{padding-left:104px;text-align:center;}
   .wordbank .preview .name{color:var(--accent-ink);}
+  .result-name-measure{position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;pointer-events:none;}
   .wordbank .preview.editing{display:flex;align-content:center;align-items:center;flex-wrap:wrap;gap:3px;text-align:left;touch-action:none;}
   /* 入力チップも語群のボタンと同じ寸法・色にして、パーツをそのまま並べ替える感覚にする */
   .answer-chip{display:inline-flex;align-items:center;font-size:14px;font-weight:700;padding:3px 7px;border:2px solid var(--border);border-radius:10px 8px 11px 9px;background:var(--surface);box-shadow:1px 2px 0 var(--shadow);cursor:grab;touch-action:none;}
@@ -3177,6 +3179,7 @@
 
   const ANSWER_DRAG_THRESHOLD = 8;
   const ANSWER_DELETE_DISTANCE = 27;
+  const RESULT_STAMP_SAFE_SIDE = 104;
   let answerDragState = null;
   let answerInsertIndex = null;
 
@@ -3325,6 +3328,17 @@
     button.addEventListener('pointerdown', (event) => beginAnswerPointer(event, token));
   }
 
+  function centerResultIfSafe(preview) {
+    const resultName = preview.querySelector('.result-name');
+    if (!resultName) return;
+    const measure = resultName.cloneNode(true);
+    measure.classList.add('result-name-measure');
+    preview.appendChild(measure);
+    const fitsCentered = measure.getBoundingClientRect().width <= preview.clientWidth - RESULT_STAMP_SAFE_SIDE * 2;
+    measure.remove();
+    preview.classList.toggle('result-centered', fitsCentered);
+  }
+
   function submitGame2Answer() {
     answerInsertIndex = null;
     const reconstructed = reconstructNameFromTokens(answerTokens);
@@ -3332,12 +3346,14 @@
     const correct = reconstructed !== null && reconstructed === targetName;
 
     document.getElementById('wordbank').classList.add('answered');
+    preview.classList.remove('editing');
     preview.classList.add('result');
 
     if (correct) {
       playCorrectSound();
       // スタンプは右側にずらして、解答の文字が隠れないようにする
-      preview.innerHTML = `<span class="stamp tappable stamp-side" id="correct-stamp2">${correctStampSVG()}</span>正解！ <span class="name">${displayCompoundName(targetName)}</span>`;
+      preview.innerHTML = `<span class="stamp tappable stamp-side" id="correct-stamp2">${correctStampSVG()}</span><span class="result-name name">${displayCompoundName(targetName)}</span>`;
+      centerResultIfSafe(preview);
       const stamp = document.getElementById('correct-stamp2');
       if (stamp) stamp.addEventListener('click', startGame2);
       return;
@@ -3346,18 +3362,21 @@
     // 不正解: 自分の回答を表示したまま「誤」スタンプを出す。正解は見せず、
     // 「再挑戦」または「正答を見る」を押すまではその表示のまま維持する。
     playIncorrectSound();
-    const message = reconstructed === null ? '入力の並びが正しくありません' : `回答: ${reconstructed}`;
-    preview.innerHTML = `<span class="stamp stamp-side" id="wrong-stamp2">${wrongStampSVG()}</span>${message}<br>`
+    const message = reconstructed === null ? '入力の並びが正しくありません' : reconstructed;
+    preview.innerHTML = `<span class="stamp stamp-side" id="wrong-stamp2">${wrongStampSVG()}</span><span class="result-name">${message}</span><br>`
       + `<div class="answer-actions"><button id="retry-btn2">再挑戦</button><button id="reveal-answer-btn2" class="secondary">正答を見る</button></div>`;
+    centerResultIfSafe(preview);
     document.getElementById('retry-btn2').addEventListener('click', () => {
       playUiClickSound();
       document.getElementById('wordbank').classList.remove('answered');
       preview.classList.remove('result');
+      preview.classList.remove('result-centered');
       updateAnswerPreview();
     });
     document.getElementById('reveal-answer-btn2').addEventListener('click', () => {
       playUiClickSound();
       // ボタン類と「誤」スタンプを消すが、自分の回答はそのまま残し、正答と次の問題へ進むボタンを添える
+      preview.classList.remove('result-centered');
       preview.innerHTML = `${message}<br>正答：<span class="name">${displayCompoundName(targetName)}</span>`
         + `<div class="answer-actions"><button id="next-btn2" class="secondary">次の問題へ</button></div>`;
       document.getElementById('next-btn2').addEventListener('click', () => { playUiClickSound(); startGame2(); });
