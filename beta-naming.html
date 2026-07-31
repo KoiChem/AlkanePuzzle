@@ -290,10 +290,16 @@
   .wordbank .preview.result{height:auto;min-height:44px;overflow:visible;padding-right:104px;}
   .wordbank .preview .name{color:var(--accent-ink);}
   .wordbank .preview.editing{display:flex;align-content:center;align-items:center;flex-wrap:wrap;gap:3px;text-align:left;touch-action:none;}
-  .answer-chip{display:inline-flex;align-items:center;min-height:28px;padding:0 6px;border:1.5px solid var(--border);border-radius:8px 7px 9px 7px;background:var(--surface);box-shadow:1px 1px 0 var(--shadow);cursor:grab;touch-action:none;}
+  /* 入力チップも語群のボタンと同じ寸法・色にして、パーツをそのまま並べ替える感覚にする */
+  .answer-chip{display:inline-flex;align-items:center;font-size:14px;font-weight:700;padding:3px 7px;border:2px solid var(--border);border-radius:10px 8px 11px 9px;background:var(--surface);box-shadow:1px 2px 0 var(--shadow);cursor:grab;touch-action:none;}
+  .answer-chip.cat-number{background:var(--cat-number-bg);border-color:var(--cat-number-border);}
+  .answer-chip.cat-multiplier{background:var(--cat-multiplier-bg);border-color:var(--cat-multiplier-border);padding-inline:3px;}
+  .answer-chip.cat-subname{background:var(--cat-subname-bg);border-color:var(--cat-subname-border);padding-inline:3px;}
+  .answer-chip.cat-basename{background:var(--cat-basename-bg);border-color:var(--cat-basename-border);padding-inline:3px;}
+  .answer-chip.special-affix{background:#f5e6e8;border-color:#d7a7ad;}
   .answer-chip:active{cursor:grabbing;}
   .answer-chip-dragging{position:fixed;z-index:1000;pointer-events:none;opacity:.92;transform:translate(-50%,-50%) rotate(-3deg) scale(1.08);box-shadow:2px 4px 0 var(--shadow);}
-  .answer-insert-marker{width:3px;height:28px;background:var(--accent);border-radius:3px;box-shadow:0 0 0 1px var(--accent-ink);}
+  .answer-insert-marker{width:3px;height:31px;background:var(--accent);border-radius:3px;box-shadow:0 0 0 1px var(--accent-ink);}
   .answer-trash{display:none;position:absolute;right:7px;top:7px;padding:2px 6px;border-radius:8px;background:#f8d9d7;color:#a83d36;border:1.5px solid #d36b63;font-size:14px;line-height:1;}
   .wordbank .preview.delete-armed .answer-trash{display:block;}
   .wordbank .preview button{
@@ -329,6 +335,7 @@
   .wordbank .row.cat-basename{gap:4px;}
   /* シクロとオールは、主鎖名と同程度に淡いローズベージュで共通表示する */
   .wordbank .row.cat-basename button.special-affix{background:#f5e6e8;border-color:#d7a7ad;}
+  .wordbank .row:not(.control-row) button{cursor:grab;}
   .wordbank.answered .row button{opacity:.4;pointer-events:none;}
   .wordbank .control-row{margin-top:0;margin-bottom:12px;gap:8px;}
   .wordbank .control-row button{padding:7px 16px;}
@@ -3179,6 +3186,13 @@
     return answerTokens.length;
   }
 
+  function answerChipCategory(token) {
+    if (/^\d+$/.test(token)) return 'cat-number';
+    if (MULTIPLIER_SET.has(token)) return 'cat-multiplier';
+    if (SUB_NAME_SET.has(token)) return 'cat-subname';
+    return 'cat-basename';
+  }
+
   function updateAnswerPreview(markerIndex = null) {
     const preview = document.getElementById('answer-preview');
     if (!preview) return;
@@ -3190,7 +3204,9 @@
     answerTokens.forEach((token, index) => {
       if (markerIndex === index) addMarker();
       const chip = document.createElement('span');
-      chip.className = 'answer-chip'; chip.textContent = token; chip.dataset.index = index;
+      chip.className = `answer-chip ${answerChipCategory(token)}`;
+      if (token === CYCLO_TOKEN || token === ALCOHOL_TOKEN) chip.classList.add('special-affix');
+      chip.textContent = token; chip.dataset.index = index;
       chip.addEventListener('pointerdown', (event) => beginAnswerDrag(event, token, index));
       preview.appendChild(chip);
     });
@@ -3203,7 +3219,9 @@
     event.preventDefault();
     const preview = document.getElementById('answer-preview');
     const ghost = document.createElement('span');
-    ghost.className = 'answer-chip answer-chip-dragging'; ghost.textContent = token;
+    ghost.className = `answer-chip ${answerChipCategory(token)} answer-chip-dragging`;
+    if (token === CYCLO_TOKEN || token === ALCOHOL_TOKEN) ghost.classList.add('special-affix');
+    ghost.textContent = token;
     document.body.appendChild(ghost);
     answerDragState = { token, fromIndex, ghost, preview, markerIndex: answerTokens.length, deleteArmed: false };
     const move = (ev) => {
@@ -3333,6 +3351,7 @@
       for (const token of tokens) {
         const btn = document.createElement('button');
         btn.textContent = token;
+        btn.title = 'タップで末尾に追加／ドラッグで途中に追加';
         if (token === CYCLO_TOKEN || token === ALCOHOL_TOKEN) btn.classList.add('special-affix');
         bindWordBankTokenDrag(btn, token);
         rowEl.appendChild(btn);
