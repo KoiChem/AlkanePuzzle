@@ -1853,7 +1853,7 @@
   resetBtn.id = 'reset-btn';
   resetBtn.textContent = 'クリア';
   resetBtn.addEventListener('click', () => {
-    playUiClickSound();
+    playClearSound();
     clearPaletteSelection();
     grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
     wasStructureValid = false;
@@ -2552,31 +2552,33 @@
   window.addEventListener('touchend', unlockAudio, { capture: true, passive: true });
   window.addEventListener('click', unlockAudio, { capture: true, passive: true });
 
-  function playTone({ freqStart, freqEnd, duration, type, volume }) {
+  function playTone({ freqStart, freqEnd, duration, type = 'sine', volume, delay = 0 }) {
     const ctx = getAudioCtx();
     if (!ctx) return; // Web Audio非対応環境では何もしない
     try {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = type;
-      const now = ctx.currentTime;
-      osc.frequency.setValueAtTime(freqStart, now);
-      if (freqEnd !== freqStart) osc.frequency.linearRampToValueAtTime(freqEnd, now + duration);
-      gain.gain.setValueAtTime(volume, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      const startAt = ctx.currentTime + delay;
+      const attackEnd = startAt + Math.min(0.004, duration * 0.2);
+      osc.frequency.setValueAtTime(freqStart, startAt);
+      if (freqEnd !== freqStart) osc.frequency.linearRampToValueAtTime(freqEnd, startAt + duration);
+      gain.gain.setValueAtTime(0.001, startAt);
+      gain.gain.linearRampToValueAtTime(volume, attackEnd);
+      gain.gain.exponentialRampToValueAtTime(0.001, startAt + duration);
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + duration);
+      osc.start(startAt);
+      osc.stop(startAt + duration);
     } catch (e) { /* 再生に失敗しても操作自体は継続させる */ }
   }
 
-  // フィルターをかけたノイズの短いバースト = iPhoneキーボードのような乾いた「カチッ」音
-  function playClick({ freq, duration, volume, q }) {
+  // フィルターをかけた短いノイズ。各操作音に木質の「コッ」という輪郭を添える。
+  function playClick({ freq, duration, volume, q, delay = 0 }) {
     const ctx = getAudioCtx();
     if (!ctx) return;
     try {
-      const now = ctx.currentTime;
+      const startAt = ctx.currentTime + delay;
       const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
@@ -2593,43 +2595,101 @@
       filter.Q.value = q;
 
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(volume, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      gain.gain.setValueAtTime(volume, startAt);
+      gain.gain.exponentialRampToValueAtTime(0.001, startAt + duration);
 
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
-      noise.start(now);
+      noise.start(startAt);
     } catch (e) { /* 再生に失敗しても操作自体は継続させる */ }
   }
 
-  // 配置: 標準的な高さのカチッという音
-  function playPlaceSound() { playClick({ freq: 2200, duration: 0.03, volume: 0.35, q: 1.1 }); }
-  // 時計回り回転: 少し高めのカチッという音
-  function playRotateCWSound() { playClick({ freq: 2800, duration: 0.025, volume: 0.3, q: 1.3 }); }
-  // 反時計回り回転: 少し低めのカチッという音(CWと対になる)
-  function playRotateCCWSound() { playClick({ freq: 1700, duration: 0.025, volume: 0.3, q: 1.3 }); }
-  // 削除: 低めで少し長さのあるカチッという音
-  function playDeleteSound() { playClick({ freq: 900, duration: 0.045, volume: 0.32, q: 0.9 }); }
-  // タブやボタンなど、UI操作全般の軽いクリック音
-  function playUiClickSound() { playClick({ freq: 1900, duration: 0.028, volume: 0.26, q: 1.0 }); }
+  function playWoodNote(freq, { delay = 0, volume = 0.065, duration = 0.065 } = {}) {
+    playClick({ freq: freq * 3.2, duration: Math.min(duration, 0.04), volume: 0.16, q: 1.2, delay });
+    playTone({ freqStart: freq * 1.08, freqEnd: freq, duration, type: 'triangle', volume, delay });
+  }
+
+  let placeSoundStep = 0;
+  // 配置: 3音を巡回させ、連続配置にも小さなリズムが生まれる木製ブロック音
+  function playPlaceSound() {
+    const notes = [392.00, 440.00, 493.88];
+    playWoodNote(notes[placeSoundStep % notes.length], { volume: 0.06 });
+    placeSoundStep++;
+  }
+  // 移動: 配置より軽く、着地点へ滑り込む短い上昇音
+  function playMoveSound() {
+    playClick({ freq: 1450, duration: 0.035, volume: 0.14, q: 1.0 });
+    playTone({ freqStart: 330, freqEnd: 392, duration: 0.075, type: 'triangle', volume: 0.05 });
+  }
+  // 回転: 時計回りは上昇、反時計回りは下降。目を離していても方向が分かる。
+  function playRotateCWSound() {
+    playClick({ freq: 2400, duration: 0.025, volume: 0.18, q: 1.3 });
+    playTone({ freqStart: 620, freqEnd: 840, duration: 0.07, type: 'triangle', volume: 0.055 });
+  }
+  function playRotateCCWSound() {
+    playClick({ freq: 1750, duration: 0.025, volume: 0.18, q: 1.3 });
+    playTone({ freqStart: 840, freqEnd: 620, duration: 0.07, type: 'triangle', volume: 0.055 });
+  }
+  // 削除: 低く短い「ポコッ」。失敗音のように重くしない。
+  function playDeleteSound() {
+    playClick({ freq: 720, duration: 0.05, volume: 0.2, q: 0.85 });
+    playTone({ freqStart: 250, freqEnd: 180, duration: 0.09, type: 'triangle', volume: 0.055 });
+  }
+  function playUiClickSound() { playClick({ freq: 1900, duration: 0.026, volume: 0.18, q: 1.0 }); }
+  function playPaletteSound(selected) {
+    playClick({ freq: selected ? 2200 : 1450, duration: 0.028, volume: 0.16, q: 1.1 });
+    playTone({
+      freqStart: selected ? 620 : 520, freqEnd: selected ? 700 : 420,
+      duration: 0.065, type: 'triangle', volume: 0.045,
+    });
+  }
+  function playNamingTokenSound() {
+    playClick({ freq: 2500, duration: 0.022, volume: 0.14, q: 1.4 });
+    playTone({ freqStart: 784, freqEnd: 830, duration: 0.055, type: 'sine', volume: 0.04 });
+  }
+  function playUndoSound() {
+    playClick({ freq: 1300, duration: 0.032, volume: 0.15, q: 1.0 });
+    playTone({ freqStart: 520, freqEnd: 390, duration: 0.085, type: 'triangle', volume: 0.05 });
+  }
+  function playClearSound() {
+    playWoodNote(293.66, { volume: 0.05, duration: 0.07 });
+    playWoodNote(220.00, { delay: 0.055, volume: 0.05, duration: 0.085 });
+  }
+  function playToggleSound(enabled) {
+    playClick({ freq: enabled ? 2100 : 1350, duration: 0.028, volume: 0.15, q: 1.1 });
+    playTone({
+      freqStart: enabled ? 440 : 659.25, freqEnd: enabled ? 659.25 : 440,
+      duration: 0.09, type: 'triangle', volume: 0.05,
+    });
+  }
+  function playModeSelectSound(mode) {
+    const base = mode === 'game2' ? 493.88 : 392.00;
+    playClick({ freq: mode === 'game2' ? 2250 : 1750, duration: 0.03, volume: 0.17, q: 1.15 });
+    playTone({ freqStart: base, freqEnd: base, duration: 0.065, type: 'triangle', volume: 0.055 });
+    playTone({ freqStart: base * 4 / 3, freqEnd: base * 4 / 3, duration: 0.085, type: 'triangle', volume: 0.05, delay: 0.055 });
+  }
+  function playDifficultySound(tier) {
+    const notes = { practice: 329.63, easy: 392.00, medium: 440.00, hard: 493.88 };
+    playWoodNote(notes[tier] || notes.easy, { volume: 0.055 });
+  }
   // 構造が正常になった瞬間: 明るい2音の上昇チャイム + ふわっと軽いきらめき
   function playValidSound() {
     playTone({ freqStart: 660, freqEnd: 700, duration: 0.09, type: 'sine', volume: 0.14 });
-    setTimeout(() => playTone({ freqStart: 880, freqEnd: 932, duration: 0.15, type: 'sine', volume: 0.16 }), 70);
-    setTimeout(() => playTone({ freqStart: 1320, freqEnd: 1320, duration: 0.1, type: 'triangle', volume: 0.07 }), 150);
+    playTone({ freqStart: 880, freqEnd: 932, duration: 0.15, type: 'sine', volume: 0.16, delay: 0.07 });
+    playTone({ freqStart: 1320, freqEnd: 1320, duration: 0.1, type: 'triangle', volume: 0.07, delay: 0.15 });
   }
   // 正解: 明るい上昇アルペジオ(ド・ミ・ソ・高ド)で弾む達成感を出す
   function playCorrectSound() {
     playTone({ freqStart: 523.25, freqEnd: 523.25, duration: 0.08, type: 'sine', volume: 0.15 });
-    setTimeout(() => playTone({ freqStart: 659.25, freqEnd: 659.25, duration: 0.08, type: 'sine', volume: 0.16 }), 60);
-    setTimeout(() => playTone({ freqStart: 783.99, freqEnd: 783.99, duration: 0.1, type: 'sine', volume: 0.17 }), 120);
-    setTimeout(() => playTone({ freqStart: 1046.5, freqEnd: 1046.5, duration: 0.22, type: 'triangle', volume: 0.16 }), 190);
+    playTone({ freqStart: 659.25, freqEnd: 659.25, duration: 0.08, type: 'sine', volume: 0.16, delay: 0.06 });
+    playTone({ freqStart: 783.99, freqEnd: 783.99, duration: 0.1, type: 'sine', volume: 0.17, delay: 0.12 });
+    playTone({ freqStart: 1046.5, freqEnd: 1046.5, duration: 0.22, type: 'triangle', volume: 0.16, delay: 0.19 });
   }
   // 不正解: やわらかい2音の下降(正解音と対になるが、きつくならないよう控えめに)
   function playIncorrectSound() {
     playTone({ freqStart: 493.88, freqEnd: 493.88, duration: 0.13, type: 'sine', volume: 0.12 });
-    setTimeout(() => playTone({ freqStart: 392.00, freqEnd: 392.00, duration: 0.22, type: 'sine', volume: 0.13 }), 110);
+    playTone({ freqStart: 392.00, freqEnd: 392.00, duration: 0.22, type: 'sine', volume: 0.13, delay: 0.11 });
   }
 
   // ============================================================
@@ -2719,8 +2779,9 @@
 
   // ---- クリック配置(パレットのカードを選んで、置きたいマスをタップする方式) ----
   function togglePaletteSelection(item, cardEl) {
-    playUiClickSound();
-    if (selectedCardEl === cardEl) { clearPaletteSelection(); return; } // 同じカードの再クリックで選択解除
+    const selecting = selectedCardEl !== cardEl;
+    playPaletteSound(selecting);
+    if (!selecting) { clearPaletteSelection(); return; } // 同じカードの再クリックで選択解除
     const type = item.kind === 'carbon' ? item.type : 1;
     const element = item.kind === 'carbon' ? 'C' : item.element;
     const rotation = (item.kind === 'carbon' && item.type === 2) ? 90 : 0;
@@ -2780,7 +2841,7 @@
           grid[fromR][fromC] = panel; // 元の場所に戻す(実質移動なし)
         } else {
           grid[r][c] = panel; // 既にパネルがあっても確認なしで上書き
-          playPlaceSound();
+          playMoveSound();
         }
       }
     } else if (dragState.mode === 'move') {
@@ -2834,7 +2895,7 @@
           clearTimeout(pending.timer);
           pendingPalettePlacements.delete(key);
           clearPaletteSelection();
-          playUiClickSound();
+          playPaletteSound(false);
           e.preventDefault();
           return;
         }
@@ -2856,7 +2917,7 @@
           if (visitedCells.size >= 3) { // 3マス目に入ったら選択解除
             deselected = true;
             clearPaletteSelection();
-            playUiClickSound();
+            playPaletteSound(false);
           }
         };
         const onPlaceUp = () => {
@@ -3289,7 +3350,7 @@
           const target = answerInsertIndex === null ? answerTokens.length : Math.max(0, Math.min(answerInsertIndex, answerTokens.length));
           answerTokens.splice(target, 0, token);
           answerInsertIndex = null;
-          playPlaceSound();
+          playNamingTokenSound();
         } else {
           answerInsertIndex = state.startX < sourceRect.left + sourceRect.width / 2 ? fromIndex : fromIndex + 1;
         }
@@ -3300,11 +3361,16 @@
       state.ghost.remove();
       const rect = state.preview.getBoundingClientRect();
       const droppedInPreview = ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom;
-      if (state.deleteArmed) answerTokens.splice(state.fromIndex, 1);
+      if (state.deleteArmed) {
+        answerTokens.splice(state.fromIndex, 1);
+        playDeleteSound();
+      }
       else if (droppedInPreview) {
         let target = state.markerIndex;
         if (state.fromIndex !== null) { answerTokens.splice(state.fromIndex, 1); if (target > state.fromIndex) target--; }
         answerTokens.splice(target, 0, state.token);
+        if (state.fromIndex === null) playNamingTokenSound();
+        else playMoveSound();
       }
       answerInsertIndex = null;
       updateAnswerPreview();
@@ -3360,11 +3426,11 @@
     }
 
     // 不正解: 自分の回答を表示したまま「誤」スタンプを出す。正解は見せず、
-    // 「再挑戦」または「正答を見る」を押すまではその表示のまま維持する。
+    // 「再挑戦」または「正答？」を押すまではその表示のまま維持する。
     playIncorrectSound();
     const message = reconstructed === null ? '入力の並びが正しくありません' : reconstructed;
     preview.innerHTML = `<span class="stamp stamp-side" id="wrong-stamp2">${wrongStampSVG()}</span><span class="result-name">${message}</span><br>`
-      + `<div class="answer-actions"><button id="retry-btn2">再挑戦</button><button id="reveal-answer-btn2" class="secondary">正答を見る</button></div>`;
+      + `<div class="answer-actions"><button id="retry-btn2">再挑戦</button><button id="reveal-answer-btn2" class="secondary">正答？</button></div>`;
     centerResultIfSafe(preview);
     document.getElementById('retry-btn2').addEventListener('click', () => {
       playUiClickSound();
@@ -3398,11 +3464,11 @@
     const undoBtn = document.createElement('button');
     undoBtn.textContent = '1つ戻す';
     undoBtn.className = 'secondary';
-    undoBtn.addEventListener('click', () => { playUiClickSound(); answerInsertIndex = null; answerTokens.pop(); updateAnswerPreview(); });
+    undoBtn.addEventListener('click', () => { playUndoSound(); answerInsertIndex = null; answerTokens.pop(); updateAnswerPreview(); });
     const clearBtn = document.createElement('button');
     clearBtn.textContent = 'クリア';
     clearBtn.className = 'secondary';
-    clearBtn.addEventListener('click', () => { playUiClickSound(); answerInsertIndex = null; answerTokens = []; updateAnswerPreview(); });
+    clearBtn.addEventListener('click', () => { playClearSound(); answerInsertIndex = null; answerTokens = []; updateAnswerPreview(); });
     const submitBtn = document.createElement('button');
     submitBtn.textContent = '回答する';
     submitBtn.className = 'primary';
@@ -3464,8 +3530,9 @@
   }
 
   function toggleHydroxylForCurrentDifficulty() {
-    if (isPracticeTier() || difficulty === 'practice') return;
-    setAlcoholEnabledForGame(currentMode, !gameSettings[currentMode].easy.alcoholEnabled);
+    if (isPracticeTier() || difficulty === 'practice') return null;
+    const enabled = !gameSettings[currentMode].easy.alcoholEnabled;
+    setAlcoholEnabledForGame(currentMode, enabled);
     saveGameSettings();
     renderHydroxylToggle();
     if (currentMode === 'game1') {
@@ -3474,6 +3541,7 @@
     } else {
       startGame2();
     }
+    return enabled;
   }
 
   // アルカン並べ: 練習(お題なし・自由に組む)か、やさしめ/まあまあ/そこそこ(お題を当てる)かで表示を切り替える
@@ -3909,15 +3977,15 @@
   // 初期化
   // ============================================================
   document.querySelectorAll('.mode-tab').forEach((btn) => {
-    btn.addEventListener('click', () => { playUiClickSound(); setMode(btn.dataset.mode); });
+    btn.addEventListener('click', () => { playModeSelectSound(btn.dataset.mode); setMode(btn.dataset.mode); });
   });
   document.getElementById('hydroxyl-toggle').addEventListener('click', () => {
-    playUiClickSound();
-    toggleHydroxylForCurrentDifficulty();
+    const enabled = toggleHydroxylForCurrentDifficulty();
+    if (enabled !== null) playToggleSound(enabled);
   });
   document.querySelectorAll('.diff-tab[data-diff]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      playUiClickSound();
+      playDifficultySound(btn.dataset.diff);
       difficulty = btn.dataset.diff;
       refreshDiffTabsUI();
       applyGridSize();
