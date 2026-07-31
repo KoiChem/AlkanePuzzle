@@ -272,13 +272,13 @@
   }
   .wordbank .preview{
     position:relative;overflow:hidden;
-    font-size:18px;font-weight:800;height:62px;overflow-y:auto;text-align:center;
-    margin-bottom:12px;padding:10px 10px;
+    font-size:18px;font-weight:800;height:44px;overflow-y:auto;text-align:center;
+    margin-bottom:8px;padding:6px 10px;
     background:var(--bg);border:2px dashed var(--border);border-radius:12px 10px 13px 11px;
     color:var(--text-muted);line-height:1.5;
   }
   /* 回答確定後(結果表示中)は高さを固定せず、正解スタンプがはみ出して見えるようにする */
-  .wordbank .preview.result{height:auto;min-height:62px;overflow:visible;padding-right:104px;}
+  .wordbank .preview.result{height:auto;min-height:44px;overflow:visible;padding-right:104px;}
   .wordbank .preview .name{color:var(--accent-ink);}
   .wordbank .preview button{
     margin-top:10px;font-size:14px;font-weight:800;padding:8px 20px;
@@ -304,8 +304,14 @@
   .wordbank .row.cat-multiplier button{background:var(--cat-multiplier-bg);border-color:var(--cat-multiplier-border);}
   .wordbank .row.cat-subname button{background:var(--cat-subname-bg);border-color:var(--cat-subname-border);}
   .wordbank .row.cat-basename button{background:var(--cat-basename-bg);border-color:var(--cat-basename-border);}
+  /* 数字以外は縦の押しやすさを保ったまま、横だけ少しコンパクトにする */
+  .wordbank .row.cat-multiplier button,
+  .wordbank .row.cat-subname button,
+  .wordbank .row.cat-basename button{padding-inline:5px;}
+  /* シクロとオールは、主鎖名に近い淡いアプリコットで共通表示する */
+  .wordbank .row.cat-basename button.special-affix{background:#fbe7d0;border-color:#e4ad74;}
   .wordbank.answered .row button{opacity:.4;pointer-events:none;}
-  .wordbank .control-row{margin-top:8px;margin-bottom:0;gap:8px;}
+  .wordbank .control-row{margin-top:0;margin-bottom:12px;gap:8px;}
   .wordbank .control-row button{padding:7px 16px;}
 
   /* 解答欄では文字が隠れないよう、スタンプを右寄せ・少し小さめにする */
@@ -2899,6 +2905,7 @@
   }
 
   function startGame1() {
+    clearPaletteSelection();
     interactionsEnabled = true;
     const { name } = generateAvoidingImmediateRepeat(buildGame1Opts(difficulty), lastGame1Name);
     lastGame1Name = name;
@@ -3066,6 +3073,7 @@
   }
 
   function startGame2() {
+    clearPaletteSelection();
     interactionsEnabled = false;
     const { grid: g, name } = generateAvoidingImmediateRepeat(buildGame2Opts(difficulty), lastGame2Name);
     lastGame2Name = name;
@@ -3137,6 +3145,23 @@
     preview.id = 'answer-preview';
     wb.appendChild(preview);
 
+    const controlRow = document.createElement('div');
+    controlRow.className = 'row control-row';
+    const undoBtn = document.createElement('button');
+    undoBtn.textContent = '1つ戻す';
+    undoBtn.className = 'secondary';
+    undoBtn.addEventListener('click', () => { playUiClickSound(); answerTokens.pop(); updateAnswerPreview(); });
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = 'クリア';
+    clearBtn.className = 'secondary';
+    clearBtn.addEventListener('click', () => { playUiClickSound(); answerTokens = []; updateAnswerPreview(); });
+    const submitBtn = document.createElement('button');
+    submitBtn.textContent = '回答する';
+    submitBtn.className = 'primary';
+    submitBtn.addEventListener('click', submitGame2Answer);
+    controlRow.append(undoBtn, clearBtn, submitBtn);
+    wb.appendChild(controlRow);
+
     const { numberTokens, baseNameTokens } = mainChainTokensForCurrentDifficulty();
     // 数字行は主鎖・環の設定に合わせた順に固定。それ以外の行はグループ内の並びを毎回シャッフルする
     const rows = [
@@ -3152,6 +3177,7 @@
       for (const token of tokens) {
         const btn = document.createElement('button');
         btn.textContent = token;
+        if (token === CYCLO_TOKEN || token === ALCOHOL_TOKEN) btn.classList.add('special-affix');
         btn.addEventListener('click', () => {
           answerTokens.push(token);
           updateAnswerPreview();
@@ -3161,23 +3187,6 @@
       }
       wb.appendChild(rowEl);
     }
-
-    const controlRow = document.createElement('div');
-    controlRow.className = 'row control-row';
-    const undoBtn = document.createElement('button');
-    undoBtn.textContent = '1つ戻す';
-    undoBtn.className = 'secondary';
-    undoBtn.addEventListener('click', () => { playUiClickSound(); answerTokens.pop(); updateAnswerPreview(); });
-    const clearBtn = document.createElement('button');
-    clearBtn.textContent = 'クリア';
-    clearBtn.className = 'secondary';
-    clearBtn.addEventListener('click', () => { playUiClickSound(); answerTokens = []; updateAnswerPreview(); });
-    const submitBtn = document.createElement('button');
-    submitBtn.textContent = '回答する';
-    submitBtn.className = 'primary';
-    submitBtn.addEventListener('click', submitGame2Answer);
-    controlRow.appendChild(undoBtn); controlRow.appendChild(clearBtn); controlRow.appendChild(submitBtn);
-    wb.appendChild(controlRow);
   }
 
   // ============================================================
