@@ -48,9 +48,9 @@
     user-select:none;
     -webkit-touch-callout:none;
   }
-  #app{max-width:520px;margin:0 auto;padding:12px;}
+  #app{max-width:520px;margin:0 auto;padding:6px 12px 12px;}
 
-  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;}
   header h1{
     font-size:20px;font-weight:800;margin:0;letter-spacing:.02em;
     color:var(--ink);
@@ -128,6 +128,7 @@
     box-shadow:1px 2px 0 var(--shadow);
   }
   .status .name{color:var(--accent-ink);font-size:20px;font-weight:800;font-family:inherit;display:inline-block;margin-top:2px;}
+  .common-name{font-size:.72em;color:var(--text-muted);font-weight:700;white-space:nowrap;}
   .status button, .objective button, .wordbank button{font-family:var(--font-hand);}
   .status button{
     margin-top:8px;font-size:14px;font-weight:800;padding:7px 18px;
@@ -138,7 +139,8 @@
   .status button:active{transform:translate(1px,2px);box-shadow:0 0 0 var(--shadow);}
 
   /* ---- モードタブ ---- */
-  .mode-tabs{display:flex;gap:6px;flex-shrink:0;}
+  .mode-controls{display:flex;align-items:stretch;gap:6px;flex-shrink:0;}
+  .mode-tabs{display:flex;align-items:stretch;gap:6px;flex-shrink:0;}
   .mode-tab{
     font-size:14px;font-weight:700;padding:6px 14px;
     border-radius:14px 12px 15px 11px;border:2.5px solid var(--border);
@@ -151,9 +153,15 @@
     border-color:var(--accent);color:var(--accent-ink);font-weight:800;
     background:var(--accent-soft);
   }
+  @media (max-width:380px){
+    /* 狭い画面ではタイトルを省き、モード切替を1行に保つ */
+    header{flex-wrap:nowrap;}
+    header h1{display:none;}
+    .mode-controls{margin-left:auto;}
+  }
 
   /* ---- 難易度タブ ---- */
-  .diff-tabs{display:flex;gap:8px;margin-bottom:14px;justify-content:center;}
+  .diff-tabs{display:flex;gap:8px;margin-bottom:8px;justify-content:center;}
   .diff-tab{
     font-size:13px;font-weight:700;padding:6px 18px;
     border-radius:999px;border:2.5px solid var(--border);
@@ -162,6 +170,13 @@
   }
   .diff-tab:active{transform:translate(1px,2px);box-shadow:0 0 0 var(--shadow);}
   .diff-tab.active{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft);font-weight:800;}
+  /* 命名ルールは幅が足りない画面だけ ? ボタンにして、難易度タブの横並びを保つ */
+  @media (max-width:430px){
+    header h1{font-size:16px;}
+    .diff-tab{padding-inline:10px;}
+    #naming-rules-btn{flex:0 0 32px;width:32px;height:32px;padding:0;box-sizing:border-box;font-size:0;}
+    #naming-rules-btn::before{content:'?';font-size:18px;line-height:1;}
+  }
   .rules-content{font-family:var(--font-hand);}
   .rules-section{margin-bottom:16px;}
   .rules-section:last-child{margin-bottom:0;}
@@ -266,13 +281,13 @@
   }
   .wordbank .preview{
     position:relative;overflow:hidden;
-    font-size:18px;font-weight:800;height:62px;overflow-y:auto;text-align:center;
-    margin-bottom:12px;padding:10px 10px;
+    font-size:18px;font-weight:800;height:44px;overflow-y:auto;text-align:center;
+    margin-bottom:8px;padding:6px 10px;
     background:var(--bg);border:2px dashed var(--border);border-radius:12px 10px 13px 11px;
     color:var(--text-muted);line-height:1.5;
   }
   /* 回答確定後(結果表示中)は高さを固定せず、正解スタンプがはみ出して見えるようにする */
-  .wordbank .preview.result{height:auto;min-height:62px;overflow:visible;padding-right:104px;}
+  .wordbank .preview.result{height:auto;min-height:44px;overflow:visible;padding-right:104px;}
   .wordbank .preview .name{color:var(--accent-ink);}
   .wordbank .preview button{
     margin-top:10px;font-size:14px;font-weight:800;padding:8px 20px;
@@ -298,8 +313,17 @@
   .wordbank .row.cat-multiplier button{background:var(--cat-multiplier-bg);border-color:var(--cat-multiplier-border);}
   .wordbank .row.cat-subname button{background:var(--cat-subname-bg);border-color:var(--cat-subname-border);}
   .wordbank .row.cat-basename button{background:var(--cat-basename-bg);border-color:var(--cat-basename-border);}
+  /* 数字以外は縦の押しやすさを保ったまま、横だけ少しコンパクトにする */
+  .wordbank .row.cat-multiplier button,
+  .wordbank .row.cat-subname button,
+  .wordbank .row.cat-basename button{padding-inline:3px;}
+  .wordbank .row.cat-multiplier,
+  .wordbank .row.cat-subname,
+  .wordbank .row.cat-basename{gap:4px;}
+  /* シクロとオールは、主鎖名と同程度に淡いローズベージュで共通表示する */
+  .wordbank .row.cat-basename button.special-affix{background:#f5e6e8;border-color:#d7a7ad;}
   .wordbank.answered .row button{opacity:.4;pointer-events:none;}
-  .wordbank .control-row{margin-top:8px;margin-bottom:0;gap:8px;}
+  .wordbank .control-row{margin-top:0;margin-bottom:12px;gap:8px;}
   .wordbank .control-row button{padding:7px 16px;}
 
   /* 解答欄では文字が隠れないよう、スタンプを右寄せ・少し小さめにする */
@@ -322,6 +346,15 @@
   /* ---- 難易度設定(管理者向け・?admin=1のときだけ表示) ---- */
   .diff-tabs-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
   .diff-tabs-row .diff-tabs{flex:1;margin-bottom:0;}
+  .hydroxyl-toggle{
+    flex:0 0 38px;align-self:stretch;width:38px;height:auto;padding:0;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;
+    border-radius:14px 12px 15px 11px;border:2.5px solid var(--border);background:var(--surface);box-shadow:1px 2px 0 var(--shadow);
+    transition:transform .08s ease, box-shadow .08s ease;
+  }
+  .hydroxyl-toggle svg{width:100%;height:100%;display:block;transform:scale(1.8);transform-origin:center;}
+  .hydroxyl-toggle.active{border-color:var(--accent);background:var(--accent-soft);}
+  .hydroxyl-toggle:active:not(:disabled){transform:translate(1px,2px);box-shadow:0 0 0 var(--shadow);}
+  .hydroxyl-toggle:disabled{cursor:default;opacity:1;}
   .gear-btn{
     flex-shrink:0;width:38px;height:38px;padding:0;box-sizing:border-box;line-height:1;display:inline-flex;align-items:center;justify-content:center;
     border-radius:50%;border:2px solid var(--border);background:var(--surface);color:var(--text-muted);
@@ -404,9 +437,12 @@
 <div id="app">
   <header>
     <h1>アルカンパズル</h1>
-    <div class="mode-tabs" id="mode-tabs">
-      <button class="mode-tab active" data-mode="game1">並べる</button>
-      <button class="mode-tab" data-mode="game2">名付ける</button>
+    <div class="mode-controls">
+      <div class="mode-tabs" id="mode-tabs">
+        <button class="mode-tab active" data-mode="game1">並べる</button>
+        <button class="mode-tab" data-mode="game2">名付ける</button>
+      </div>
+      <button id="hydroxyl-toggle" class="hydroxyl-toggle" type="button" aria-pressed="true" title="ヒドロキシ基を出題数に含める" aria-label="ヒドロキシ基を出題数に含める"></button>
     </div>
   </header>
   <div class="diff-tabs-row">
@@ -415,7 +451,7 @@
       <button class="diff-tab" data-diff="easy">やさしめ</button>
       <button class="diff-tab" data-diff="medium">まあまあ</button>
       <button class="diff-tab" data-diff="hard">そこそこ</button>
-      <button id="naming-rules-btn" class="diff-tab" style="display:none;" type="button">命名ルール</button>
+      <button id="naming-rules-btn" class="diff-tab" style="display:none;" type="button" title="命名ルール" aria-label="命名ルール">命名ルール</button>
     </div>
     <button id="settings-gear" class="gear-btn" style="display:none;" type="button" title="難易度設定" aria-label="難易度設定">
       <svg class="gear-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -460,17 +496,38 @@
 <div class="modal-overlay" id="rules-modal" style="display:none;">
   <div class="modal-box">
     <div class="modal-header">
-      <h2>置換基が2種類以上ある場合の命名法</h2>
+      <h2>置換基・アルコールの命名法</h2>
       <button id="rules-close" class="modal-close" type="button">×</button>
     </div>
     <div class="rules-content">
       <section class="rules-section">
         <h3>全体の流れ</h3>
         <ol>
-          <li>主鎖（最長の炭素鎖）または環を決める</li>
+          <li>OHがあるときは、OHを最も多く含む主鎖または環を決める</li>
           <li>置換基に位置番号をつける</li>
           <li>決まった順番（アルファベット順）で名前を書く</li>
         </ol>
+      </section>
+
+      <section class="rules-section">
+        <h3>アルコール（OH）があるとき</h3>
+        <ul>
+          <li>OHの位置番号を最も小さくする。立体異性はこのベータ版では扱わない。</li>
+          <li>1個なら「オール」：メタノール、エタノール、1-プロパノール、シクロヘキサノール</li>
+          <li>2個以上なら既存の数詞を使う：1,2-エタンジオール、1,2-シクロヘキサンジオール</li>
+          <li>同じ炭素にOHを2個付けるジェミナルジオールは出題しない。</li>
+        </ul>
+      </section>
+
+      <section class="rules-section">
+        <h3>慣用名とIUPAC名（参考）</h3>
+        <ul>
+          <li>エチレングリコール：ethane-1,2-diol</li>
+          <li>グリセリン：propane-1,2,3-triol</li>
+          <li>エリスリトール：butane-1,2,3,4-tetrol</li>
+          <li>キシリトール：pentane-1,2,3,4,5-pentol</li>
+        </ul>
+        <p>立体異性はこのベータ版では扱わないため、立体配置の表記は省略している。</p>
       </section>
 
       <section class="rules-section">
@@ -558,6 +615,17 @@
             <li>あとは時計回り・反時計回りで位置番号が小さくなる方を選ぶ</li>
           </ul>
         </div>
+
+        <div class="rules-example">
+          <strong>例5：OHを優先してから、側鎖の番号を比べる</strong>
+          <div class="rule-diagram" id="diagram-ex5"></div>
+          <p>✅ 2,2,8-トリブロモ-7-メチル-1,4-シクロオクタンジオール</p>
+          <ul>
+            <li>まずOHの位置番号が最小になるようにして、1,4-ジオールを選ぶ</li>
+            <li>残る二方向では、側鎖の番号列 {2,2,7,8} と {3,3,5,6} を比べる</li>
+            <li>最初に違う 2 &lt; 3 により、ブロモを 2,2,8、メチルを7番にする</li>
+          </ul>
+        </div>
       </section>
     </div>
   </div>
@@ -601,10 +669,12 @@
     Br: { name: 'ブロモ', stroke: '#A0522D', fill: '#F3E0D6' },
     I: { name: 'ヨード', stroke: '#7B4397', fill: '#EBDFF5' },
   };
+  const HYDROXYL_ELEMENT = 'OH';
+  const HYDROXYL_FILL = '#E8564F';
   const HALOGEN_ELEMENT_BY_NAME = { 'フルオロ': 'F', 'クロロ': 'Cl', 'ブロモ': 'Br', 'ヨード': 'I' };
   // 出題(生成)で使う置換基の種類プール。長さはエチルのみ2、それ以外は1。
   const SUBSTITUENT_SPECIES = ['メチル', 'エチル', 'フルオロ', 'クロロ', 'ブロモ', 'ヨード'];
-  const SUBSTITUENT_LENGTH = { 'メチル': 1, 'エチル': 2, 'フルオロ': 1, 'クロロ': 1, 'ブロモ': 1, 'ヨード': 1 };
+  const SUBSTITUENT_LENGTH = { 'メチル': 1, 'エチル': 2, 'フルオロ': 1, 'クロロ': 1, 'ブロモ': 1, 'ヨード': 1, [HYDROXYL_ELEMENT]: 1 };
   // 環は原子1個分の余白しか確保していないため、エチル(2マス必要)は対象外にする
   const RING_SUBSTITUENT_SPECIES = ['メチル', 'フルオロ', 'クロロ', 'ブロモ', 'ヨード'];
 
@@ -767,6 +837,7 @@
 
         const neighborElement = graph.elements.get(neighbor);
         if (neighborElement !== 'C') {
+          if (neighborElement === HYDROXYL_ELEMENT) continue; // OHは主官能基として別途集計する
           // ハロゲンは一価なので、この1マスで置換基が確定する(さらに先に何か繋がっていたら不正な構造)
           const further = [...graph.adjacency.get(neighbor)].filter((n) => n !== node);
           if (further.length > 0) throw new Error('UNSUPPORTED_SUBSTITUENT');
@@ -794,20 +865,81 @@
     return substituents;
   }
 
-  function buildName(baseName, locantedSubstituents) {
-    if (locantedSubstituents.length === 0) return baseName;
+  function hydroxylLocants(graph, orderedBackbone) {
+    const backboneSet = new Set(orderedBackbone);
+    const locants = [];
+    for (const node of orderedBackbone) {
+      for (const neighbor of graph.adjacency.get(node)) {
+        if (graph.elements.get(neighbor) === HYDROXYL_ELEMENT) {
+          if (graph.adjacency.get(neighbor).size !== 1) throw new Error('INVALID_HYDROXYL');
+          locants.push(orderedBackbone.indexOf(node) + 1);
+        }
+      }
+    }
+    // 親構造外のOHを「ヒドロキシ置換基」としては扱わない。ベータでは主鎖・主環に
+    // すべてのOHが載る構造だけを命名対象とし、生成器もその条件を満たすものを選ぶ。
+    const allHydroxyls = graph.nodeIds.filter((id) => graph.elements.get(id) === HYDROXYL_ELEMENT);
+    if (locants.length !== allHydroxyls.length || new Set(locants).size !== locants.length) {
+      throw new Error('UNSUPPORTED_HYDROXYL_LAYOUT');
+    }
+    return locants.sort((a, b) => a - b);
+  }
+
+  function validateHydroxyls(graph) {
+    for (const id of graph.nodeIds) {
+      if (graph.elements.get(id) !== HYDROXYL_ELEMENT) continue;
+      const neighbors = [...graph.adjacency.get(id)];
+      if (neighbors.length !== 1 || graph.elements.get(neighbors[0]) !== 'C') throw new Error('INVALID_HYDROXYL');
+    }
+    for (const id of graph.nodeIds) {
+      if (graph.elements.get(id) !== 'C') continue;
+      const hydroxylCount = [...graph.adjacency.get(id)].filter((n) => graph.elements.get(n) === HYDROXYL_ELEMENT).length;
+      if (hydroxylCount > 1) throw new Error('GEMINAL_DIOL');
+    }
+  }
+
+  function buildSubstituentPrefix(locantedSubstituents) {
+    if (locantedSubstituents.length === 0) return '';
     const groups = new Map();
     for (const s of locantedSubstituents) {
       if (!groups.has(s.name)) groups.set(s.name, []);
       groups.get(s.name).push(s.locant);
     }
     const sortedNames = [...groups.keys()].sort((a, b) => SUBSTITUENT_ORDER[a] - SUBSTITUENT_ORDER[b]);
-    const parts = sortedNames.map((name) => {
+    return sortedNames.map((name) => {
       const locants = groups.get(name).sort((a, b) => a - b);
-      const multiplier = MULTIPLIER_PREFIX[locants.length] || '';
-      return `${locants.join(',')}-${multiplier}${name}`;
-    });
-    return parts.join('-') + baseName;
+      return `${locants.join(',')}-${MULTIPLIER_PREFIX[locants.length] || ''}${name}`;
+    }).join('-');
+  }
+
+  function buildAlcoholName(parentName, hydroxylLocantList, locantedSubstituents, isCyclo) {
+    const prefix = buildSubstituentPrefix(locantedSubstituents);
+    const count = hydroxylLocantList.length;
+    if (count === 0) return prefix + parentName;
+    const alcoholStem = parentName.endsWith('ン') ? parentName.slice(0, -1) + 'ノール' : parentName + 'オール';
+    if (count === 1) {
+      const omitLocant = isCyclo || parentName === 'メタン' || parentName === 'エタン';
+      const alcoholPart = omitLocant ? alcoholStem : `${hydroxylLocantList[0]}-${alcoholStem}`;
+      return prefix ? (omitLocant ? prefix + alcoholPart : `${prefix}-${alcoholPart}`) : alcoholPart;
+    }
+    const alcoholPart = `${hydroxylLocantList.join(',')}-${parentName}${MULTIPLIER_PREFIX[count]}オール`;
+    return prefix ? `${prefix}-${alcoholPart}` : alcoholPart;
+  }
+
+  function buildName(baseName, locantedSubstituents) {
+    return buildSubstituentPrefix(locantedSubstituents) + baseName;
+  }
+
+  // 判定用の名称は変えず、表示だけに代表的な慣用名を添える。
+  const COMMON_ALCOHOL_NAME = {
+    '1,2-エタンジオール': 'エチレングリコール',
+    '1,2,3-プロパントリオール': 'グリセリン',
+    '1,2,3,4-ブタンテトラオール': 'エリスリトール',
+    '1,2,3,4,5-ペンタンペンタオール': 'キシリトール',
+  };
+  function displayCompoundName(name) {
+    const commonName = COMMON_ALCOHOL_NAME[name];
+    return commonName ? `${name}<span class="common-name">（${commonName}）</span>` : name;
   }
   function compareLocantArrays(a, b) {
     const len = Math.max(a.length, b.length);
@@ -861,6 +993,8 @@
     if (carbonIds.length === 1) {
       const centerId = carbonIds[0];
       const rawSubstituents = extractSubstituents(graph, new Set([centerId]));
+      const hydroxyls = hydroxylLocants(graph, [centerId]);
+      if (hydroxyls.length) return buildAlcoholName('メタン', hydroxyls, rawSubstituents.map((s) => ({ locant: 1, name: s.name })), false);
       return buildMethaneName(rawSubstituents);
     }
 
@@ -875,40 +1009,41 @@
     const distMaps = new Map();
     for (const leaf of leaves) distMaps.set(leaf, bfsDistancesAndParents(adjacency, leaf));
 
-    let maxDist = -1, candidatePairs = [];
+    const candidatePairs = [];
     for (let i = 0; i < leaves.length; i++) {
       for (let j = i + 1; j < leaves.length; j++) {
         const d = distMaps.get(leaves[i]).dist.get(leaves[j]);
-        if (d > maxDist) { maxDist = d; candidatePairs = [[leaves[i], leaves[j]]]; }
-        else if (d === maxDist) candidatePairs.push([leaves[i], leaves[j]]);
+        if (Number.isFinite(d)) candidatePairs.push([leaves[i], leaves[j]]);
       }
     }
-    if (maxDist + 1 > 35) throw new Error('UNSUPPORTED: 主鎖がペンタトリアコンタンを超えています');
-
-    const candidatePaths = candidatePairs.map(([a, b]) => reconstructPath(distMaps.get(a).parent, a, b));
-    const scored = candidatePaths.map((path) => {
-      const pathSet = new Set(path);
-      let branchCount = 0;
-      for (const node of path) for (const n of adjacency.get(node)) if (!pathSet.has(n)) branchCount++;
-      return { path, branchCount };
-    });
-    const maxBranch = Math.max(...scored.map((s) => s.branchCount));
-    const filtered = scored.filter((s) => s.branchCount === maxBranch).map((s) => s.path);
 
     let best = null;
-    for (const path of filtered) {
+    for (const [a, b] of candidatePairs) {
+      const path = reconstructPath(distMaps.get(a).parent, a, b);
+      if (path.length > 35) throw new Error('UNSUPPORTED: 主鎖がペンタトリアコンタンを超えています');
       for (const reversed of [false, true]) {
         const orderedPath = reversed ? [...path].reverse() : path;
         const pathSet = new Set(orderedPath);
-        const rawSubstituents = extractSubstituents(graph, pathSet);
-        const locantOf = (s) => orderedPath.indexOf(s.backboneNode) + 1;
-        const locants = rawSubstituents.map(locantOf).sort((a, b) => a - b);
-        const alphaLocants = alphabeticalLocants(rawSubstituents, locantOf);
-        const candidate = { orderedPath, rawSubstituents, locants, alphaLocants };
-        if (best === null || compareNumberingCandidates(candidate, best) < 0) best = candidate;
+        try {
+          const rawSubstituents = extractSubstituents(graph, pathSet);
+          const hydroxyls = hydroxylLocants(graph, orderedPath);
+          const locantOf = (s) => orderedPath.indexOf(s.backboneNode) + 1;
+          const locants = rawSubstituents.map(locantOf).sort((a, b) => a - b);
+          const alphaLocants = alphabeticalLocants(rawSubstituents, locantOf);
+          const branchCount = rawSubstituents.length;
+          const candidate = { orderedPath, rawSubstituents, hydroxyls, locants, alphaLocants, branchCount };
+          if (best === null
+            || candidate.hydroxyls.length > best.hydroxyls.length
+            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length > best.orderedPath.length)
+            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && candidate.branchCount > best.branchCount)
+            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && candidate.branchCount === best.branchCount && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) < 0)
+            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && candidate.branchCount === best.branchCount && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) === 0 && compareNumberingCandidates(candidate, best) < 0)) best = candidate;
+        } catch (e) { /* OHが主鎖外へ出る候補は除外 */ }
       }
     }
+    if (!best) throw new Error('UNSUPPORTED_HYDROXYL_LAYOUT');
     const locantedSubstituents = best.rawSubstituents.map((s) => ({ locant: best.orderedPath.indexOf(s.backboneNode) + 1, name: s.name }));
+    if (best.hydroxyls.length) return buildAlcoholName(CHAIN_NAMES[best.orderedPath.length], best.hydroxyls, locantedSubstituents, false);
     return buildName(CHAIN_NAMES[best.orderedPath.length], locantedSubstituents);
   }
 
@@ -943,6 +1078,29 @@
 
     const ringSet = new Set(ring);
     const rawSubstituents = extractSubstituents(graph, ringSet);
+    const hydroxylCount = graph.nodeIds.filter((id) => graph.elements.get(id) === HYDROXYL_ELEMENT).length;
+    const parentName = 'シクロ' + CHAIN_NAMES[ringSize];
+    if (hydroxylCount > 0) {
+      let bestAlcohol = null;
+      for (let startIdx = 0; startIdx < ringSize; startIdx++) {
+        for (const direction of [1, -1]) {
+          const ordered = [];
+          for (let step = 0; step < ringSize; step++) ordered.push(ring[((startIdx + step * direction) % ringSize + ringSize) % ringSize]);
+          try {
+            const hydroxyls = hydroxylLocants(graph, ordered);
+            const locantOf = (s) => ordered.indexOf(s.backboneNode) + 1;
+            const locants = rawSubstituents.map(locantOf).sort((a, b) => a - b);
+            const candidate = { ordered, hydroxyls, locants, alphaLocants: alphabeticalLocants(rawSubstituents, locantOf) };
+            if (bestAlcohol === null
+              || compareLocantArrays(candidate.hydroxyls, bestAlcohol.hydroxyls) < 0
+              || (compareLocantArrays(candidate.hydroxyls, bestAlcohol.hydroxyls) === 0 && compareNumberingCandidates(candidate, bestAlcohol) < 0)) bestAlcohol = candidate;
+          } catch (e) { /* 主環外のOHを持つ候補は除外 */ }
+        }
+      }
+      if (!bestAlcohol) throw new Error('UNSUPPORTED_HYDROXYL_LAYOUT');
+      const locantedSubstituents = rawSubstituents.map((s) => ({ locant: bestAlcohol.ordered.indexOf(s.backboneNode) + 1, name: s.name }));
+      return buildAlcoholName(parentName, bestAlcohol.hydroxyls, locantedSubstituents, true);
+    }
     if (rawSubstituents.length === 0) return 'シクロ' + CHAIN_NAMES[ringSize];
 
     // 環の置換基が1個だけなら、どこを1番炭素にしても位置番号は必ず1になり情報を持たないため省略する
@@ -979,6 +1137,7 @@
     if (!connectivity.allConnected) return { ok: false, error: 'DISCONNECTED', islands: connectivity.islands };
     const structureType = classifyStructure(graph);
     try {
+      validateHydroxyls(graph);
       if (structureType === 'ALKANE') return { ok: true, name: nameAlkane(graph) };
       if (structureType === 'CYCLOALKANE') return { ok: true, name: nameCycloalkane(graph) };
       return { ok: false, error: structureType };
@@ -1052,11 +1211,12 @@
     const sub = buildSubgraph(graph, cells);
     const structureType = classifyStructure(sub);
     try {
+      validateHydroxyls(sub);
       if (structureType === 'ALKANE') return { sig, cells, status: 'valid', name: nameAlkane(sub) };
       if (structureType === 'CYCLOALKANE') return { sig, cells, status: 'valid', name: nameCycloalkane(sub) };
       return { sig, cells, status: 'unsupported' };
     } catch (e) {
-      return { sig, cells, status: 'unsupported' };
+      return { sig, cells, status: e.message === 'GEMINAL_DIOL' ? 'geminal-diol' : 'unsupported' };
     }
   }
 
@@ -1080,12 +1240,19 @@
   }
   // 側鎖の「種類数」の範囲([min,max])に従って、実際に使う置換基の種類を選ぶ。
   // 空きスロット数より多くの種類は使えないので、そこでも頭打ちにする。
-  function pickSpeciesForRange(typeRange, slotCount) {
+  function pickSpeciesForRange(typeRange, slotCount, forceHydroxyl = false) {
     const [rawMin, rawMax] = Array.isArray(typeRange) ? typeRange : [1, typeRange || 1];
-    const hi = Math.max(1, Math.min(rawMax, SUBSTITUENT_SPECIES.length, Math.max(1, slotCount)));
+    const pool = forceHydroxyl ? [...SUBSTITUENT_SPECIES, HYDROXYL_ELEMENT] : SUBSTITUENT_SPECIES;
+    const hi = Math.max(1, Math.min(rawMax, pool.length, Math.max(1, slotCount)));
     const lo = Math.max(1, Math.min(rawMin, hi));
     const count = randInt(lo, hi);
-    return shuffle([...SUBSTITUENT_SPECIES]).slice(0, count);
+    // アルコール問題ではOHを「種類数」の1つとして必ず選ぶ。
+    // 残りの種類は従来どおり他の置換基から選ぶため、OHだけを重み付けして
+    // 多価アルコールが不意に増えすぎることを避けられる。
+    if (forceHydroxyl) {
+      return [HYDROXYL_ELEMENT, ...shuffle([...SUBSTITUENT_SPECIES]).slice(0, count - 1)];
+    }
+    return shuffle([...pool]).slice(0, count);
   }
 
   // targetDirsが欲しいときに、その活性方向の組を実現するtype/rotationを逆算する
@@ -1118,6 +1285,7 @@
     const length = SUBSTITUENT_LENGTH[name];
     if (length === 1) {
       const panel = panelFor(1, [back]);
+      if (name === HYDROXYL_ELEMENT) panel.element = HYDROXYL_ELEMENT;
       const el = HALOGEN_ELEMENT_BY_NAME[name];
       if (el) panel.element = el;
       return [panel];
@@ -1128,7 +1296,7 @@
   // 鎖状(アルカン): 横一直線の主鎖 + 上下に伸びる置換基、という単純なレイアウトで生成する(かんたんモード用)。
   // 5行×7列に収めるため主鎖は最大7炭素までとする(命名エンジン自体は10炭素まで対応可能)。
   function generateAlkaneGrid(typeRange, opts) {
-    const { lenMin = 2, lenMax = 7, subMin = 0, subMax = 3 } = opts || {};
+    const { lenMin = 2, lenMax = 7, subMin = 0, subMax = 3, forceHydroxyl = false, hydroxylLimitOne = false } = opts || {};
     const len = randInt(Math.max(2, lenMin), Math.max(2, lenMax));
     const startCol = Math.floor((COLS - len) / 2);
     const spineRow = 2;
@@ -1138,15 +1306,20 @@
     for (let i = 1; i < len - 1; i++) { slots.push([i, 'up']); slots.push([i, 'down']); }
     shuffle(slots);
 
-    const distinctNames = pickSpeciesForRange(typeRange, slots.length);
+    const distinctNames = pickSpeciesForRange(typeRange, slots.length, forceHydroxyl);
 
     const count = Math.min(slots.length, randInt(subMin, subMax));
     const posInfo = {};
+    let hydroxylCount = 0;
     for (let i = 0; i < count; i++) {
       const [idx, side] = slots[i];
-      const name = distinctNames.length === 1 ? distinctNames[0] : choice(distinctNames);
       if (!posInfo[idx]) posInfo[idx] = {};
+      const candidates = distinctNames.filter((name) => name !== HYDROXYL_ELEMENT
+        || (!Object.values(posInfo[idx]).includes(HYDROXYL_ELEMENT) && (!hydroxylLimitOne || hydroxylCount === 0)));
+      if (candidates.length === 0) continue; // 同じ炭素へのOH重複(ジェミナルジオール)を避ける
+      const name = candidates.length === 1 ? candidates[0] : choice(candidates);
       posInfo[idx][side] = name;
+      if (name === HYDROXYL_ELEMENT) hydroxylCount++;
     }
 
     for (let i = 0; i < len; i++) {
@@ -1240,7 +1413,7 @@
     return { path, occupied };
   }
 
-  function planBentSubstituents(path, occupied, typeRange, subMin, subMax) {
+  function planBentSubstituents(path, occupied, typeRange, subMin, subMax, forceHydroxyl, hydroxylLimitOne) {
     const len = path.length;
     const slots = [];
     for (let i = 1; i < len - 1; i++) {
@@ -1249,14 +1422,19 @@
     }
     shuffle(slots);
 
-    const distinctNames = pickSpeciesForRange(typeRange, slots.length);
+    const distinctNames = pickSpeciesForRange(typeRange, slots.length, forceHydroxyl);
 
     const targetCount = randInt(subMin, subMax);
     const posInfo = {};
     let placed = 0;
+    let hydroxylCount = 0;
     for (const [i, dir] of slots) {
       if (placed >= targetCount) break;
-      const name = distinctNames.length === 1 ? distinctNames[0] : choice(distinctNames);
+      if (!posInfo[i]) posInfo[i] = {};
+      const candidates = distinctNames.filter((name) => name !== HYDROXYL_ELEMENT
+        || (!Object.values(posInfo[i]).includes(HYDROXYL_ELEMENT) && (!hydroxylLimitOne || hydroxylCount === 0)));
+      if (candidates.length === 0) continue;
+      const name = candidates.length === 1 ? candidates[0] : choice(candidates);
       const length = SUBSTITUENT_LENGTH[name];
       const [dr, dc] = DELTA[dir];
       const [r0, c0] = path[i];
@@ -1269,8 +1447,8 @@
       }
       if (!ok) continue;
       cells.forEach(([rr2, cc2]) => occupied.add(`${rr2},${cc2}`));
-      if (!posInfo[i]) posInfo[i] = {};
       posInfo[i][dir] = name;
+      if (name === HYDROXYL_ELEMENT) hydroxylCount++;
       placed++;
     }
     return posInfo;
@@ -1295,6 +1473,7 @@
           rr += dr; cc += dc;
           const isLast = k === length - 1;
           grid[rr][cc] = panelForDirections(isLast ? [OPPOSITE[dir]] : [OPPOSITE[dir], dir]);
+          if (isLast && name === HYDROXYL_ELEMENT) grid[rr][cc].element = HYDROXYL_ELEMENT;
           if (isLast && el) grid[rr][cc].element = el;
         }
       }
@@ -1305,7 +1484,7 @@
   // 難問モード用: 屈曲した主鎖 + 側鎖多め
   // bendRange: [min, max] で「折れ曲がり炭素(かど)の数」の範囲を指定(省略時は無制限)
   function generateBentAlkaneGrid(typeRange, opts, forceTurn, bendRange) {
-    const { lenMin = 6, lenMax = 9, subMin = 2, subMax = 4 } = opts || {};
+    const { lenMin = 6, lenMax = 9, subMin = 2, subMax = 4, forceHydroxyl = false, hydroxylLimitOne = false } = opts || {};
     const [bendMin, bendMax] = bendRange || [0, Infinity];
     for (let attempt = 0; attempt < 60; attempt++) {
       const len = randInt(Math.max(2, lenMin), Math.max(2, lenMax));
@@ -1314,7 +1493,7 @@
       const bends = countBends(walk.path);
       if (bends < bendMin || bends > bendMax) continue; // 指定した折れ曲がり数の範囲外ならやり直す
       const occupied = new Set(walk.occupied);
-      const posInfo = planBentSubstituents(walk.path, occupied, typeRange, subMin, subMax);
+      const posInfo = planBentSubstituents(walk.path, occupied, typeRange, subMin, subMax, forceHydroxyl, hydroxylLimitOne);
       return buildBentGrid(walk.path, posInfo);
     }
     return null; // 呼び出し元でリトライ
@@ -1380,7 +1559,7 @@
 
   // 環の経路(path: [r,c]の配列。順に隣接し、最後は始点に隣接して閉じている)から、
   // 実際のグリッドを組み立てる。置換基は「環の他の炭素と隣接してしまわない」安全な位置にのみ置く。
-  function buildRingGridFromPath(path, forceSubstituent, subMin, subMax) {
+  function buildRingGridFromPath(path, forceSubstituent, subMin, subMax, typeRange, forceHydroxyl, hydroxylLimitOne) {
     const size = path.length;
     const grid = emptyGrid();
     const occupied = new Set(path.map(([r, c]) => `${r},${c}`));
@@ -1411,6 +1590,7 @@
       }
     }
     shuffle(slots);
+    const distinctNames = pickSpeciesForRange(typeRange, slots.length, forceHydroxyl);
 
     // 付ける個数を決める(subMin/subMaxが未指定なら従来通り0個か1個)
     let want;
@@ -1422,17 +1602,26 @@
     }
 
     let placed = 0;
+    let hydroxylCount = 0;
+    const hydroxylParents = new Set();
     for (const slot of slots) {
       if (placed >= want) break;
       if (occupied.has(`${slot.nr},${slot.nc}`)) continue; // 既に他の置換基が使った
+      const parentKey = `${slot.r},${slot.c}`;
+      const candidates = distinctNames.filter((name) => name !== HYDROXYL_ELEMENT
+        || (!hydroxylParents.has(parentKey) && (!hydroxylLimitOne || hydroxylCount === 0)));
+      if (candidates.length === 0) continue;
+      const name = candidates.length === 1 ? candidates[0] : choice(candidates);
       const existing = getActiveDirections(grid[slot.r][slot.c]);
       grid[slot.r][slot.c] = panelForDirections([...existing, slot.dir]);
-      const name = choice(RING_SUBSTITUENT_SPECIES);
       const panel = panelFor(1, [OPPOSITE[slot.dir]]);
+      if (name === HYDROXYL_ELEMENT) panel.element = HYDROXYL_ELEMENT;
       const el = HALOGEN_ELEMENT_BY_NAME[name];
       if (el) panel.element = el;
       grid[slot.nr][slot.nc] = panel;
       occupied.add(`${slot.nr},${slot.nc}`);
+      if (name === HYDROXYL_ELEMENT) hydroxylParents.add(parentKey);
+      if (name === HYDROXYL_ELEMENT) hydroxylCount++;
       placed++;
     }
     return grid;
@@ -1440,7 +1629,7 @@
 
   // 環に付ける置換基は、設定された側鎖数(subMin〜subMax)に従って複数付ける。
   // 環の形は、定番の長方形と、盤面を自由に這うランダムな形(L字・階段状など)を半々くらいで混ぜる。
-  function generateCycloalkaneGrid(forceSubstituent, ringSizes, subMin, subMax) {
+  function generateCycloalkaneGrid(forceSubstituent, ringSizes, subMin, subMax, typeRange, forceHydroxyl, hydroxylLimitOne) {
     const ringSize = choice(ringSizes || [4, 6]);
     const tmpl = RING_TEMPLATES[ringSize];
     const templatePath = () => {
@@ -1450,14 +1639,14 @@
     };
 
     if (Math.random() < 0.5) {
-      return buildRingGridFromPath(templatePath(), forceSubstituent, subMin, subMax);
+      return buildRingGridFromPath(templatePath(), forceSubstituent, subMin, subMax, typeRange, forceHydroxyl, hydroxylLimitOne);
     }
     for (let attempt = 0; attempt < 15; attempt++) {
       const walk = tryGenerateRingWalk(ringSize);
-      if (walk) return buildRingGridFromPath(walk.path, forceSubstituent, subMin, subMax);
+      if (walk) return buildRingGridFromPath(walk.path, forceSubstituent, subMin, subMax, typeRange, forceHydroxyl, hydroxylLimitOne);
     }
     // ランダムな形が見つからなければ長方形にフォールバック
-    return buildRingGridFromPath(templatePath(), forceSubstituent, subMin, subMax);
+    return buildRingGridFromPath(templatePath(), forceSubstituent, subMin, subMax, typeRange, forceHydroxyl, hydroxylLimitOne);
   }
 
   // 名前文字列に含まれる置換基の「種類数」を数える(メチル/エチルのみが対象なので単純な部分文字列チェックで十分)
@@ -1469,11 +1658,12 @@
     if (name.includes('クロロ')) n++;
     if (name.includes('ブロモ')) n++;
     if (name.includes('ヨード')) n++;
+    if (name.endsWith('ノール') || name.endsWith('オール')) n++;
     return n;
   }
 
   // 主鎖が炭素1個だけの構造(ハロゲン化メタン)を生成する。やさしめ難度でのみ登場させる。
-  function generateMethaneGrid() {
+  function generateMethaneGrid(forceHydroxyl = false) {
     const dirsByCount = { 1: ['E'], 2: ['E', 'W'], 3: ['E', 'W', 'N'], 4: ['E', 'W', 'N', 'S'] };
     const typeByCount = { 1: 1, 2: 2, 3: 4, 4: 5 };
     const count = randInt(1, 4);
@@ -1482,11 +1672,16 @@
     const cr = 2, cc = Math.floor(COLS / 2);
     grid[cr][cc] = panelFor(typeByCount[count], dirs);
     const opp = { E: 'W', W: 'E', N: 'S', S: 'N' };
-    const halogenNames = Object.keys(HALOGEN_ELEMENT_BY_NAME);
+    const names = forceHydroxyl ? [...Object.keys(HALOGEN_ELEMENT_BY_NAME), HYDROXYL_ELEMENT] : Object.keys(HALOGEN_ELEMENT_BY_NAME);
+    let hydroxylUsed = false;
+    const forcedHydroxylDir = forceHydroxyl ? choice(dirs) : null;
     dirs.forEach((d) => {
       const [dr, dc] = DELTA[d];
       const panel = panelFor(1, [opp[d]]);
-      panel.element = HALOGEN_ELEMENT_BY_NAME[choice(halogenNames)];
+      const candidates = names.filter((name) => name !== HYDROXYL_ELEMENT || !hydroxylUsed);
+      const name = d === forcedHydroxylDir ? HYDROXYL_ELEMENT : choice(candidates);
+      panel.element = name === HYDROXYL_ELEMENT ? HYDROXYL_ELEMENT : HALOGEN_ELEMENT_BY_NAME[name];
+      if (name === HYDROXYL_ELEMENT) hydroxylUsed = true;
       grid[cr + dr][cc + dc] = panel;
     });
     return grid;
@@ -1515,16 +1710,26 @@
   function generateStructureWithOptions(opts) {
     const {
       typeMin = 1, typeMax = 1, lenMin = 2, lenMax = 7, useBent = false, forceTurn = false, forceRingSubstituent = false,
-      ringSizes = [4, 6], bendRange = null, allowMethane = false, maxWidth = COLS, maxHeight = ROWS,
+      ringSizes = [4, 6], bendRange = null, allowMethane = false, alcoholEnabled = false, alcoholRate = 40, hydroxylLimitOne = false,
+      maxWidth = COLS, maxHeight = ROWS,
     } = opts || {};
     const typeRange = [typeMin, typeMax];
-
+    // OHを候補の重みで増やすのではなく、問題単位で含めるかを決める。
+    // 有効時は設定した割合で、少なくとも1個のOHを含む問題になる。
+    const normalizedAlcoholRate = Math.max(0, Math.min(100, Number(alcoholRate) || 0));
+    const forceHydroxyl = alcoholEnabled && Math.random() * 100 < normalizedAlcoholRate;
+    function hydroxylCountInGrid(g) {
+      return g.flat().filter((panel) => panel && panel.element === HYDROXYL_ELEMENT).length;
+    }
     function finalize(g) {
       // 盤面の使用可能な範囲に収まらない構造は出題しない(組み立て不可能になるため)
       const extent = gridExtent(g);
       if (extent.w > maxWidth || extent.h > maxHeight) return null;
       const result = generateName(g);
       if (!result.ok) return null;
+      const hydroxylCount = hydroxylCountInGrid(g);
+      if (forceHydroxyl && hydroxylCount === 0) return null;
+      if (hydroxylLimitOne && hydroxylCount > 1) return null;
       // 分岐の位置によっては最長鎖ルールの都合で主鎖の解釈が変わり、
       // 意図せず種類数が設定範囲から外れることがあるため、実際の結果を見てから判定する。
       // ただし置換基が1つも無い構造(種類数0)は、下限が何であっても許容する。
@@ -1533,11 +1738,11 @@
       if (typeCount > 0 && typeCount < typeMin) return null;
       return { grid: g, name: result.name, fellBack: false };
     }
-    function tryMethane() { try { return finalize(generateMethaneGrid()); } catch (e) { return null; } }
-    function tryCyclo() { try { return finalize(generateCycloalkaneGrid(forceRingSubstituent, ringSizes, opts.subMin, opts.subMax)); } catch (e) { return null; } }
+    function tryMethane() { try { return finalize(generateMethaneGrid(forceHydroxyl)); } catch (e) { return null; } }
+    function tryCyclo() { try { return finalize(generateCycloalkaneGrid(forceRingSubstituent, ringSizes, opts.subMin, opts.subMax, typeRange, forceHydroxyl, hydroxylLimitOne)); } catch (e) { return null; } }
     function tryChainLen(len) {
       try {
-        const lenOpts = { ...opts, lenMin: len, lenMax: len };
+        const lenOpts = { ...opts, lenMin: len, lenMax: len, forceHydroxyl, hydroxylLimitOne };
         const g = useBent ? generateBentAlkaneGrid(typeRange, lenOpts, forceTurn, bendRange) : generateAlkaneGrid(typeRange, lenOpts);
         return g ? finalize(g) : null;
       } catch (e) { return null; }
@@ -1575,8 +1780,14 @@
     }
     // 最終手段: 万一失敗してもエタンで確実に成功させる(fellBack:trueで「設定が厳しすぎる」ことを呼び出し元に伝える)
     const g = emptyGrid();
-    g[2][3] = panelFor(1, ['E']);
-    g[2][4] = panelFor(1, ['W']);
+    if (forceHydroxyl) {
+      g[2][2] = panelFor(1, ['E']);
+      g[2][3] = panelFor(2, ['W', 'E']);
+      g[2][4] = { ...panelFor(1, ['W']), element: HYDROXYL_ELEMENT };
+    } else {
+      g[2][3] = panelFor(1, ['E']);
+      g[2][4] = panelFor(1, ['W']);
+    }
     return { grid: g, name: generateName(g).name, fellBack: true };
   }
 
@@ -1711,6 +1922,21 @@
         }
         arms += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--text)" stroke-width="3" stroke-linecap="round"/>`;
       }
+      if (element === HYDROXYL_ELEMENT) {
+        const bondDir = [...bondSet][0];
+        if (bondDir) {
+          const [dx, dy] = VEC[OPPOSITE[bondDir]];
+          const x1 = 50 + dx * 13, y1 = 50 + dy * 13, x2 = 50 + dx * H_LINE_END, y2 = 50 + dy * H_LINE_END;
+          const cx = 50 + dx * H_CIRCLE_AT, cy = 50 + dy * H_CIRCLE_AT;
+          arms += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round"/>`;
+          arms += `<circle cx="${cx}" cy="${cy}" r="6" fill="var(--paper)" stroke="var(--text-muted)" stroke-width="2"/>`;
+        } else {
+          // デッキ・未結合時は、結合線を出さずにHを右上(約2時方向)へ直接付ける。
+          arms += `<circle cx="64.1" cy="35.9" r="6" fill="var(--paper)" stroke="var(--text-muted)" stroke-width="2"/>`;
+        }
+        const atom = `<circle cx="50" cy="50" r="14" fill="${HYDROXYL_FILL}"/>`;
+        return `<svg viewBox="0 0 100 100" width="100%" height="100%">${underlay}${arms}${atom}</svg>`;
+      }
       const info = HALOGEN_INFO[element];
       const fontSize = element.length === 1 ? 32 : 24;
       const atom = `<circle cx="50" cy="50" r="27" fill="${info.fill}" stroke="${info.stroke}" stroke-width="2"/>`
@@ -1765,14 +1991,14 @@
   // ============================================================
   // モーダルで編集できる項目の既定値。ここが「今の設定」の基準になる。
   const DEFAULT_GAME1_OPTS = {
-    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, gridCols: 7, gridRows: 5, traceEnabled: true },
-    medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  gridCols: 7, gridRows: 5, traceEnabled: true },
-    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  gridCols: 5, gridRows: 5, traceEnabled: true },
+    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, gridCols: 7, gridRows: 5, traceEnabled: true, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
+    medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  gridCols: 7, gridRows: 5, traceEnabled: true, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  gridCols: 5, gridRows: 5, traceEnabled: true, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
   };
   const DEFAULT_GAME2_OPTS = {
-    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 3, ringSizes: [4, 6],     forceRingSubstituent: false, bendMin: 0, bendMax: 1 },
-    medium: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  bendMin: 2, bendMax: 3 },
-    hard:   { typeMin: 1, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  bendMin: 4, bendMax: 99 },
+    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 3, ringSizes: [4, 6],     forceRingSubstituent: false, bendMin: 0, bendMax: 1, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
+    medium: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  bendMin: 2, bendMax: 3, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  bendMin: 4, bendMax: 99, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
   };
   // モーダルには出さず内部で固定する値。
   // 屈曲主鎖: 並べ・名付けとも常にON(並べは盤面の曲がりが見えないため露出の意味が薄く、
@@ -1785,9 +2011,45 @@
   const ALLOW_METHANE = { easy: true, medium: false, hard: false };
 
   const SETTINGS_KEY = 'alkane-puzzle-settings-v3';
+  // v1の「むずかしめ」はOH出題がONだった。完全に既定値のまま使われていた設定だけを
+  // 新既定値へ移し、利用者が調整した設定は保持する。
+  const LEGACY_V1_HARD_DEFAULTS = {
+    game1: { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true, gridCols: 5, gridRows: 5, traceEnabled: true, alcoholEnabled: true },
+    game2: { typeMin: 1, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true, bendMin: 4, bendMax: 99, alcoholEnabled: true },
+  };
+  // OH既定値の移行後も、名付ける「そこそこ」の旧既定値だけを側鎖種類2〜4へ進める。
+  // 利用者がどれか一つでも変更した設定は、この比較に一致しないためそのまま保持する。
+  const LEGACY_GAME2_HARD_DEFAULT = {
+    typeMin: 1, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8,
+    ringSizes: [6, 8, 10], forceRingSubstituent: true, bendMin: 4, bendMax: 99,
+    alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false,
+  };
+  const LEGACY_INDEX_GAME2_HARD_DEFAULT = {
+    typeMin: 1, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8,
+    ringSizes: [6, 8, 10], forceRingSubstituent: true, bendMin: 4, bendMax: 99,
+  };
+  function matchesLegacyDefault(savedTier, legacyDefault) {
+    return !!savedTier && Object.entries(legacyDefault).every(([key, value]) => JSON.stringify(savedTier[key]) === JSON.stringify(value));
+  }
+  function migrateLegacyHydroxylDefaults(saved) {
+    if (!saved) return saved;
+    for (const game of ['game1', 'game2']) {
+      const savedTier = saved[game] && saved[game].hard;
+      if (matchesLegacyDefault(savedTier, LEGACY_V1_HARD_DEFAULTS[game])) savedTier.alcoholEnabled = false;
+    }
+    return saved;
+  }
+  function migrateLegacyGame2HardDefault(saved) {
+    const hard = saved && saved.game2 && saved.game2.hard;
+    if (matchesLegacyDefault(hard, LEGACY_GAME2_HARD_DEFAULT)
+      || matchesLegacyDefault(hard, LEGACY_INDEX_GAME2_HARD_DEFAULT)) hard.typeMin = 2;
+    return saved;
+  }
   function loadGameSettings() {
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)); } catch (e) { saved = null; }
+    saved = migrateLegacyHydroxylDefaults(saved);
+    saved = migrateLegacyGame2HardDefault(saved);
     const merge = (defaults, savedGame) => {
       const out = {};
       for (const tier of ['easy', 'medium', 'hard']) {
@@ -1811,6 +2073,9 @@
       typeMin: s.typeMin, typeMax: s.typeMax, lenMin: s.lenMin, lenMax: s.lenMax, subMin: s.subMin, subMax: s.subMax,
       ringSizes: s.ringSizes.length ? s.ringSizes : [6],
       forceRingSubstituent: s.forceRingSubstituent,
+      alcoholEnabled: s.alcoholEnabled,
+      alcoholRate: s.alcoholRate,
+      hydroxylLimitOne: s.hydroxylLimitOne,
       useBent: true, forceTurn: FORCE_TURN.game1[tier], allowMethane: ALLOW_METHANE[tier],
       maxWidth: s.gridCols, maxHeight: s.gridRows,
     };
@@ -1821,6 +2086,9 @@
       typeMin: s.typeMin, typeMax: s.typeMax, lenMin: s.lenMin, lenMax: s.lenMax, subMin: s.subMin, subMax: s.subMax,
       ringSizes: s.ringSizes.length ? s.ringSizes : [6],
       forceRingSubstituent: s.forceRingSubstituent,
+      alcoholEnabled: s.alcoholEnabled,
+      alcoholRate: s.alcoholRate,
+      hydroxylLimitOne: s.hydroxylLimitOne,
       useBent: true, forceTurn: FORCE_TURN.game2[tier], allowMethane: ALLOW_METHANE[tier],
       bendRange: [s.bendMin, s.bendMax],
     };
@@ -2094,7 +2362,7 @@
     } else if (islands.size > 0) {
       statusEl.textContent = `孤立フラグメントがあります(${islands.size}マス)\nひとつの分子になるよう繋げてください`;
     } else if (nameResult && nameResult.ok) {
-      statusEl.innerHTML = `<span class="name">${nameResult.name}</span>`;
+      statusEl.innerHTML = `<span class="name">${displayCompoundName(nameResult.name)}</span>`;
     } else if (nameResult) {
       statusEl.textContent = `判定エラー: ${nameResult.error}`;
     }
@@ -2181,10 +2449,13 @@
     const activeComp = practiceActiveCells
       ? analyzed.find((a) => setsOverlap(a.cells, practiceActiveCells))
       : null;
-    if (analyzed.length === 0) {
+    const geminalDiol = analyzed.find((comp) => comp.status === 'geminal-diol');
+    if (geminalDiol) {
+      statusEl.textContent = 'ひとつの炭素原子にヒドロキシ基はひとつまで';
+    } else if (analyzed.length === 0) {
       statusEl.textContent = '原子を並べてください';
     } else if (activeComp && activeComp.status === 'valid') {
-      statusEl.innerHTML = `<span class="name">${activeComp.name}</span>`;
+      statusEl.innerHTML = `<span class="name">${displayCompoundName(activeComp.name)}</span>`;
     } else {
       statusEl.textContent = '組み立て中';
     }
@@ -2339,6 +2610,11 @@
   // ============================================================
   // パレット(新規配置ドラッグ)
   // ============================================================
+  function alcoholEnabledForCurrentContext() {
+    if (isPracticeTier()) return true;
+    return difficulty !== 'practice' && !!gameSettings[currentMode][difficulty]?.alcoholEnabled;
+  }
+
   function setupPalette() {
     const paletteEl = document.getElementById('palette');
     paletteEl.innerHTML = '';
@@ -2346,9 +2622,11 @@
     carbonRow.className = 'palette-row';
     const halogenRow = document.createElement('div');
     halogenRow.className = 'palette-row';
+    const halogenItems = ['F', 'Cl', 'Br', 'I'].map((element) => ({ kind: 'halogen', element }));
+    if (alcoholEnabledForCurrentContext()) halogenItems.push({ kind: 'hydroxyl', element: HYDROXYL_ELEMENT });
     const groups = [
       { row: carbonRow, items: [1, 2, 3, 4, 5].map((type) => ({ kind: 'carbon', type })) },
-      { row: halogenRow, items: ['F', 'Cl', 'Br', 'I'].map((element) => ({ kind: 'halogen', element })) },
+      { row: halogenRow, items: halogenItems },
     ];
     for (const { row, items } of groups) {
       for (const item of items) {
@@ -2484,6 +2762,24 @@
   // ============================================================
   const MOVE_THRESHOLD = 8;
   const TAP_TIMEOUT = 220; // この時間内に次のタップが来なければ、それまでのタップ回数でアクションを確定する
+
+  // iOS Safariはviewport指定とtouch-action:manipulationだけでは、連続タップを
+  // ページ拡大として扱うことがある。pointerupで数えるパネル操作の後に来るtouchendで
+  // 2回目以降だけ既定動作を止めれば、2/3タップ判定・単タップのボタン操作を保ったまま
+  // 画面全体のダブルタップ拡大を抑止できる。
+  const SAFARI_ZOOM_TAP_WINDOW = 350;
+  let lastDocumentTouchEndAt = 0;
+  function preventSafariZoom(event) { event.preventDefault(); }
+  document.addEventListener('gesturestart', preventSafariZoom, { capture: true, passive: false });
+  document.addEventListener('gesturechange', preventSafariZoom, { capture: true, passive: false });
+  document.addEventListener('gestureend', preventSafariZoom, { capture: true, passive: false });
+  document.addEventListener('dblclick', preventSafariZoom, { capture: true, passive: false });
+  document.addEventListener('touchend', (event) => {
+    if (event.changedTouches.length !== 1) return;
+    const now = Date.now();
+    if (now - lastDocumentTouchEndAt <= SAFARI_ZOOM_TAP_WINDOW) event.preventDefault();
+    lastDocumentTouchEndAt = now;
+  }, { capture: true, passive: false });
 
   function attachCellInteractions(cell, r, c) {
     let downX = 0, downY = 0, moved = false;
@@ -2650,6 +2946,7 @@
   }
 
   function startGame1() {
+    clearPaletteSelection();
     interactionsEnabled = true;
     const { name } = generateAvoidingImmediateRepeat(buildGame1Opts(difficulty), lastGame1Name);
     lastGame1Name = name;
@@ -2676,17 +2973,17 @@
     // 「お題：」ラベルはやさしめだけ表示する(まあまあ・そこそこは名前だけ見せる)
     const objectiveLabel = difficulty === 'easy' ? 'お題：' : '';
     if (game1Checked === 'correct') {
-      obj.innerHTML = `<span class="stamp tappable" id="correct-stamp1">${correctStampSVG()}</span>正解です！<br><span class="name">${targetName}</span>`;
+      obj.innerHTML = `<span class="stamp tappable" id="correct-stamp1">${correctStampSVG()}</span>正解です！<br><span class="name">${displayCompoundName(targetName)}</span>`;
       const stamp = document.getElementById('correct-stamp1');
       if (stamp) stamp.addEventListener('click', startGame1);
     } else if (game1Checked === 'incorrect') {
       // 不正解スタンプを表示。チェックボタンは出さず、枠の右側に次の問題へ進むボタンを置く
       // (パネルを操作した場合は自動で消えてチェックボタンが再表示される)
       obj.innerHTML = `<span class="stamp" id="wrong-stamp1">${wrongStampSVG()}</span>`
-        + `<div class="objective-row">${objectiveLabel}<span class="name">${targetName}</span><button id="next-btn1" class="secondary">次の問題へ</button></div>`;
+        + `<div class="objective-row">${objectiveLabel}<span class="name">${displayCompoundName(targetName)}</span><button id="next-btn1" class="secondary">次の問題へ</button></div>`;
       document.getElementById('next-btn1').addEventListener('click', () => { playUiClickSound(); startGame1(); });
     } else {
-      obj.innerHTML = `${objectiveLabel}<span class="name">${targetName}</span><div class="objective-actions"><button id="check-btn1">チェック</button></div>`;
+      obj.innerHTML = `${objectiveLabel}<span class="name">${displayCompoundName(targetName)}</span><div class="objective-actions"><button id="check-btn1">チェック</button></div>`;
       document.getElementById('check-btn1').addEventListener('click', checkGame1Answer);
       document.querySelector('.objective-actions').appendChild(resetBtn);
     }
@@ -2699,6 +2996,7 @@
   const BASE_NAME_TOKENS = CHAIN_NAMES.slice(1, 11);
   const BASE_NAME_SET = new Set(BASE_NAME_TOKENS);
   const CYCLO_TOKEN = 'シクロ';
+  const ALCOHOL_TOKEN = 'オール';
   const SUB_NAME_SET = new Set(['メチル', 'エチル', 'フルオロ', 'クロロ', 'ブロモ', 'ヨード']);
   // 命名側と語群側で同じ数詞表を使う。index 0・1 は接頭語なしなので除く。
   const MULTIPLIER_TOKENS = MULTIPLIER_PREFIX.slice(2);
@@ -2712,7 +3010,8 @@
   // 名付けモードの「側鎖数」の上限まで、必要になり得る数詞だけを語群に出す。
   function multiplierTokensForCurrentDifficulty() {
     const settings = game2SettingsForCurrentDifficulty();
-    return MULTIPLIER_TOKENS.slice(0, Math.max(0, settings.subMax - 1));
+    const requiredMax = settings.alcoholEnabled ? 2 : 1; // ジオールを入力できるようにする
+    return MULTIPLIER_TOKENS.slice(0, Math.max(0, Math.max(settings.subMax, requiredMax) - 1));
   }
 
   // 現在の名付け難易度で出題され得る主鎖名と位置番号を求める。
@@ -2731,7 +3030,7 @@
     if (ALLOW_METHANE[tier]) baseLengths.add(1);
     for (const size of ringSizes) if (Number.isInteger(size) && size >= 1 && size <= maxSupportedLength) baseLengths.add(size);
     for (let length = 1; length <= maxSupportedLength; length++) {
-      if (targetName.endsWith(CHAIN_NAMES[length])) baseLengths.add(length);
+      if (targetName.includes(CHAIN_NAMES[length])) baseLengths.add(length);
     }
 
     const maxLocant = Math.max(lenMax, ...ringSizes.filter((size) => Number.isInteger(size) && size >= 1 && size <= maxSupportedLength));
@@ -2741,7 +3040,8 @@
     };
   }
 
-  // 数字・倍数詞・置換基名・(シクロ)・主鎖名のトークン列から、コンマ・ハイフンを自動で補って正式な名称文字列に組み立てる。
+  // 数字・倍数詞・置換基名・(シクロ)・主鎖名・オールのトークン列から、
+  // コンマ・ハイフンを自動で補って正式な名称文字列に組み立てる。
   // 例: ['2','2','3','トリ','メチル','ブタン'] -> '2,2,3-トリメチルブタン'
   // 例: ['ブロモ','シクロ','ヘキサン'] -> 'ブロモシクロヘキサン'
   // 例: ['ジ','フルオロ','メタン'] -> 'ジフルオロメタン' (メタン置換体は位置番号なし)
@@ -2751,14 +3051,15 @@
     const groups = [];
     let usedLocants = false; // 位置番号ありのグループを1つでも読んだか(連結記号の切り替えに使う)
 
-    // 数字から始まる置換基グループ(位置番号あり)を読み取れるだけ読み取る
+    // 数字から始まる置換基グループ(位置番号あり)。数字の後に置換基が続く場合だけ消費する。
     while (i < tokens.length && /^\d+$/.test(tokens[i])) {
-      usedLocants = true;
+      const start = i;
       const locants = [];
       while (i < tokens.length && /^\d+$/.test(tokens[i])) { locants.push(tokens[i]); i++; }
       let multiplier = '';
       if (i < tokens.length && MULTIPLIER_SET.has(tokens[i])) { multiplier = tokens[i]; i++; }
-      if (i >= tokens.length || !SUB_NAME_SET.has(tokens[i])) return null;
+      if (i >= tokens.length || !SUB_NAME_SET.has(tokens[i])) { i = start; break; }
+      usedLocants = true;
       groups.push(`${locants.join(',')}-${multiplier}${tokens[i]}`);
       i++;
     }
@@ -2771,19 +3072,49 @@
       groups.push(`${multiplier}${tokens[i]}`);
       i++;
     }
+    // アルコールの位置番号(置換基グループの後、主鎖の前)を読む。
+    const alcoholLocants = [];
+    while (i < tokens.length && /^\d+$/.test(tokens[i])) { alcoholLocants.push(tokens[i]); i++; }
+
     // 「シクロ」があれば、その次に来る鎖の名前と繋げて環の名前にする
     let cycloPrefix = '';
     if (i < tokens.length && tokens[i] === CYCLO_TOKEN) { cycloPrefix = CYCLO_TOKEN; i++; }
     if (i >= tokens.length || !BASE_NAME_SET.has(tokens[i])) return null;
-    const base = cycloPrefix + tokens[i];
+    const baseToken = tokens[i];
+    const base = cycloPrefix + baseToken;
     i++;
+
+    let alcoholMultiplier = '';
+    if (i < tokens.length && MULTIPLIER_SET.has(tokens[i])) { alcoholMultiplier = tokens[i]; i++; }
+    const hasAlcohol = i < tokens.length && tokens[i] === ALCOHOL_TOKEN;
+    if (hasAlcohol) i++;
     if (i !== tokens.length) return null; // 余分なトークンが残っている
+
+    if (hasAlcohol) {
+      const multiplierCount = alcoholMultiplier ? MULTIPLIER_PREFIX.indexOf(alcoholMultiplier) : 1;
+      if (!multiplierCount) return null;
+      if (alcoholLocants.length > 0) {
+        if (new Set(alcoholLocants).size !== alcoholLocants.length) return null; // ジェミナルジオールを防ぐ
+        if (alcoholLocants.length !== multiplierCount) return null;
+      } else if (multiplierCount !== 1) {
+        return null;
+      }
+      const carbonCount = CHAIN_NAMES.indexOf(baseToken);
+      if (alcoholLocants.some((n) => Number(n) < 1 || Number(n) > carbonCount)) return null;
+      const alcoholStem = base.endsWith('ン') ? `${base.slice(0, -1)}ノール` : `${base}ノール`;
+      const suffix = multiplierCount === 1 ? alcoholStem : `${base}${alcoholMultiplier}オール`;
+      const alcoholPrefix = alcoholLocants.length ? `${alcoholLocants.join(',')}-` : '';
+      const subPrefix = groups.join(usedLocants ? '-' : '');
+      return subPrefix + (subPrefix && alcoholPrefix ? '-' : '') + alcoholPrefix + suffix;
+    }
+    if (alcoholLocants.length || alcoholMultiplier) return null;
 
     // 位置番号ありの名前は各グループをハイフンで繋ぐが、メタン置換体(位置番号なし)はハイフンを挟まない
     return groups.join(usedLocants ? '-' : '') + base;
   }
 
   function startGame2() {
+    clearPaletteSelection();
     interactionsEnabled = false;
     const { grid: g, name } = generateAvoidingImmediateRepeat(buildGame2Opts(difficulty), lastGame2Name);
     lastGame2Name = name;
@@ -2817,7 +3148,7 @@
     if (correct) {
       playCorrectSound();
       // スタンプは右側にずらして、解答の文字が隠れないようにする
-      preview.innerHTML = `<span class="stamp tappable stamp-side" id="correct-stamp2">${correctStampSVG()}</span>正解！ <span class="name">${targetName}</span>`;
+      preview.innerHTML = `<span class="stamp tappable stamp-side" id="correct-stamp2">${correctStampSVG()}</span>正解！ <span class="name">${displayCompoundName(targetName)}</span>`;
       const stamp = document.getElementById('correct-stamp2');
       if (stamp) stamp.addEventListener('click', startGame2);
       return;
@@ -2839,7 +3170,7 @@
     document.getElementById('reveal-answer-btn2').addEventListener('click', () => {
       playUiClickSound();
       // ボタン類と「誤」スタンプを消すが、自分の回答はそのまま残し、正答と次の問題へ進むボタンを添える
-      preview.innerHTML = `${message}<br>正答：<span class="name">${targetName}</span>`
+      preview.innerHTML = `${message}<br>正答：<span class="name">${displayCompoundName(targetName)}</span>`
         + `<div class="answer-actions"><button id="next-btn2" class="secondary">次の問題へ</button></div>`;
       document.getElementById('next-btn2').addEventListener('click', () => { playUiClickSound(); startGame2(); });
     });
@@ -2855,31 +3186,6 @@
     preview.id = 'answer-preview';
     wb.appendChild(preview);
 
-    const { numberTokens, baseNameTokens } = mainChainTokensForCurrentDifficulty();
-    // 数字行は主鎖・環の設定に合わせた順に固定。それ以外の行はグループ内の並びを毎回シャッフルする
-    const rows = [
-      { cls: 'cat-number', tokens: numberTokens },
-      { cls: 'cat-multiplier', tokens: shuffle(multiplierTokensForCurrentDifficulty()) },
-      { cls: 'cat-subname', tokens: shuffle(['メチル', 'エチル', 'フルオロ', 'クロロ', 'ブロモ', 'ヨード']) },
-      // 環の名前は「シクロ」+ 鎖の名前 で組み立てさせる。「シクロ」はシャッフルせず先頭に固定する。
-      { cls: 'cat-basename', tokens: ['シクロ', ...shuffle(baseNameTokens)] },
-    ];
-    for (const { cls, tokens } of rows) {
-      const rowEl = document.createElement('div');
-      rowEl.className = 'row ' + cls;
-      for (const token of tokens) {
-        const btn = document.createElement('button');
-        btn.textContent = token;
-        btn.addEventListener('click', () => {
-          answerTokens.push(token);
-          updateAnswerPreview();
-          playPlaceSound();
-        });
-        rowEl.appendChild(btn);
-      }
-      wb.appendChild(rowEl);
-    }
-
     const controlRow = document.createElement('div');
     controlRow.className = 'row control-row';
     const undoBtn = document.createElement('button');
@@ -2894,8 +3200,34 @@
     submitBtn.textContent = '回答する';
     submitBtn.className = 'primary';
     submitBtn.addEventListener('click', submitGame2Answer);
-    controlRow.appendChild(undoBtn); controlRow.appendChild(clearBtn); controlRow.appendChild(submitBtn);
+    controlRow.append(undoBtn, clearBtn, submitBtn);
     wb.appendChild(controlRow);
+
+    const { numberTokens, baseNameTokens } = mainChainTokensForCurrentDifficulty();
+    // 数字行は主鎖・環の設定に合わせた順に固定。それ以外の行はグループ内の並びを毎回シャッフルする
+    const rows = [
+      { cls: 'cat-number', tokens: numberTokens },
+      { cls: 'cat-multiplier', tokens: shuffle(multiplierTokensForCurrentDifficulty()) },
+      { cls: 'cat-subname', tokens: shuffle(['メチル', 'エチル', 'フルオロ', 'クロロ', 'ブロモ', 'ヨード']) },
+      // 環の名前は「シクロ」+ 鎖の名前 で組み立てさせる。「シクロ」は先頭、オールはその右に固定する。
+      { cls: 'cat-basename', tokens: ['シクロ', ...(game2SettingsForCurrentDifficulty().alcoholEnabled ? [ALCOHOL_TOKEN] : []), ...shuffle(baseNameTokens)] },
+    ];
+    for (const { cls, tokens } of rows) {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'row ' + cls;
+      for (const token of tokens) {
+        const btn = document.createElement('button');
+        btn.textContent = token;
+        if (token === CYCLO_TOKEN || token === ALCOHOL_TOKEN) btn.classList.add('special-affix');
+        btn.addEventListener('click', () => {
+          answerTokens.push(token);
+          updateAnswerPreview();
+          playPlaceSound();
+        });
+        rowEl.appendChild(btn);
+      }
+      wb.appendChild(rowEl);
+    }
   }
 
   // ============================================================
@@ -2907,11 +3239,40 @@
     if (practiceBtn) practiceBtn.style.display = currentMode === 'game1' ? '' : 'none';
     const rulesBtn = document.getElementById('naming-rules-btn');
     if (rulesBtn) rulesBtn.style.display = currentMode === 'game2' ? '' : 'none';
+    renderHydroxylToggle();
+  }
+
+  function renderHydroxylToggle() {
+    const button = document.getElementById('hydroxyl-toggle');
+    if (!button) return;
+    const lockedForPractice = isPracticeTier();
+    const enabled = lockedForPractice || (difficulty !== 'practice' && !!gameSettings[currentMode][difficulty]?.alcoholEnabled);
+    button.innerHTML = svgIcon(1, [], 0, false, HYDROXYL_ELEMENT);
+    button.classList.toggle('active', enabled);
+    button.disabled = lockedForPractice;
+    button.setAttribute('aria-pressed', String(enabled));
+    button.title = lockedForPractice ? '練習ではヒドロキシ基は常にON' : `ヒドロキシ基を出題数に含める: ${enabled ? 'ON' : 'OFF'}`;
+    button.setAttribute('aria-label', button.title);
+  }
+
+  function toggleHydroxylForCurrentDifficulty() {
+    if (isPracticeTier() || difficulty === 'practice') return;
+    const settings = gameSettings[currentMode][difficulty];
+    settings.alcoholEnabled = !settings.alcoholEnabled;
+    saveGameSettings();
+    renderHydroxylToggle();
+    if (currentMode === 'game1') {
+      setupPalette();
+      refreshAll();
+    } else {
+      startGame2();
+    }
   }
 
   // アルカン並べ: 練習(お題なし・自由に組む)か、やさしめ/まあまあ/そこそこ(お題を当てる)かで表示を切り替える
   function enterGame1Tier() {
     clearPaletteSelection();
+    setupPalette();
     const practice = difficulty === 'practice';
     document.getElementById('objective').style.display = practice ? 'none' : 'block';
     document.getElementById('status').style.display = practice ? 'block' : 'none';
@@ -2979,6 +3340,19 @@
     row.appendChild(stepperControl(s[key],
       () => { if (s[key] > lo) { s[key]--; onSettingsChanged(); } },
       () => { if (s[key] < hi) { s[key]++; onSettingsChanged(); } }));
+    return row;
+  }
+
+  function makePercentStepperRow(label, s, key) {
+    const row = document.createElement('div');
+    row.className = 'settings-row';
+    const lab = document.createElement('span'); lab.className = 'settings-label'; lab.textContent = label;
+    const value = Math.max(0, Math.min(100, Number(s[key]) || 0));
+    s[key] = value;
+    row.appendChild(lab);
+    row.appendChild(stepperControl(`${value}%`,
+      () => { if (s[key] > 0) { s[key] = Math.max(0, s[key] - 10); onSettingsChanged(); } },
+      () => { if (s[key] < 100) { s[key] = Math.min(100, s[key] + 10); onSettingsChanged(); } }));
     return row;
   }
 
@@ -3052,16 +3426,21 @@
     } else {
       form.appendChild(makeRangeStepperRow('折れ曲がり炭素数', s, 'bendMin', 'bendMax', 0, 10));
     }
+    form.appendChild(makeToggleRow('ヒドロキシ基を出題数に含める', s, 'alcoholEnabled'));
+    form.appendChild(makePercentStepperRow('アルコール問題の出題率', s, 'alcoholRate'));
+    form.appendChild(makeToggleRow('分子中のヒドロキシ基を1個までにする', s, 'hydroxylLimitOne'));
     form.appendChild(makeToggleRow('環に置換基を必ず付ける', s, 'forceRingSubstituent'));
     updateFeasibilityWarning();
   }
 
   function onSettingsChanged() {
     saveGameSettings();
+    renderHydroxylToggle();
     renderSettingsForm(); // 全体を再描画して値のズレを防ぐ
     // 編集中の設定が今まさに表示されている難度と同じなら、盤面サイズなどを即座に反映する
     if (modalState.game === 'game1' && currentMode === 'game1' && modalState.tier === difficulty) {
       applyGridSize();
+      setupPalette();
       refreshAll();
     }
     // 名付け中の難易度を編集した場合は、その設定で問題と語群を作り直して常に一致させる。
@@ -3090,7 +3469,7 @@
 
   function exportSettingsAsCode() {
     const fmtTier = (s, isGame1) => {
-      const common = `typeMin: ${s.typeMin}, typeMax: ${s.typeMax}, lenMin: ${s.lenMin}, lenMax: ${s.lenMax}, subMin: ${s.subMin}, subMax: ${s.subMax}, ringSizes: [${s.ringSizes.join(', ')}]`;
+      const common = `typeMin: ${s.typeMin}, typeMax: ${s.typeMax}, lenMin: ${s.lenMin}, lenMax: ${s.lenMax}, subMin: ${s.subMin}, subMax: ${s.subMax}, ringSizes: [${s.ringSizes.join(', ')}], alcoholEnabled: ${s.alcoholEnabled}, alcoholRate: ${s.alcoholRate}, hydroxylLimitOne: ${s.hydroxylLimitOne}`;
       const rest = isGame1
         ? `forceRingSubstituent: ${s.forceRingSubstituent}, gridCols: ${s.gridCols}, gridRows: ${s.gridRows}, traceEnabled: ${s.traceEnabled}`
         : `forceRingSubstituent: ${s.forceRingSubstituent}, bendMin: ${s.bendMin}, bendMax: ${s.bendMax}`;
@@ -3210,6 +3589,26 @@
         { r: 3, c: 1, element: 'Br', dirs: ['N'] },
       ],
     },
+    // 例5: 2,2,8-トリブロモ-7-メチル-1,4-シクロオクタンジオール
+    ex5: {
+      rows: 5, cols: 5,
+      cells: [
+        { r: 1, c: 1, dirs: ['E', 'S', 'N'] },
+        { r: 0, c: 1, element: 'OH', dirs: ['S'] },
+        { r: 2, c: 1, dirs: ['N', 'E', 'S', 'W'] },
+        { r: 3, c: 1, element: 'Br', dirs: ['N'] },
+        { r: 2, c: 0, element: 'Br', dirs: ['E'] },
+        { r: 2, c: 2, dirs: ['W', 'S'] },
+        { r: 3, c: 2, dirs: ['N', 'E', 'S'] },
+        { r: 4, c: 2, element: 'OH', dirs: ['N'] },
+        { r: 3, c: 3, dirs: ['W', 'N'] },
+        { r: 2, c: 3, dirs: ['S', 'N'] },
+        { r: 1, c: 3, dirs: ['S', 'W', 'E'] },
+        { r: 1, c: 4, dirs: ['W'] },
+        { r: 1, c: 2, dirs: ['E', 'W', 'N'] },
+        { r: 0, c: 2, element: 'Br', dirs: ['S'] },
+      ],
+    },
   };
 
   function renderRuleDiagram(containerId, diagram) {
@@ -3252,6 +3651,7 @@
   renderRuleDiagram('diagram-ex2', RULE_DIAGRAMS.ex2);
   renderRuleDiagram('diagram-ex3', RULE_DIAGRAMS.ex3);
   renderRuleDiagram('diagram-ex4', RULE_DIAGRAMS.ex4);
+  renderRuleDiagram('diagram-ex5', RULE_DIAGRAMS.ex5);
 
   document.getElementById('naming-rules-btn').addEventListener('click', () => {
     document.getElementById('rules-modal').style.display = 'flex';
@@ -3289,6 +3689,10 @@
   // ============================================================
   document.querySelectorAll('.mode-tab').forEach((btn) => {
     btn.addEventListener('click', () => { playUiClickSound(); setMode(btn.dataset.mode); });
+  });
+  document.getElementById('hydroxyl-toggle').addEventListener('click', () => {
+    playUiClickSound();
+    toggleHydroxylForCurrentDifficulty();
   });
   document.querySelectorAll('.diff-tab[data-diff]').forEach((btn) => {
     btn.addEventListener('click', () => {

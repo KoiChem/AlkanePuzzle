@@ -615,6 +615,17 @@
             <li>あとは時計回り・反時計回りで位置番号が小さくなる方を選ぶ</li>
           </ul>
         </div>
+
+        <div class="rules-example">
+          <strong>例5：OHを優先してから、側鎖の番号を比べる</strong>
+          <div class="rule-diagram" id="diagram-ex5"></div>
+          <p>✅ 2,2,8-トリブロモ-7-メチル-1,4-シクロオクタンジオール</p>
+          <ul>
+            <li>まずOHの位置番号が最小になるようにして、1,4-ジオールを選ぶ</li>
+            <li>残る二方向では、側鎖の番号列 {2,2,7,8} と {3,3,5,6} を比べる</li>
+            <li>最初に違う 2 &lt; 3 により、ブロモを 2,2,8、メチルを7番にする</li>
+          </ul>
+        </div>
       </section>
     </div>
   </div>
@@ -1987,7 +1998,7 @@
   const DEFAULT_GAME2_OPTS = {
     easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 3, ringSizes: [4, 6],     forceRingSubstituent: false, bendMin: 0, bendMax: 1, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
     medium: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  bendMin: 2, bendMax: 3, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
-    hard:   { typeMin: 1, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  bendMin: 4, bendMax: 99, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  bendMin: 4, bendMax: 99, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
   };
   // モーダルには出さず内部で固定する値。
   // 屈曲主鎖: 並べ・名付けとも常にON(並べは盤面の曲がりが見えないため露出の意味が薄く、
@@ -2006,6 +2017,13 @@
     game1: { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true, gridCols: 5, gridRows: 5, traceEnabled: true, alcoholEnabled: true },
     game2: { typeMin: 1, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true, bendMin: 4, bendMax: 99, alcoholEnabled: true },
   };
+  // OH既定値の移行後も、名付ける「そこそこ」の旧既定値だけを側鎖種類2〜4へ進める。
+  // 利用者がどれか一つでも変更した設定は、この比較に一致しないためそのまま保持する。
+  const LEGACY_GAME2_HARD_DEFAULT = {
+    typeMin: 1, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8,
+    ringSizes: [6, 8, 10], forceRingSubstituent: true, bendMin: 4, bendMax: 99,
+    alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false,
+  };
   function matchesLegacyDefault(savedTier, legacyDefault) {
     return !!savedTier && Object.entries(legacyDefault).every(([key, value]) => JSON.stringify(savedTier[key]) === JSON.stringify(value));
   }
@@ -2017,10 +2035,16 @@
     }
     return saved;
   }
+  function migrateLegacyGame2HardDefault(saved) {
+    const hard = saved && saved.game2 && saved.game2.hard;
+    if (matchesLegacyDefault(hard, LEGACY_GAME2_HARD_DEFAULT)) hard.typeMin = 2;
+    return saved;
+  }
   function loadGameSettings() {
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)); } catch (e) { saved = null; }
     saved = migrateLegacyHydroxylDefaults(saved);
+    saved = migrateLegacyGame2HardDefault(saved);
     const merge = (defaults, savedGame) => {
       const out = {};
       for (const tier of ['easy', 'medium', 'hard']) {
@@ -3560,6 +3584,26 @@
         { r: 3, c: 1, element: 'Br', dirs: ['N'] },
       ],
     },
+    // 例5: 2,2,8-トリブロモ-7-メチル-1,4-シクロオクタンジオール
+    ex5: {
+      rows: 5, cols: 5,
+      cells: [
+        { r: 1, c: 1, dirs: ['E', 'S', 'N'] },
+        { r: 0, c: 1, element: 'OH', dirs: ['S'] },
+        { r: 2, c: 1, dirs: ['N', 'E', 'S', 'W'] },
+        { r: 3, c: 1, element: 'Br', dirs: ['N'] },
+        { r: 2, c: 0, element: 'Br', dirs: ['E'] },
+        { r: 2, c: 2, dirs: ['W', 'S'] },
+        { r: 3, c: 2, dirs: ['N', 'E', 'S'] },
+        { r: 4, c: 2, element: 'OH', dirs: ['N'] },
+        { r: 3, c: 3, dirs: ['W', 'N'] },
+        { r: 2, c: 3, dirs: ['S', 'N'] },
+        { r: 1, c: 3, dirs: ['S', 'W', 'E'] },
+        { r: 1, c: 4, dirs: ['W'] },
+        { r: 1, c: 2, dirs: ['E', 'W', 'N'] },
+        { r: 0, c: 2, element: 'Br', dirs: ['S'] },
+      ],
+    },
   };
 
   function renderRuleDiagram(containerId, diagram) {
@@ -3602,6 +3646,7 @@
   renderRuleDiagram('diagram-ex2', RULE_DIAGRAMS.ex2);
   renderRuleDiagram('diagram-ex3', RULE_DIAGRAMS.ex3);
   renderRuleDiagram('diagram-ex4', RULE_DIAGRAMS.ex4);
+  renderRuleDiagram('diagram-ex5', RULE_DIAGRAMS.ex5);
 
   document.getElementById('naming-rules-btn').addEventListener('click', () => {
     document.getElementById('rules-modal').style.display = 'flex';
