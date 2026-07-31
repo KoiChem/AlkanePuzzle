@@ -335,7 +335,7 @@
   .wordbank .row.cat-basename{gap:4px;}
   /* シクロとオールは、主鎖名と同程度に淡いローズベージュで共通表示する */
   .wordbank .row.cat-basename button.special-affix{background:#f5e6e8;border-color:#d7a7ad;}
-  .wordbank .row:not(.control-row) button{cursor:grab;}
+  .wordbank .row:not(.control-row) button{cursor:grab;touch-action:none;}
   .wordbank.answered .row button{opacity:.4;pointer-events:none;}
   .wordbank .control-row{margin-top:0;margin-bottom:12px;gap:8px;}
   .wordbank .control-row button{padding:7px 16px;}
@@ -3225,6 +3225,7 @@
     document.body.appendChild(ghost);
     answerDragState = { token, fromIndex, ghost, preview, markerIndex: answerTokens.length, deleteArmed: false };
     const move = (ev) => {
+      ev.preventDefault();
       if (!answerDragState) return;
       ghost.style.left = `${ev.clientX}px`; ghost.style.top = `${ev.clientY}px`;
       const rect = preview.getBoundingClientRect();
@@ -3258,7 +3259,11 @@
   function bindWordBankTokenDrag(button, token) {
     let startX = 0, startY = 0, dragging = false;
     const move = (event) => {
-      if (!dragging && Math.hypot(event.clientX - startX, event.clientY - startY) >= ANSWER_DRAG_THRESHOLD) { dragging = true; beginAnswerDrag(event, token); }
+      if (!dragging && Math.hypot(event.clientX - startX, event.clientY - startY) >= ANSWER_DRAG_THRESHOLD) {
+        dragging = true;
+        event.preventDefault();
+        beginAnswerDrag(event, token);
+      }
     };
     const up = () => {
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
