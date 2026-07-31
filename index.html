@@ -512,7 +512,7 @@
       <section class="rules-section">
         <h3>アルコール（OH）があるとき</h3>
         <ul>
-          <li>OHの位置番号を最も小さくする。立体異性はこのベータ版では扱わない。</li>
+          <li>OHの位置番号を最も小さくする。立体異性は扱わない。</li>
           <li>1個なら「オール」：メタノール、エタノール、1-プロパノール、シクロヘキサノール</li>
           <li>2個以上なら既存の数詞を使う：1,2-エタンジオール、1,2-シクロヘキサンジオール</li>
           <li>同じ炭素にOHを2個付けるジェミナルジオールは出題しない。</li>
@@ -527,7 +527,7 @@
           <li>エリスリトール：butane-1,2,3,4-tetrol</li>
           <li>キシリトール：pentane-1,2,3,4,5-pentol</li>
         </ul>
-        <p>立体異性はこのベータ版では扱わないため、立体配置の表記は省略している。</p>
+        <p>立体異性は扱わないため、立体配置の表記は省略している。</p>
       </section>
 
       <section class="rules-section">
@@ -2057,10 +2057,17 @@
       }
       return out;
     };
-    return {
+    const settings = {
       game1: merge(DEFAULT_GAME1_OPTS, saved && saved.game1),
       game2: merge(DEFAULT_GAME2_OPTS, saved && saved.game2),
     };
+    // ON/OFFは難易度ではなくゲームごとに共有する。既存の難易度別設定は、どれか一つでも
+    // ONならそのゲーム全体をONとして引き継ぐ。
+    for (const game of ['game1', 'game2']) {
+      const enabled = ['easy', 'medium', 'hard'].some((tier) => settings[game][tier].alcoholEnabled);
+      for (const tier of ['easy', 'medium', 'hard']) settings[game][tier].alcoholEnabled = enabled;
+    }
+    return settings;
   }
   let gameSettings = loadGameSettings();
   function saveGameSettings() {
@@ -2612,7 +2619,7 @@
   // ============================================================
   function alcoholEnabledForCurrentContext() {
     if (isPracticeTier()) return true;
-    return difficulty !== 'practice' && !!gameSettings[currentMode][difficulty]?.alcoholEnabled;
+    return difficulty !== 'practice' && !!gameSettings[currentMode]?.easy?.alcoholEnabled;
   }
 
   function setupPalette() {
@@ -3246,7 +3253,7 @@
     const button = document.getElementById('hydroxyl-toggle');
     if (!button) return;
     const lockedForPractice = isPracticeTier();
-    const enabled = lockedForPractice || (difficulty !== 'practice' && !!gameSettings[currentMode][difficulty]?.alcoholEnabled);
+    const enabled = lockedForPractice || (difficulty !== 'practice' && !!gameSettings[currentMode]?.easy?.alcoholEnabled);
     button.innerHTML = svgIcon(1, [], 0, false, HYDROXYL_ELEMENT);
     button.classList.toggle('active', enabled);
     button.disabled = lockedForPractice;
@@ -3255,10 +3262,13 @@
     button.setAttribute('aria-label', button.title);
   }
 
+  function setAlcoholEnabledForGame(game, enabled) {
+    for (const tier of ['easy', 'medium', 'hard']) gameSettings[game][tier].alcoholEnabled = enabled;
+  }
+
   function toggleHydroxylForCurrentDifficulty() {
     if (isPracticeTier() || difficulty === 'practice') return;
-    const settings = gameSettings[currentMode][difficulty];
-    settings.alcoholEnabled = !settings.alcoholEnabled;
+    setAlcoholEnabledForGame(currentMode, !gameSettings[currentMode].easy.alcoholEnabled);
     saveGameSettings();
     renderHydroxylToggle();
     if (currentMode === 'game1') {
@@ -3410,6 +3420,20 @@
     return row;
   }
 
+  function makeAlcoholToggleRow(game) {
+    const row = document.createElement('div');
+    row.className = 'settings-row';
+    const lab = document.createElement('span'); lab.className = 'settings-label'; lab.textContent = 'ヒドロキシ基を出題数に含める（このゲーム共通）';
+    const enabled = !!gameSettings[game].easy.alcoholEnabled;
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'settings-toggle' + (enabled ? ' on' : '');
+    toggle.textContent = enabled ? 'ON' : 'OFF';
+    toggle.addEventListener('click', () => { setAlcoholEnabledForGame(game, !enabled); onSettingsChanged(); });
+    row.append(lab, toggle);
+    return row;
+  }
+
   function renderSettingsForm() {
     const { game, tier } = modalState;
     const s = gameSettings[game][tier];
@@ -3426,7 +3450,7 @@
     } else {
       form.appendChild(makeRangeStepperRow('折れ曲がり炭素数', s, 'bendMin', 'bendMax', 0, 10));
     }
-    form.appendChild(makeToggleRow('ヒドロキシ基を出題数に含める', s, 'alcoholEnabled'));
+    form.appendChild(makeAlcoholToggleRow(game));
     form.appendChild(makePercentStepperRow('アルコール問題の出題率', s, 'alcoholRate'));
     form.appendChild(makeToggleRow('分子中のヒドロキシ基を1個までにする', s, 'hydroxylLimitOne'));
     form.appendChild(makeToggleRow('環に置換基を必ず付ける', s, 'forceRingSubstituent'));
@@ -3680,7 +3704,7 @@
   document.getElementById('settings-reset-btn').addEventListener('click', () => {
     const { game, tier } = modalState;
     const defaults = game === 'game1' ? DEFAULT_GAME1_OPTS : DEFAULT_GAME2_OPTS;
-    gameSettings[game][tier] = { ...defaults[tier] };
+    gameSettings[game][tier] = { ...defaults[tier], alcoholEnabled: gameSettings[game].easy.alcoholEnabled };
     onSettingsChanged();
   });
 
