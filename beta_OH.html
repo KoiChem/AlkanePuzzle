@@ -48,9 +48,9 @@
     user-select:none;
     -webkit-touch-callout:none;
   }
-  #app{max-width:520px;margin:0 auto;padding:12px;}
+  #app{max-width:520px;margin:0 auto;padding:6px 12px 12px;}
 
-  header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;}
   header h1{
     font-size:20px;font-weight:800;margin:0;letter-spacing:.02em;
     color:var(--ink);
@@ -154,12 +154,14 @@
     background:var(--accent-soft);
   }
   @media (max-width:380px){
-    header{flex-wrap:wrap;}
+    /* 狭い画面ではタイトルを省き、モード切替を1行に保つ */
+    header{flex-wrap:nowrap;}
+    header h1{display:none;}
     .mode-controls{margin-left:auto;}
   }
 
   /* ---- 難易度タブ ---- */
-  .diff-tabs{display:flex;gap:8px;margin-bottom:14px;justify-content:center;}
+  .diff-tabs{display:flex;gap:8px;margin-bottom:8px;justify-content:center;}
   .diff-tab{
     font-size:13px;font-weight:700;padding:6px 18px;
     border-radius:999px;border:2.5px solid var(--border);
@@ -168,6 +170,13 @@
   }
   .diff-tab:active{transform:translate(1px,2px);box-shadow:0 0 0 var(--shadow);}
   .diff-tab.active{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft);font-weight:800;}
+  /* 命名ルールは幅が足りない画面だけ ? ボタンにして、難易度タブの横並びを保つ */
+  @media (max-width:430px){
+    header h1{font-size:16px;}
+    .diff-tab{padding-inline:10px;}
+    #naming-rules-btn{flex:0 0 32px;width:32px;height:32px;padding:0;box-sizing:border-box;font-size:0;}
+    #naming-rules-btn::before{content:'?';font-size:18px;line-height:1;}
+  }
   .rules-content{font-family:var(--font-hand);}
   .rules-section{margin-bottom:16px;}
   .rules-section:last-child{margin-bottom:0;}
@@ -442,7 +451,7 @@
       <button class="diff-tab" data-diff="easy">やさしめ</button>
       <button class="diff-tab" data-diff="medium">まあまあ</button>
       <button class="diff-tab" data-diff="hard">そこそこ</button>
-      <button id="naming-rules-btn" class="diff-tab" style="display:none;" type="button">命名ルール</button>
+      <button id="naming-rules-btn" class="diff-tab" style="display:none;" type="button" title="命名ルール" aria-label="命名ルール">命名ルール</button>
     </div>
     <button id="settings-gear" class="gear-btn" style="display:none;" type="button" title="難易度設定" aria-label="難易度設定">
       <svg class="gear-icon" viewBox="0 0 24 24" aria-hidden="true">
