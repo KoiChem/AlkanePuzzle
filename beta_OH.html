@@ -2661,6 +2661,24 @@
   const MOVE_THRESHOLD = 8;
   const TAP_TIMEOUT = 220; // この時間内に次のタップが来なければ、それまでのタップ回数でアクションを確定する
 
+  // iOS Safariはviewport指定とtouch-action:manipulationだけでは、連続タップを
+  // ページ拡大として扱うことがある。pointerupで数えるパネル操作の後に来るtouchendで
+  // 2回目以降だけ既定動作を止めれば、2/3タップ判定・単タップのボタン操作を保ったまま
+  // 画面全体のダブルタップ拡大を抑止できる。
+  const SAFARI_ZOOM_TAP_WINDOW = 350;
+  let lastDocumentTouchEndAt = 0;
+  function preventSafariZoom(event) { event.preventDefault(); }
+  document.addEventListener('gesturestart', preventSafariZoom, { capture: true, passive: false });
+  document.addEventListener('gesturechange', preventSafariZoom, { capture: true, passive: false });
+  document.addEventListener('gestureend', preventSafariZoom, { capture: true, passive: false });
+  document.addEventListener('dblclick', preventSafariZoom, { capture: true, passive: false });
+  document.addEventListener('touchend', (event) => {
+    if (event.changedTouches.length !== 1) return;
+    const now = Date.now();
+    if (now - lastDocumentTouchEndAt <= SAFARI_ZOOM_TAP_WINDOW) event.preventDefault();
+    lastDocumentTouchEndAt = now;
+  }, { capture: true, passive: false });
+
   function attachCellInteractions(cell, r, c) {
     let downX = 0, downY = 0, moved = false;
     let tapCount = 0;
