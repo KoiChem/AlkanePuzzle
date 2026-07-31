@@ -88,6 +88,21 @@
   /* 非表示の列(アルカン並べ「そこそこ」の左右端): 背景の方眼罫がそのまま見えるようにする */
   .cell.hidden-col{border-color:transparent;background:transparent;pointer-events:none;}
   .rotor{width:100%;height:100%;transition:transform 220ms cubic-bezier(.34,1.7,.5,1);transform-origin:50% 50%;-webkit-user-drag:none;}
+  .cell.trace-tip .rotor svg{animation:traceTipPop 120ms cubic-bezier(.2,1.7,.4,1);transform-origin:50% 50%;}
+  .cell.trace-closed .rotor svg{animation:traceRingClose 220ms cubic-bezier(.2,1.8,.4,1);transform-origin:50% 50%;}
+  @keyframes traceTipPop{
+    0%{transform:scale(.76);}
+    65%{transform:scale(1.1);}
+    100%{transform:scale(1);}
+  }
+  @keyframes traceRingClose{
+    0%{transform:scale(.82);filter:none;}
+    55%{transform:scale(1.14);filter:drop-shadow(0 0 5px var(--highlighter));}
+    100%{transform:scale(1);filter:none;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .cell.trace-tip .rotor svg,.cell.trace-closed .rotor svg{animation:none;}
+  }
 
   /* ---- パレット ---- */
   .palette{
@@ -2210,6 +2225,7 @@
         const prev = path[path.length - 2];
         if (nr === prev.r && nc === prev.c) {
           path.pop();
+          playTraceBacktrackSound();
           if (path.length >= 2) applyTraceToGrid();
           else grid = traceSnapshot.map((row) => row.slice());
           refreshAll();
@@ -2221,6 +2237,7 @@
       const start = path[0];
       if (path.length >= 3 && nr === start.r && nc === start.c) {
         traceState.closed = true;
+        playTraceCloseSound(path.length);
         applyTraceToGrid();
         refreshAll();
         return;
@@ -2229,6 +2246,7 @@
       if (path.some((p) => p.r === nr && p.c === nc)) return;
 
       path.push({ r: nr, c: nc });
+      playTraceStepSound(path.length);
       applyTraceToGrid();
       refreshAll();
     };
@@ -2245,9 +2263,7 @@
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
       const path = traceState ? traceState.path : [];
-      if (path.length >= 2) {
-        playPlaceSound(); // gridは既にapplyTraceToGridで反映済みなので、そのまま確定する
-      } else {
+      if (path.length < 2) {
         grid = traceSnapshot.map((row) => row.slice()); // 実質タップのみ = 何もしない
       }
       traceState = null;
@@ -2269,6 +2285,10 @@
 
     let cls = 'cell filled' + hiddenCls;
     if (mismatchMap.has(key)) cls += ' mismatch';
+    if (traceState?.path.length) {
+      const traceMarker = traceState.closed ? traceState.path[0] : traceState.path[traceState.path.length - 1];
+      if (traceMarker.r === r && traceMarker.c === c) cls += traceState.closed ? ' trace-closed' : ' trace-tip';
+    }
     cellEl.className = cls;
 
     let rotor = cellEl.querySelector('.rotor');
@@ -2672,6 +2692,74 @@
   function playDifficultySound(tier) {
     const notes = { practice: 329.63, easy: 392.00, medium: 440.00, hard: 493.88 };
     playWoodNote(notes[tier] || notes.easy, { volume: 0.055 });
+  }
+
+  // なぞり描き用の短いノイズは一度だけ生成して使い回す。
+  // 高速で炭素鎖を伸ばしても、1マスごとのBuffer生成で処理が重くならないようにする。
+  let traceNoiseBuffer = null;
+  let traceNoiseSampleRate = 0;
+  function getTraceNoiseBuffer(ctx) {
+    if (traceNoiseBuffer && traceNoiseSampleRate === ctx.sampleRate) return traceNoiseBuffer;
+    const duration = 0.09;
+    const size = Math.max(1, Math.floor(ctx.sampleRate * duration));
+    traceNoiseBuffer = ctx.createBuffer(1, size, ctx.sampleRate);
+    traceNoiseSampleRate = ctx.sampleRate;
+    const data = traceNoiseBuffer.getChannelData(0);
+    for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+    return traceNoiseBuffer;
+  }
+
+  function playTraceHit({ freq, duration = 0.045, volume = 0.07, delay = 0, q = 1.1 }) {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    try {
+      const startAt = ctx.currentTime + delay;
+      const source = ctx.createBufferSource();
+      source.buffer = getTraceNoiseBuffer(ctx);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(freq, startAt);
+      filter.Q.setValueAtTime(q, startAt);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(volume, startAt);
+      gain.gain.exponentialRampToValueAtTime(0.001, startAt + duration);
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      source.start(startAt);
+      source.stop(startAt + duration);
+    } catch (e) { /* 再生に失敗しても、なぞり描き自体は継続させる */ }
+  }
+
+  // 新しい炭素へ進むたびに音を積み上げる。長い鎖ほど明るく、5炭素目以降は
+  // 小さな追い打ちを加えて、素早くなぞったときにドラムロールとしてつながる。
+  function playTraceStepSound(carbonCount) {
+    const pattern = [980, 1260, 1100, 1480];
+    const lift = 1 + Math.min(Math.max(carbonCount - 2, 0), 10) * 0.035;
+    const freq = pattern[(carbonCount - 2) % pattern.length] * lift;
+    playTraceHit({ freq, volume: 0.068, duration: 0.042, q: 1.05 });
+    if (carbonCount >= 5) {
+      playTraceHit({ freq: freq * 1.12, volume: 0.036, duration: 0.032, delay: 0.03, q: 1.25 });
+    }
+    if (carbonCount % 4 === 0) {
+      playTraceHit({ freq: 2200 + carbonCount * 35, volume: 0.055, duration: 0.035, delay: 0.012, q: 1.6 });
+    }
+    if (carbonCount >= 8 && carbonCount % 4 === 0) {
+      playTone({ freqStart: 659.25, freqEnd: 740, duration: 0.075, type: 'triangle', volume: 0.035, delay: 0.035 });
+    }
+  }
+
+  function playTraceBacktrackSound() {
+    playTraceHit({ freq: 620, volume: 0.045, duration: 0.04, q: 0.85 });
+    playTone({ freqStart: 310, freqEnd: 230, duration: 0.06, type: 'triangle', volume: 0.025 });
+  }
+
+  function playTraceCloseSound(carbonCount) {
+    const lift = 1 + Math.min(carbonCount, 12) * 0.02;
+    playTraceHit({ freq: 1450 * lift, volume: 0.07, duration: 0.04, q: 1.2 });
+    playTraceHit({ freq: 1850 * lift, volume: 0.065, duration: 0.04, delay: 0.035, q: 1.35 });
+    playTraceHit({ freq: 2350 * lift, volume: 0.06, duration: 0.045, delay: 0.07, q: 1.5 });
+    playTone({ freqStart: 740, freqEnd: 880, duration: 0.11, type: 'triangle', volume: 0.045, delay: 0.065 });
   }
   // 構造が正常になった瞬間: 明るい2音の上昇チャイム + ふわっと軽いきらめき
   function playValidSound() {
