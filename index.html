@@ -295,13 +295,13 @@
     padding:14px;margin-top:4px;box-shadow:2px 3px 0 var(--shadow);
   }
   .wordbank .preview{
-    position:relative;overflow:hidden;
-    font-size:18px;font-weight:800;height:44px;overflow-y:auto;text-align:center;
+    position:relative;
+    font-size:18px;font-weight:800;min-height:44px;height:auto;overflow:visible;text-align:center;
     margin-bottom:8px;padding:6px 10px;
     background:var(--bg);border:2px dashed var(--border);border-radius:12px 10px 13px 11px;
     color:var(--text-muted);line-height:1.5;
   }
-  /* 回答確定後(結果表示中)は高さを固定せず、正解スタンプがはみ出して見えるようにする */
+  /* 解答確定後(結果表示中)は高さを固定せず、正解スタンプがはみ出して見えるようにする */
   .wordbank .preview.result{height:auto;min-height:44px;overflow:visible;padding-right:104px;}
   .wordbank .preview.result.result-centered{padding-left:104px;text-align:center;}
   .wordbank .preview .name{color:var(--accent-ink);}
@@ -3539,7 +3539,7 @@
       return;
     }
 
-    // 不正解: 自分の回答を表示したまま「誤」スタンプを出す。正解は見せず、
+    // 不正解: 自分の解答を表示したまま「誤」スタンプを出す。正解は見せず、
     // 「再挑戦」または「正答？」を押すまではその表示のまま維持する。
     playIncorrectSound();
     const message = reconstructed === null ? '入力の並びが正しくありません' : reconstructed;
@@ -3555,7 +3555,7 @@
     });
     document.getElementById('reveal-answer-btn2').addEventListener('click', () => {
       playUiClickSound();
-      // ボタン類と「誤」スタンプを消すが、自分の回答はそのまま残し、正答と次の問題へ進むボタンを添える
+      // ボタン類と「誤」スタンプを消すが、自分の解答はそのまま残し、正答と次の問題へ進むボタンを添える
       preview.classList.remove('result-centered');
       preview.innerHTML = `${message}<br>正答：<span class="name">${displayCompoundName(targetName)}</span>`
         + `<div class="answer-actions"><button id="next-btn2" class="secondary">次の問題へ</button></div>`;
@@ -3584,7 +3584,7 @@
     clearBtn.className = 'secondary';
     clearBtn.addEventListener('click', () => { playClearSound(); answerInsertIndex = null; answerTokens = []; updateAnswerPreview(); });
     const submitBtn = document.createElement('button');
-    submitBtn.textContent = '回答する';
+    submitBtn.textContent = '解答する';
     submitBtn.className = 'primary';
     submitBtn.addEventListener('click', submitGame2Answer);
     controlRow.append(undoBtn, clearBtn, submitBtn);
