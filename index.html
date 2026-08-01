@@ -265,15 +265,13 @@
     filter:drop-shadow(1px 2px 1px rgba(200,60,40,0.18));
   }
   .stamp svg{width:100%;height:100%;display:block;}
-  /* 正解スタンプは付近タップで次の問題へ進めるようにする */
-  .stamp.tappable{pointer-events:auto;cursor:pointer;}
-  .stamp.tappable::after{
-    content:'タップで次へ';
-    position:absolute;left:50%;bottom:-22px;transform:translateX(-50%);
-    font-size:11px;font-weight:700;color:var(--text-muted);white-space:nowrap;
-    animation:hint-fade-in .4s ease .5s both;
-  }
-  @keyframes hint-fade-in{from{opacity:0;}to{opacity:.9;}}
+  /* 正解結果はスタンプ・名称・次へを横並びにして、文字を隠さない */
+  .result-celebration{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;}
+  .result-stamp-inline{width:62px;height:62px;flex:0 0 62px;filter:drop-shadow(1px 2px 1px rgba(200,60,40,0.18));animation:result-stamp-in .42s cubic-bezier(.2,1.5,.4,1) both;}
+  .result-stamp-inline svg{width:100%;height:100%;display:block;}
+  .result-copy{min-width:0;text-align:left;line-height:1.35;}
+  .result-copy .name{overflow-wrap:anywhere;}
+  @keyframes result-stamp-in{0%{transform:rotate(-9deg) scale(1.8);opacity:0;}65%{transform:rotate(-9deg) scale(.9);opacity:1;}100%{transform:rotate(-9deg) scale(1);opacity:1;}}
   @keyframes stamp-in{
     0%{transform:translate(-50%,-50%) rotate(-9deg) scale(2.3);opacity:0;}
     55%{transform:translate(-50%,-50%) rotate(-9deg) scale(.86);opacity:1;}
@@ -283,7 +281,7 @@
   .pop{animation:pop .35s ease;}
   @media (prefers-reduced-motion: reduce){
     .stamp{animation:none;transform:translate(-50%,-50%) rotate(-9deg) scale(1);}
-    .stamp.tappable::after{animation:none;opacity:.9;}
+    .result-stamp-inline{animation:none;}
     .pop{animation:none;}
     .rotor{transition:none;}
   }
@@ -294,6 +292,11 @@
     border:2.5px solid var(--ink);border-radius:20px 18px 21px 19px;
     padding:14px;margin-top:4px;box-shadow:2px 3px 0 var(--shadow);
   }
+  .wordbank .token-scroll{
+    max-height:var(--token-scroll-max, none);overflow-y:auto;overscroll-behavior:contain;
+    scrollbar-width:thin;scrollbar-color:var(--border) transparent;touch-action:pan-y;
+  }
+  .wordbank .token-scroll::before,.wordbank .token-scroll::after{content:'';display:block;height:1px;}
   .wordbank .preview{
     position:relative;
     font-size:18px;font-weight:800;min-height:44px;height:auto;overflow:visible;text-align:center;
@@ -302,12 +305,8 @@
     color:var(--text-muted);line-height:1.5;
   }
   /* 解答確定後(結果表示中)は高さを固定せず、正解スタンプがはみ出して見えるようにする */
-  .wordbank .preview.result{height:auto;min-height:44px;overflow:visible;padding-right:104px;}
-  .wordbank .preview.result.result-centered{padding-left:104px;text-align:center;}
-  /* 正答表示ではスタンプを消すため、解答欄の横幅をすべて使う */
-  .wordbank .preview.result.answer-revealed{padding-right:10px;}
+  .wordbank .preview.result{height:auto;min-height:44px;overflow:visible;}
   .wordbank .preview .name{color:var(--accent-ink);}
-  .result-name-measure{position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;pointer-events:none;}
   .wordbank .preview.editing{display:flex;align-content:center;align-items:center;flex-wrap:wrap;gap:3px;text-align:left;touch-action:none;}
   /* 入力チップも語群のボタンと同じ寸法・色にして、パーツをそのまま並べ替える感覚にする */
   .answer-chip{display:inline-flex;align-items:center;font-size:14px;font-weight:700;padding:3px 7px;border:2px solid var(--border);border-radius:10px 8px 11px 9px;background:var(--surface);box-shadow:1px 2px 0 var(--shadow);cursor:grab;touch-action:none;}
@@ -334,7 +333,7 @@
   }
   .wordbank .row{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-bottom:6px;}
   .wordbank button{
-    font-size:14px;font-weight:700;padding:3px 7px;
+    min-height:38px;font-size:14px;font-weight:700;padding:5px 7px;
     border-radius:10px 8px 11px 9px;border:2px solid var(--border);
     background:var(--surface);color:var(--text);
     box-shadow:1px 2px 0 var(--shadow);transition:transform .07s ease, box-shadow .07s ease;
@@ -349,32 +348,26 @@
   /* 数字以外は縦の押しやすさを保ったまま、横だけ少しコンパクトにする */
   .wordbank .row.cat-multiplier button,
   .wordbank .row.cat-subname button,
-  .wordbank .row.cat-basename button{padding-inline:3px;}
+  .wordbank .row.cat-basename button{padding-inline:4px;}
   .wordbank .row.cat-multiplier,
   .wordbank .row.cat-subname,
   .wordbank .row.cat-basename{gap:4px;}
   /* シクロとオールは、主鎖名と同程度に淡いローズベージュで共通表示する */
   .wordbank .row.cat-basename button.special-affix{background:#f5e6e8;border-color:#d7a7ad;}
-  .wordbank .row:not(.control-row) button{cursor:grab;touch-action:none;}
+  .wordbank .row:not(.control-row) button{cursor:grab;touch-action:manipulation;}
   .wordbank.answered .row button{opacity:.4;pointer-events:none;}
   .wordbank .control-row{margin-top:0;margin-bottom:12px;gap:8px;}
-  .wordbank .control-row button{padding:7px 16px;}
+  .wordbank .control-row button{min-height:44px;padding:7px 16px;}
 
-  /* 解答欄では文字が隠れないよう、スタンプを右寄せ・少し小さめにする */
-  .stamp.stamp-side{
-    left:auto;right:6px;top:50%;width:96px;height:96px;
-    transform:translate(0,-50%) rotate(-9deg) scale(0);
-    animation:stamp-in-side .5s cubic-bezier(.2,1.5,.4,1) forwards;
-  }
-  .stamp.stamp-side.tappable::after{left:50%;bottom:-18px;transform:translateX(-50%);}
-  @keyframes stamp-in-side{
-    0%{transform:translate(0,-50%) rotate(-9deg) scale(2.3);opacity:0;}
-    55%{transform:translate(0,-50%) rotate(-9deg) scale(.86);opacity:1;}
-    100%{transform:translate(0,-50%) rotate(-9deg) scale(1);opacity:1;}
-  }
-  .retry-hint{font-size:13px;font-weight:700;color:var(--accent-ink);}
-  @media (prefers-reduced-motion: reduce){
-    .stamp.stamp-side{animation:none;transform:translate(0,-50%) rotate(-9deg) scale(1);}
+  .answer-feedback{margin:7px 0 0;font-size:12.5px;line-height:1.45;font-weight:700;color:var(--accent-ink);}
+
+  .grid.game2-compact{width:min(74vw,310px);margin-bottom:7px;}
+  @media (max-height:699px){
+    #app{padding-bottom:6px;}
+    .wordbank{padding:10px;margin-top:1px;}
+    .wordbank .preview{margin-bottom:6px;}
+    .wordbank .control-row{margin-bottom:8px;}
+    .wordbank .row{margin-bottom:4px;}
   }
 
   /* ---- 難易度設定(管理者向け・?admin=1のときだけ表示) ---- */
@@ -506,7 +499,7 @@
   <div class="modal-box">
     <div class="modal-header">
       <h2>難易度設定</h2>
-      <button id="settings-close" class="modal-close" type="button">×</button>
+      <button id="settings-close" class="modal-close" type="button" aria-label="難易度設定を閉じる">×</button>
     </div>
     <div class="modal-game-tabs" id="modal-game-tabs">
       <button class="modal-game-tab active" data-game="game1">並べる</button>
@@ -531,7 +524,7 @@
   <div class="modal-box">
     <div class="modal-header">
       <h2>置換基・アルコールの命名法</h2>
-      <button id="rules-close" class="modal-close" type="button">×</button>
+      <button id="rules-close" class="modal-close" type="button" aria-label="命名ルールを閉じる">×</button>
     </div>
     <div class="rules-content">
       <section class="rules-section">
@@ -554,7 +547,13 @@
       </section>
 
       <section class="rules-section">
-        <h3>慣用名とIUPAC名（参考）</h3>
+        <h3>このアプリでの表記</h3>
+        <p>正答には高校化学で一般的な日本語表記（例：1-プロパノール、1,2-エタンジオール）を使います。Preferred IUPAC Name（PIN）では、propan-1-ol、ethane-1,2-diol のように表します。</p>
+        <p>エリスリトール、キシリトールは本来、特定の立体配置を含む名称です。本アプリでは立体異性を扱わないため、代表的な慣用名として参考表示しています。</p>
+      </section>
+
+      <section class="rules-section">
+        <h3>慣用名とPIN（参考）</h3>
         <ul>
           <li>エチレングリコール：ethane-1,2-diol</li>
           <li>グリセリン：propane-1,2,3-triol</li>
@@ -946,8 +945,21 @@
     }).join('-');
   }
 
+  // メタンを親構造にする場合、炭素は1個だけなので置換基の位置番号「1」は書かない。
+  function buildMethaneSubstituentPrefix(substituents) {
+    if (substituents.length === 0) return '';
+    const counts = new Map();
+    for (const s of substituents) counts.set(s.name, (counts.get(s.name) || 0) + 1);
+    return [...counts.keys()]
+      .sort((a, b) => SUBSTITUENT_ORDER[a] - SUBSTITUENT_ORDER[b])
+      .map((name) => `${MULTIPLIER_PREFIX[counts.get(name)] || ''}${name}`)
+      .join('');
+  }
+
   function buildAlcoholName(parentName, hydroxylLocantList, locantedSubstituents, isCyclo) {
-    const prefix = buildSubstituentPrefix(locantedSubstituents);
+    const prefix = parentName === 'メタン'
+      ? buildMethaneSubstituentPrefix(locantedSubstituents)
+      : buildSubstituentPrefix(locantedSubstituents);
     const count = hydroxylLocantList.length;
     if (count === 0) return prefix + parentName;
     const alcoholStem = parentName.endsWith('ン') ? parentName.slice(0, -1) + 'ノール' : parentName + 'オール';
@@ -1069,9 +1081,9 @@
           if (best === null
             || candidate.hydroxyls.length > best.hydroxyls.length
             || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length > best.orderedPath.length)
-            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && candidate.branchCount > best.branchCount)
-            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && candidate.branchCount === best.branchCount && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) < 0)
-            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && candidate.branchCount === best.branchCount && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) === 0 && compareNumberingCandidates(candidate, best) < 0)) best = candidate;
+            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) < 0)
+            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) === 0 && candidate.branchCount > best.branchCount)
+            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) === 0 && candidate.branchCount === best.branchCount && compareNumberingCandidates(candidate, best) < 0)) best = candidate;
         } catch (e) { /* OHが主鎖外へ出る候補は除外 */ }
       }
     }
@@ -1180,6 +1192,19 @@
     }
   }
 
+  // 結合としては正常だが、この学習アプリの命名範囲外であるエラーを分けて扱う。
+  function isNamingTargetUnsupported(error) {
+    return typeof error === 'string' && (error.startsWith('UNSUPPORTED') || error === 'GEMINAL_DIOL');
+  }
+  function namingTargetMessage(error) {
+    if (error === 'UNSUPPORTED_MULTI_RING') return '正常な構造です（命名対象外）\n複数の環を持つ構造の命名には、まだ対応していません';
+    if (error === 'UNSUPPORTED_SUBSTITUENT') return '正常な構造です（命名対象外）\n長い側鎖や枝分かれした側鎖の命名には、まだ対応していません';
+    if (error === 'UNSUPPORTED_HYDROXYL_LAYOUT') return '正常な構造です（命名対象外）\nOHを主鎖・主環にまとめられない構造には、まだ対応していません';
+    if (error === 'GEMINAL_DIOL') return '正常な構造です（命名対象外）\n同じ炭素にOHが2つ付く構造は、このアプリでは出題しません';
+    if (typeof error === 'string' && error.includes('奇数員環')) return '正常な構造です（命名対象外）\nこの環サイズの命名には、まだ対応していません';
+    return '正常な構造です（命名対象外）\nこの構造の命名には、まだ対応していません';
+  }
+
   // ============================================================
   // 複数分子解析(アルカン並べ「練習」専用): 盤面全体を1分子とみなさず、
   // 宣言された結合で繋がっている塊(連結成分)ごとに分子候補として扱う。
@@ -1233,7 +1258,7 @@
     return false;
   }
 
-  // 1つの連結成分を解析し、{ sig, cells, status: 'valid'|'incomplete'|'unsupported', name? } を返す。
+  // 1つの連結成分を解析し、{ sig, cells, status: 'valid'|'incomplete'|'unsupported', name?, error? } を返す。
   // status:
   //   'incomplete'  … 結合の手が揃っていないマスがある(組み立て中)
   //   'unsupported' … 結合は揃っているが命名エンジンが対応していない構造(多重環など)
@@ -1248,9 +1273,12 @@
       validateHydroxyls(sub);
       if (structureType === 'ALKANE') return { sig, cells, status: 'valid', name: nameAlkane(sub) };
       if (structureType === 'CYCLOALKANE') return { sig, cells, status: 'valid', name: nameCycloalkane(sub) };
-      return { sig, cells, status: 'unsupported' };
+      return { sig, cells, status: 'unsupported', error: structureType };
     } catch (e) {
-      return { sig, cells, status: e.message === 'GEMINAL_DIOL' ? 'geminal-diol' : 'unsupported' };
+      const error = e.message;
+      return isNamingTargetUnsupported(error)
+        ? { sig, cells, status: 'unsupported', error }
+        : { sig, cells, status: 'incomplete' };
     }
   }
 
@@ -1272,7 +1300,7 @@
     const shuffled = shuffle([...pool]);
     return shuffled.slice(0, count);
   }
-  // 側鎖の「種類数」の範囲([min,max])に従って、実際に使う置換基の種類を選ぶ。
+  // 「置換基・OH基の種類数」の範囲([min,max])に従って、実際に使う種類を選ぶ。
   // 空きスロット数より多くの種類は使えないので、そこでも頭打ちにする。
   function pickSpeciesForRange(typeRange, slotCount, forceHydroxyl = false) {
     const [rawMin, rawMax] = Array.isArray(typeRange) ? typeRange : [1, typeRange || 1];
@@ -1280,7 +1308,7 @@
     const hi = Math.max(1, Math.min(rawMax, pool.length, Math.max(1, slotCount)));
     const lo = Math.max(1, Math.min(rawMin, hi));
     const count = randInt(lo, hi);
-    // アルコール問題ではOHを「種類数」の1つとして必ず選ぶ。
+    // アルコール問題ではOHを「置換基・OH基の種類数」の1つとして必ず選ぶ。
     // 残りの種類は従来どおり他の置換基から選ぶため、OHだけを重み付けして
     // 多価アルコールが不意に増えすぎることを避けられる。
     if (forceHydroxyl) {
@@ -1697,25 +1725,27 @@
   }
 
   // 主鎖が炭素1個だけの構造(ハロゲン化メタン)を生成する。やさしめ難度でのみ登場させる。
-  function generateMethaneGrid(forceHydroxyl = false) {
+  function generateMethaneGrid(forceHydroxyl = false, maxTypeCount = Infinity) {
     const dirsByCount = { 1: ['E'], 2: ['E', 'W'], 3: ['E', 'W', 'N'], 4: ['E', 'W', 'N', 'S'] };
     const typeByCount = { 1: 1, 2: 2, 3: 4, 4: 5 };
-    const count = randInt(1, 4);
+    // OHを必ず1種類として数える設定で種類数上限が1なら、OHだけのメタノールにする。
+    // OHとハロゲンの混在を何度も生成してから棄却するのを避け、出題率も安定させる。
+    const count = forceHydroxyl && maxTypeCount <= 1 ? 1 : randInt(1, 4);
     const dirs = dirsByCount[count];
     const grid = emptyGrid();
     const cr = 2, cc = Math.floor(COLS / 2);
     grid[cr][cc] = panelFor(typeByCount[count], dirs);
     const opp = { E: 'W', W: 'E', N: 'S', S: 'N' };
     const names = forceHydroxyl ? [...Object.keys(HALOGEN_ELEMENT_BY_NAME), HYDROXYL_ELEMENT] : Object.keys(HALOGEN_ELEMENT_BY_NAME);
-    let hydroxylUsed = false;
     const forcedHydroxylDir = forceHydroxyl ? choice(dirs) : null;
     dirs.forEach((d) => {
       const [dr, dc] = DELTA[d];
       const panel = panelFor(1, [opp[d]]);
-      const candidates = names.filter((name) => name !== HYDROXYL_ELEMENT || !hydroxylUsed);
+      // OHを強制する場合は、選んだ1方向だけをOHにする。
+      // 先に別方向でOHが選ばれてジェミナルジオールになる候補を作らない。
+      const candidates = names.filter((name) => name !== HYDROXYL_ELEMENT || d === forcedHydroxylDir);
       const name = d === forcedHydroxylDir ? HYDROXYL_ELEMENT : choice(candidates);
       panel.element = name === HYDROXYL_ELEMENT ? HYDROXYL_ELEMENT : HALOGEN_ELEMENT_BY_NAME[name];
-      if (name === HYDROXYL_ELEMENT) hydroxylUsed = true;
       grid[cr + dr][cc + dc] = panel;
     });
     return grid;
@@ -1735,16 +1765,16 @@
     return { w: maxC - minC + 1, h: maxR - minR + 1 };
   }
 
-  // opts: { typeMin, typeMax, lenMin, lenMax, subMin, subMax, useBent, forceTurn, forceRingSubstituent, ringSizes, bendRange, allowMethane, maxWidth, maxHeight }
-  //   typeMin / typeMax: この問題で使う置換基の「種類数」の範囲
+  // opts: { typeMin, typeMax, lenMin, lenMax, subMin, subMax, useBent, forceTurn, forceRingSubstituent, ringSizes, bendRange, allowMethane, categoryWeights, maxWidth, maxHeight }
+  //   typeMin / typeMax: この問題で使う置換基・OH基の「種類数」の範囲
   //   useBent: 屈曲した主鎖を使うか / forceTurn: できるだけ曲げるように誘導するか
   //   ringSizes: 環のサイズ候補(例: [4,6]) / bendRange: [min,max]で折れ曲がり炭素数を指定(省略時は無制限)
-  //   allowMethane: 炭素1個だけの構造(ハロゲン化メタン)も出題対象に含めるか(出現率は固定で10%)
+  //   allowMethane: 炭素1個だけの構造(ハロゲン化メタン)も出題対象に含めるか
   //   maxWidth / maxHeight: 出題する構造が収まるべき列数・行数の上限(盤面を狭めている難度で使う)
   function generateStructureWithOptions(opts) {
     const {
       typeMin = 1, typeMax = 1, lenMin = 2, lenMax = 7, useBent = false, forceTurn = false, forceRingSubstituent = false,
-      ringSizes = [4, 6], bendRange = null, allowMethane = false, alcoholEnabled = false, alcoholRate = 40, hydroxylLimitOne = false,
+      ringSizes = [4, 6], bendRange = null, allowMethane = false, categoryWeights = null, alcoholEnabled = false, alcoholRate = 40, hydroxylLimitOne = false,
       maxWidth = COLS, maxHeight = ROWS,
     } = opts || {};
     const typeRange = [typeMin, typeMax];
@@ -1772,7 +1802,7 @@
       if (typeCount > 0 && typeCount < typeMin) return null;
       return { grid: g, name: result.name, fellBack: false };
     }
-    function tryMethane() { try { return finalize(generateMethaneGrid(forceHydroxyl)); } catch (e) { return null; } }
+    function tryMethane() { try { return finalize(generateMethaneGrid(forceHydroxyl, typeMax)); } catch (e) { return null; } }
     function tryCyclo() { try { return finalize(generateCycloalkaneGrid(forceRingSubstituent, ringSizes, opts.subMin, opts.subMax, typeRange, forceHydroxyl, hydroxylLimitOne)); } catch (e) { return null; } }
     function tryChainLen(len) {
       try {
@@ -1782,17 +1812,13 @@
       } catch (e) { return null; }
     }
 
-    // 生成する候補を「メタン」「主鎖長ごとの鎖」「環」のカテゴリに分け、
-    // まずカテゴリの並びをシャッフルしてから、1つのカテゴリをまとめて何度か試す。
-    // 単に毎回ランダムにカテゴリを選び直すだけだと、エタン(長さ2)のように
-    // ほぼ確実に一発で成功するカテゴリが最初の成功として選ばれやすくなり、
-    // 結果的にそればかりが出題されてしまう。カテゴリ単位でまとまった回数を試すことで、
-    // 生成の成功しやすさに関わらずカテゴリ間で公平にする。
+    // 問題形式(メタン／鎖状／環状)を先に重み付きで選び、鎖状なら主鎖長を均等に選ぶ。
+    // これで主鎖範囲を変えてもメタン・環状の出題率が意図せず変わらない。
     const categories = [];
     if (allowMethane) categories.push({ kind: 'methane' });
     for (let l = Math.max(2, lenMin); l <= Math.max(2, lenMax); l++) categories.push({ kind: 'chain', len: l });
     categories.push({ kind: 'cyclo' });
-    shuffle(categories);
+    const chainCategories = categories.filter((cat) => cat.kind === 'chain');
 
     function tryCategory(cat) {
       if (cat.kind === 'methane') return tryMethane();
@@ -1800,8 +1826,23 @@
       return tryChainLen(cat.len);
     }
 
+    const familyChoices = [
+      ...(allowMethane ? [{ kind: 'methane', weight: categoryWeights?.methane ?? 10 }] : []),
+      ...(chainCategories.length ? [{ kind: 'chain', weight: categoryWeights?.chain ?? 75 }] : []),
+      { kind: 'cyclo', weight: categoryWeights?.cyclo ?? 15 },
+    ].filter((item) => item.weight > 0);
+    const totalWeight = familyChoices.reduce((sum, item) => sum + item.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let family = familyChoices[familyChoices.length - 1].kind;
+    for (const item of familyChoices) {
+      roll -= item.weight;
+      if (roll < 0) { family = item.kind; break; }
+    }
+    const preferred = family === 'chain' ? choice(chainCategories) : categories.find((cat) => cat.kind === family);
+    const orderedCategories = [preferred, ...shuffle(categories.filter((cat) => cat !== preferred))];
+
     const attemptsPerCategory = 15;
-    for (const cat of categories) {
+    for (const cat of orderedCategories) {
       for (let i = 0; i < attemptsPerCategory; i++) {
         const r = tryCategory(cat);
         if (r) return r;
@@ -2045,6 +2086,11 @@
     game2: { easy: false, medium: false, hard: true },
   };
   const ALLOW_METHANE = { easy: true, medium: false, hard: false };
+  const QUESTION_CATEGORY_WEIGHTS = {
+    easy: { methane: 10, chain: 75, cyclo: 15 },
+    medium: { chain: 80, cyclo: 20 },
+    hard: { chain: 75, cyclo: 25 },
+  };
 
   const SETTINGS_KEY = 'alkane-puzzle-settings-v3';
   // v1の「むずかしめ」はOH出題がONだった。完全に既定値のまま使われていた設定だけを
@@ -2119,7 +2165,7 @@
       alcoholEnabled: s.alcoholEnabled,
       alcoholRate: s.alcoholRate,
       hydroxylLimitOne: s.hydroxylLimitOne,
-      useBent: true, forceTurn: FORCE_TURN.game1[tier], allowMethane: ALLOW_METHANE[tier],
+      useBent: true, forceTurn: FORCE_TURN.game1[tier], allowMethane: ALLOW_METHANE[tier], categoryWeights: QUESTION_CATEGORY_WEIGHTS[tier],
       maxWidth: s.gridCols, maxHeight: s.gridRows,
     };
   }
@@ -2132,7 +2178,7 @@
       alcoholEnabled: s.alcoholEnabled,
       alcoholRate: s.alcoholRate,
       hydroxylLimitOne: s.hydroxylLimitOne,
-      useBent: true, forceTurn: FORCE_TURN.game2[tier], allowMethane: ALLOW_METHANE[tier],
+      useBent: true, forceTurn: FORCE_TURN.game2[tier], allowMethane: ALLOW_METHANE[tier], categoryWeights: QUESTION_CATEGORY_WEIGHTS[tier],
       bendRange: [s.bendMin, s.bendMax],
     };
   }
@@ -2180,6 +2226,85 @@
       }
     }
   }
+
+  // 名付ける画面は、低いスマホ画面だけ分子の周囲の空白を畳み、語群のための高さを作る。
+  // 大きな画面では従来の7×5盤面のままにして、語群も内容が収まる限りスクロールさせない。
+  let game2LayoutFrame = null;
+  function resetGame2GridLayout() {
+    const gridEl = document.getElementById('grid');
+    gridEl.classList.remove('game2-compact');
+    gridEl.style.width = '';
+    gridEl.style.gridTemplateColumns = '';
+    gridEl.style.gridTemplateRows = '';
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const cell = cellEls[r]?.[c];
+        if (!cell) continue;
+        cell.style.display = '';
+        cell.style.gridColumn = '';
+        cell.style.gridRow = '';
+      }
+    }
+  }
+  function updateGame2ResponsiveLayout() {
+    game2LayoutFrame = null;
+    const gridEl = document.getElementById('grid');
+    const tokenScroll = document.querySelector('#wordbank .token-scroll');
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    const viewportWidth = window.visualViewport?.width || window.innerWidth;
+    const compact = currentMode === 'game2' && viewportWidth <= 480 && viewportHeight < 700;
+    if (!compact) {
+      resetGame2GridLayout();
+      if (tokenScroll) tokenScroll.style.removeProperty('--token-scroll-max');
+      return;
+    }
+
+    let minR = ROWS, maxR = -1, minC = COLS, maxC = -1;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (!grid[r][c]) continue;
+        minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+        minC = Math.min(minC, c); maxC = Math.max(maxC, c);
+      }
+    }
+    if (maxR < 0) { resetGame2GridLayout(); return; }
+    const margin = viewportHeight <= 620 ? 0 : 1;
+    minR = Math.max(0, minR - margin); maxR = Math.min(ROWS - 1, maxR + margin);
+    minC = Math.max(0, minC - margin); maxC = Math.min(COLS - 1, maxC + margin);
+    const rows = maxR - minR + 1, cols = maxC - minC + 1;
+    gridEl.classList.add('game2-compact');
+    const maxGridHeight = viewportHeight <= 620 ? 180 : 250;
+    const compactWidth = Math.min(viewportWidth * 0.74, 310, maxGridHeight * cols / rows);
+    gridEl.style.width = `${compactWidth}px`;
+    gridEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+    gridEl.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const cell = cellEls[r]?.[c];
+        if (!cell) continue;
+        const visible = r >= minR && r <= maxR && c >= minC && c <= maxC;
+        cell.style.display = visible ? '' : 'none';
+        if (visible) {
+          cell.style.gridColumn = String(c - minC + 1);
+          cell.style.gridRow = String(r - minR + 1);
+        } else {
+          cell.style.gridColumn = '';
+          cell.style.gridRow = '';
+        }
+      }
+    }
+    if (tokenScroll) {
+      const rect = tokenScroll.getBoundingClientRect();
+      const available = Math.max(112, Math.floor(viewportHeight - rect.top - 10));
+      tokenScroll.style.setProperty('--token-scroll-max', `${available}px`);
+    }
+  }
+  function scheduleGame2ResponsiveLayout() {
+    if (game2LayoutFrame) return;
+    game2LayoutFrame = requestAnimationFrame(updateGame2ResponsiveLayout);
+  }
+  window.addEventListener('resize', scheduleGame2ResponsiveLayout);
+  window.visualViewport?.addEventListener('resize', scheduleGame2ResponsiveLayout);
 
   // ============================================================
   // なぞって描く(アルカン並べ専用): 空きマスからドラッグを始め、
@@ -2372,6 +2497,7 @@
     // 専用ロジックへ委譲する(クイズ・ゲーム②は以下の従来ロジックのまま)。
     if (isPracticeTier()) {
       refreshPractice(mismatchMap, suppressValidSound);
+      scheduleGame2ResponsiveLayout();
       return;
     }
 
@@ -2389,7 +2515,9 @@
       }
     }
 
-    const structureValid = !!(nameResult && nameResult.ok);
+    // 命名できる構造だけでなく、「結合として正常だが命名対象外」の構造も
+    // 蛍光ペンと正常音で受け止める。化学的な不正と学習範囲外を混同させないため。
+    const structureValid = !!(nameResult && (nameResult.ok || isNamingTargetUnsupported(nameResult.error)));
     // なぞって描く操作の最中は、途中経過(例:2マス繋いだ時点のエタン)で正常判定が
     // ちらつくたびに音・ハイライトが鳴らないよう、判定をドラッグ終了まで凍結する。
     const isNewValid = !traceState && structureValid && !wasStructureValid;
@@ -2418,8 +2546,11 @@
     } else if (nameResult && nameResult.ok) {
       statusEl.innerHTML = `<span class="name">${displayCompoundName(nameResult.name)}</span>`;
     } else if (nameResult) {
-      statusEl.textContent = `判定エラー: ${nameResult.error}`;
+      statusEl.textContent = isNamingTargetUnsupported(nameResult.error)
+        ? namingTargetMessage(nameResult.error)
+        : 'この結合の組み合わせは確認できません。OHの結合も含めて見直してください';
     }
+    scheduleGame2ResponsiveLayout();
   }
 
   // ============================================================
@@ -2452,7 +2583,7 @@
     // なぞって描く操作の途中経過(例:2マス繋いだ時点のエタン)でアクティブや音が
     // ちらつかないよう、この一連の更新はドラッグ終了まで凍結する。
     if (!traceState) {
-      const validNow = analyzed.filter((a) => a.status === 'valid');
+      const validNow = analyzed.filter((a) => a.status === 'valid' || a.status === 'unsupported');
       const validSigs = new Set(validNow.map((a) => a.sig));
       const newlyValid = validNow.filter((a) => !practicePrevValidSigs.has(a.sig));
 
@@ -2503,13 +2634,12 @@
     const activeComp = practiceActiveCells
       ? analyzed.find((a) => setsOverlap(a.cells, practiceActiveCells))
       : null;
-    const geminalDiol = analyzed.find((comp) => comp.status === 'geminal-diol');
-    if (geminalDiol) {
-      statusEl.textContent = 'ひとつの炭素原子にヒドロキシ基はひとつまで';
-    } else if (analyzed.length === 0) {
+    if (analyzed.length === 0) {
       statusEl.textContent = '原子を並べてください';
     } else if (activeComp && activeComp.status === 'valid') {
       statusEl.innerHTML = `<span class="name">${displayCompoundName(activeComp.name)}</span>`;
+    } else if (activeComp && activeComp.status === 'unsupported') {
+      statusEl.textContent = namingTargetMessage(activeComp.error);
     } else {
       statusEl.textContent = '組み立て中';
     }
@@ -3158,23 +3288,34 @@
   // ============================================================
   let game1Checked = null; // null | 'correct' | 'incorrect'
 
-  // 直前に出した名前と同じものが連続しないよう、数回だけ引き直す(体感的な繰り返しを減らすための軽い対策)
-  let lastGame1Name = null;
-  let lastGame2Name = null;
-  function generateAvoidingImmediateRepeat(opts, lastName) {
-    let result = generateStructureWithOptions(opts);
-    for (let i = 0; i < 5 && result.name === lastName; i++) {
-      result = generateStructureWithOptions(opts);
+  // 直近の名称と構造パターンを避け、同じ見た目・同じ答えの連続を減らす。
+  const recentGame1Questions = [];
+  const recentGame2Questions = [];
+  function questionGridSignature(g) {
+    return g.flat().map((panel) => panel ? `${panel.type}:${panel.rotation}:${panel.element || 'C'}` : '.').join('|');
+  }
+  function rememberQuestion(history, result) {
+    history.push({ name: result.name, signature: questionGridSignature(result.grid) });
+    if (history.length > 8) history.shift();
+  }
+  function generateAvoidingRecentRepeat(opts, history) {
+    let fallback = generateStructureWithOptions(opts);
+    const recentNames = new Set(history.slice(-8).map((item) => item.name));
+    const recentSignatures = new Set(history.slice(-4).map((item) => item.signature));
+    for (let i = 0; i < 12; i++) {
+      const result = i === 0 ? fallback : generateStructureWithOptions(opts);
+      const signature = questionGridSignature(result.grid);
+      if (!recentNames.has(result.name) && !recentSignatures.has(signature)) return result;
     }
-    return result;
+    return fallback; // 設定が狭すぎるときだけ、重複より出題継続を優先する。
   }
 
   function startGame1() {
     clearPaletteSelection();
     interactionsEnabled = true;
-    const { name } = generateAvoidingImmediateRepeat(buildGame1Opts(difficulty), lastGame1Name);
-    lastGame1Name = name;
-    targetName = name;
+    const question = generateAvoidingRecentRepeat(buildGame1Opts(difficulty), recentGame1Questions);
+    rememberQuestion(recentGame1Questions, question);
+    targetName = question.name;
     grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
     game1Checked = null;
     wasStructureValid = false;
@@ -3197,14 +3338,14 @@
     // 「お題：」ラベルはやさしめだけ表示する(まあまあ・そこそこは名前だけ見せる)
     const objectiveLabel = difficulty === 'easy' ? 'お題：' : '';
     if (game1Checked === 'correct') {
-      obj.innerHTML = `<span class="stamp tappable" id="correct-stamp1">${correctStampSVG()}</span>正解です！<br><span class="name">${displayCompoundName(targetName)}</span>`;
-      const stamp = document.getElementById('correct-stamp1');
-      if (stamp) stamp.addEventListener('click', startGame1);
+      obj.innerHTML = `<div class="result-celebration"><span class="result-stamp-inline" aria-hidden="true">${correctStampSVG()}</span><div class="result-copy">正解！<br><span class="name">${displayCompoundName(targetName)}</span></div></div>`
+        + `<div class="objective-actions"><button id="next-btn1">次へ</button></div>`;
+      document.getElementById('next-btn1').addEventListener('click', () => { playUiClickSound(); startGame1(); });
     } else if (game1Checked === 'incorrect') {
       // 不正解スタンプを表示。チェックボタンは出さず、枠の右側に次の問題へ進むボタンを置く
       // (パネルを操作した場合は自動で消えてチェックボタンが再表示される)
       obj.innerHTML = `<span class="stamp" id="wrong-stamp1">${wrongStampSVG()}</span>`
-        + `<div class="objective-row">${objectiveLabel}<span class="name">${displayCompoundName(targetName)}</span><button id="next-btn1" class="secondary">次の問題へ</button></div>`;
+        + `<div class="objective-row">${objectiveLabel}<span class="name">${displayCompoundName(targetName)}</span><button id="next-btn1" class="secondary">次へ</button></div>`;
       document.getElementById('next-btn1').addEventListener('click', () => { playUiClickSound(); startGame1(); });
     } else {
       obj.innerHTML = `${objectiveLabel}<span class="name">${displayCompoundName(targetName)}</span><div class="objective-actions"><button id="check-btn1">チェック</button></div>`;
@@ -3340,10 +3481,10 @@
   function startGame2() {
     clearPaletteSelection();
     interactionsEnabled = false;
-    const { grid: g, name } = generateAvoidingImmediateRepeat(buildGame2Opts(difficulty), lastGame2Name);
-    lastGame2Name = name;
-    targetName = name;
-    grid = g;
+    const question = generateAvoidingRecentRepeat(buildGame2Opts(difficulty), recentGame2Questions);
+    rememberQuestion(recentGame2Questions, question);
+    targetName = question.name;
+    grid = question.grid;
     answerTokens = [];
     answerInsertIndex = null;
     wasStructureValid = false;
@@ -3356,7 +3497,6 @@
 
   const ANSWER_DRAG_THRESHOLD = 8;
   const ANSWER_DELETE_DISTANCE = 27;
-  const RESULT_STAMP_SAFE_SIDE = 104;
   let answerDragState = null;
   let answerInsertIndex = null;
 
@@ -3402,7 +3542,6 @@
   function beginAnswerPointer(event, token, fromIndex = null) {
     if (event.button !== undefined && event.button !== 0) return;
     if (answerDragState) return;
-    event.preventDefault();
     const preview = document.getElementById('answer-preview');
     const sourceRect = event.currentTarget.getBoundingClientRect();
     const state = {
@@ -3424,6 +3563,7 @@
     };
 
     const startDrag = (ev) => {
+      ev.preventDefault();
       state.dragging = true;
       answerInsertIndex = null;
       const ghost = document.createElement('span');
@@ -3438,13 +3578,22 @@
 
     const move = (ev) => {
       if (ev.pointerId !== state.pointerId || answerDragState !== state) return;
-      ev.preventDefault();
       if (!state.dragging) {
         if (Math.hypot(ev.clientX - state.startX, ev.clientY - state.startY) < ANSWER_DRAG_THRESHOLD) return;
         startDrag(ev);
         return;
       }
+      ev.preventDefault();
       state.ghost.style.left = `${ev.clientX}px`; state.ghost.style.top = `${ev.clientY}px`;
+      if (fromIndex === null) {
+        const tokenScroll = document.querySelector('#wordbank .token-scroll');
+        if (tokenScroll && tokenScroll.scrollHeight > tokenScroll.clientHeight) {
+          const scrollRect = tokenScroll.getBoundingClientRect();
+          const edge = 34;
+          if (ev.clientY < scrollRect.top + edge) tokenScroll.scrollTop -= Math.ceil((scrollRect.top + edge - ev.clientY) / 5);
+          else if (ev.clientY > scrollRect.bottom - edge) tokenScroll.scrollTop += Math.ceil((ev.clientY - (scrollRect.bottom - edge)) / 5);
+        }
+      }
       const rect = preview.getBoundingClientRect();
       const deleteArmed = fromIndex !== null && (ev.clientY < rect.top - ANSWER_DELETE_DISTANCE || ev.clientY > rect.bottom + ANSWER_DELETE_DISTANCE);
       state.deleteArmed = deleteArmed;
@@ -3510,15 +3659,15 @@
     button.addEventListener('pointerdown', (event) => beginAnswerPointer(event, token));
   }
 
-  function centerResultIfSafe(preview) {
-    const resultName = preview.querySelector('.result-name');
-    if (!resultName) return;
-    const measure = resultName.cloneNode(true);
-    measure.classList.add('result-name-measure');
-    preview.appendChild(measure);
-    const fitsCentered = measure.getBoundingClientRect().width <= preview.clientWidth - RESULT_STAMP_SAFE_SIDE * 2;
-    measure.remove();
-    preview.classList.toggle('result-centered', fitsCentered);
+  function game2FeedbackMessage(reconstructed) {
+    const expectedBase = [...CHAIN_NAMES].reverse().find((name) => name && targetName.includes(name));
+    const selectedBase = answerTokens.find((token) => BASE_NAME_SET.has(token));
+    if (!selectedBase) return 'ヒント：最後に母体名を置きます';
+    if (selectedBase !== expectedBase) return 'ヒント：いちばん長い主鎖を母体名にします';
+    if ((targetName.endsWith('ノール') || targetName.endsWith('オール')) && !answerTokens.includes(ALCOHOL_TOKEN)) return 'ヒント：OHがあるときは「オール」を付けます';
+    if (reconstructed === null) return 'ヒント：数字のあとには置換基、最後に母体名を置きます';
+    if (MULTIPLIER_TOKENS.some((token) => targetName.includes(token)) && !answerTokens.some((token) => MULTIPLIER_SET.has(token))) return 'ヒント：同じ置換基が複数なら数詞を使います';
+    return 'ヒント：位置番号を小さくし、置換基はアルファベット順に並べます';
   }
 
   function submitGame2Answer() {
@@ -3534,35 +3683,29 @@
 
     if (correct) {
       playCorrectSound();
-      // スタンプは右側にずらして、解答の文字が隠れないようにする
-      preview.innerHTML = `<span class="stamp tappable stamp-side" id="correct-stamp2">${correctStampSVG()}</span><span class="result-name name">${displayCompoundName(targetName)}</span>`;
-      centerResultIfSafe(preview);
-      const stamp = document.getElementById('correct-stamp2');
-      if (stamp) stamp.addEventListener('click', startGame2);
+      preview.innerHTML = `<div class="result-celebration"><span class="result-stamp-inline" aria-hidden="true">${correctStampSVG()}</span><div class="result-copy">正解！<br><span class="result-name name">${displayCompoundName(targetName)}</span></div></div>`
+        + `<div class="answer-actions"><button id="next-btn2">次へ</button></div>`;
+      document.getElementById('next-btn2').addEventListener('click', () => { playUiClickSound(); startGame2(); });
       return;
     }
 
-    // 不正解: 自分の解答を表示したまま「誤」スタンプを出す。正解は見せず、
-    // 「再挑戦」または「正答？」を押すまではその表示のまま維持する。
+    // 不正解: 自分の解答と短い学習ヒントを残し、「もう一度」または「答え」を選べる。
     playIncorrectSound();
     const message = reconstructed === null ? '入力の並びが正しくありません' : reconstructed;
-    preview.innerHTML = `<span class="stamp stamp-side" id="wrong-stamp2">${wrongStampSVG()}</span><span class="result-name">${message}</span><br>`
-      + `<div class="answer-actions"><button id="retry-btn2">再挑戦</button><button id="reveal-answer-btn2" class="secondary">正答？</button></div>`;
-    centerResultIfSafe(preview);
+    preview.innerHTML = `<div class="result-celebration"><span class="result-stamp-inline" aria-hidden="true">${wrongStampSVG()}</span><div class="result-copy"><span class="result-name">${message}</span><p class="answer-feedback">${game2FeedbackMessage(reconstructed)}</p></div></div>`
+      + `<div class="answer-actions"><button id="retry-btn2">もう一度</button><button id="reveal-answer-btn2" class="secondary">答え</button></div>`;
     document.getElementById('retry-btn2').addEventListener('click', () => {
       playUiClickSound();
       document.getElementById('wordbank').classList.remove('answered');
       preview.classList.remove('result');
-      preview.classList.remove('result-centered');
       updateAnswerPreview();
     });
     document.getElementById('reveal-answer-btn2').addEventListener('click', () => {
       playUiClickSound();
-      // ボタン類と「誤」スタンプを消すが、自分の解答はそのまま残し、正答と次の問題へ進むボタンを添える
-      preview.classList.remove('result-centered');
+      // 自分の解答を残し、正答と次へボタンを添える。
       preview.classList.add('answer-revealed');
-      preview.innerHTML = `${message}<br>正答：<span class="name">${displayCompoundName(targetName)}</span>`
-        + `<div class="answer-actions"><button id="next-btn2" class="secondary">次の問題へ</button></div>`;
+      preview.innerHTML = `<div class="result-copy">${message}<br>答え：<span class="name">${displayCompoundName(targetName)}</span></div>`
+        + `<div class="answer-actions"><button id="next-btn2" class="secondary">次へ</button></div>`;
       document.getElementById('next-btn2').addEventListener('click', () => { playUiClickSound(); startGame2(); });
     });
   }
@@ -3594,6 +3737,10 @@
     controlRow.append(undoBtn, clearBtn, submitBtn);
     wb.appendChild(controlRow);
 
+    const tokenScroll = document.createElement('div');
+    tokenScroll.className = 'token-scroll';
+    wb.appendChild(tokenScroll);
+
     const { numberTokens, baseNameTokens } = mainChainTokensForCurrentDifficulty();
     // 数字行は主鎖・環の設定に合わせた順に固定。それ以外の行はグループ内の並びを毎回シャッフルする
     const rows = [
@@ -3614,7 +3761,7 @@
         bindWordBankTokenDrag(btn, token);
         rowEl.appendChild(btn);
       }
-      wb.appendChild(rowEl);
+      tokenScroll.appendChild(rowEl);
     }
   }
 
@@ -3823,8 +3970,8 @@
     const form = document.getElementById('settings-form');
     form.innerHTML = '';
     form.appendChild(makeRangeStepperRow('主鎖炭素数', s, 'lenMin', 'lenMax', 1, 10));
-    form.appendChild(makeRangeStepperRow('側鎖種類数', s, 'typeMin', 'typeMax', 1, 6));
-    form.appendChild(makeRangeStepperRow('側鎖数', s, 'subMin', 'subMax', 0, 10));
+    form.appendChild(makeRangeStepperRow('置換基・OH基の種類数', s, 'typeMin', 'typeMax', 1, 6));
+    form.appendChild(makeRangeStepperRow('置換基・OH基の数', s, 'subMin', 'subMax', 0, 10));
     form.appendChild(makeRingSizeRow('シクロ主鎖の炭素数', s));
     if (game === 'game1') {
       form.appendChild(makeStepperRow('枠数(横)', s, 'gridCols', 3, COLS));
