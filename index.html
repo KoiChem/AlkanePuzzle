@@ -304,6 +304,8 @@
   /* 解答確定後(結果表示中)は高さを固定せず、正解スタンプがはみ出して見えるようにする */
   .wordbank .preview.result{height:auto;min-height:44px;overflow:visible;padding-right:104px;}
   .wordbank .preview.result.result-centered{padding-left:104px;text-align:center;}
+  /* 正答表示ではスタンプを消すため、解答欄の横幅をすべて使う */
+  .wordbank .preview.result.answer-revealed{padding-right:10px;}
   .wordbank .preview .name{color:var(--accent-ink);}
   .result-name-measure{position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;pointer-events:none;}
   .wordbank .preview.editing{display:flex;align-content:center;align-items:center;flex-wrap:wrap;gap:3px;text-align:left;touch-action:none;}
@@ -3526,6 +3528,7 @@
     const correct = reconstructed !== null && reconstructed === targetName;
 
     document.getElementById('wordbank').classList.add('answered');
+    preview.classList.remove('answer-revealed');
     preview.classList.remove('editing');
     preview.classList.add('result');
 
@@ -3557,6 +3560,7 @@
       playUiClickSound();
       // ボタン類と「誤」スタンプを消すが、自分の解答はそのまま残し、正答と次の問題へ進むボタンを添える
       preview.classList.remove('result-centered');
+      preview.classList.add('answer-revealed');
       preview.innerHTML = `${message}<br>正答：<span class="name">${displayCompoundName(targetName)}</span>`
         + `<div class="answer-actions"><button id="next-btn2" class="secondary">次の問題へ</button></div>`;
       document.getElementById('next-btn2').addEventListener('click', () => { playUiClickSound(); startGame2(); });
