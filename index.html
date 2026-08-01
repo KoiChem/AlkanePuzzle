@@ -297,14 +297,6 @@
     scrollbar-width:thin;scrollbar-color:var(--border) transparent;touch-action:pan-y;
   }
   .wordbank .token-scroll::before,.wordbank .token-scroll::after{content:'';display:block;height:1px;}
-  /* 語句ボタンをつかんだ操作は常に追加・ドラッグにする。スクロールはこの帯や語句間の余白から行う。 */
-  .wordbank .token-scroll-grip{
-    display:flex;align-items:center;justify-content:center;gap:5px;min-height:24px;
-    margin:0 2px 6px;border:1.5px dashed var(--border);border-radius:9px 8px 10px 9px;
-    color:var(--text-muted);font-size:11px;font-weight:800;letter-spacing:.03em;
-    touch-action:pan-y;user-select:none;-webkit-user-select:none;
-  }
-  .wordbank .token-scroll-grip::before{content:'↕';font-size:14px;line-height:1;}
   .wordbank .preview{
     position:relative;
     font-size:18px;font-weight:800;min-height:44px;height:auto;overflow:visible;text-align:center;
@@ -3754,11 +3746,6 @@
 
     const tokenScroll = document.createElement('div');
     tokenScroll.className = 'token-scroll';
-    const scrollGrip = document.createElement('div');
-    scrollGrip.className = 'token-scroll-grip';
-    scrollGrip.textContent = '語群をスクロール';
-    scrollGrip.setAttribute('aria-label', 'ここを上下にドラッグすると語群をスクロールできます');
-    tokenScroll.appendChild(scrollGrip);
     wb.appendChild(tokenScroll);
 
     const { numberTokens, baseNameTokens } = mainChainTokensForCurrentDifficulty();
