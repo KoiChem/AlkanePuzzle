@@ -297,6 +297,14 @@
     scrollbar-width:thin;scrollbar-color:var(--border) transparent;touch-action:pan-y;
   }
   .wordbank .token-scroll::before,.wordbank .token-scroll::after{content:'';display:block;height:1px;}
+  /* 語句ボタンをつかんだ操作は常に追加・ドラッグにする。スクロールはこの帯や語句間の余白から行う。 */
+  .wordbank .token-scroll-grip{
+    display:flex;align-items:center;justify-content:center;gap:5px;min-height:24px;
+    margin:0 2px 6px;border:1.5px dashed var(--border);border-radius:9px 8px 10px 9px;
+    color:var(--text-muted);font-size:11px;font-weight:800;letter-spacing:.03em;
+    touch-action:pan-y;user-select:none;-webkit-user-select:none;
+  }
+  .wordbank .token-scroll-grip::before{content:'↕';font-size:14px;line-height:1;}
   .wordbank .preview{
     position:relative;
     font-size:18px;font-weight:800;min-height:44px;height:auto;overflow:visible;text-align:center;
@@ -354,7 +362,9 @@
   .wordbank .row.cat-basename{gap:4px;}
   /* シクロとオールは、主鎖名と同程度に淡いローズベージュで共通表示する */
   .wordbank .row.cat-basename button.special-affix{background:#f5e6e8;border-color:#d7a7ad;}
-  .wordbank .row:not(.control-row) button{cursor:grab;touch-action:manipulation;}
+  .wordbank .row:not(.control-row) button{
+    cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
+  }
   .wordbank.answered .row button{opacity:.4;pointer-events:none;}
   .wordbank .control-row{margin-top:0;margin-bottom:12px;gap:8px;}
   .wordbank .control-row button{min-height:44px;padding:7px 16px;}
@@ -3656,7 +3666,12 @@
   }
 
   function bindWordBankTokenDrag(button, token) {
-    button.addEventListener('pointerdown', (event) => beginAnswerPointer(event, token));
+    button.addEventListener('pointerdown', (event) => {
+      // touch-action はジェスチャー開始時に判定される。ここでも既定動作を止め、
+      // iOS Safari を含めて「語句をつかんだらドラッグ」を確実にする。
+      event.preventDefault();
+      beginAnswerPointer(event, token);
+    });
   }
 
   function game2FeedbackMessage(reconstructed) {
@@ -3739,6 +3754,11 @@
 
     const tokenScroll = document.createElement('div');
     tokenScroll.className = 'token-scroll';
+    const scrollGrip = document.createElement('div');
+    scrollGrip.className = 'token-scroll-grip';
+    scrollGrip.textContent = '語群をスクロール';
+    scrollGrip.setAttribute('aria-label', 'ここを上下にドラッグすると語群をスクロールできます');
+    tokenScroll.appendChild(scrollGrip);
     wb.appendChild(tokenScroll);
 
     const { numberTokens, baseNameTokens } = mainChainTokensForCurrentDifficulty();
