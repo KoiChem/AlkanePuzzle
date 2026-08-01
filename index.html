@@ -361,7 +361,18 @@
   .wordbank .control-row{margin-top:0;margin-bottom:12px;gap:8px;}
   .wordbank .control-row button{min-height:44px;padding:7px 16px;}
 
-  .answer-feedback{margin:7px 0 0;font-size:12.5px;line-height:1.45;font-weight:700;color:var(--accent-ink);}
+  .wordbank .preview .answer-hint-trigger{
+    display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:36px;
+    margin-top:7px;padding:4px 11px;border:1.5px solid var(--accent);border-radius:999px;
+    background:var(--accent-soft);color:var(--accent-ink);font-size:12.5px;font-weight:800;
+    box-shadow:0 1px 0 var(--shadow);transition:transform .08s ease,box-shadow .08s ease,background .12s ease;
+  }
+  .wordbank .preview .answer-hint-trigger:active{transform:translate(1px,1px);box-shadow:none;}
+  .answer-hint-icon{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+  .answer-feedback{display:flex;align-items:flex-start;gap:5px;margin:7px 0 0;font-size:12.5px;line-height:1.45;font-weight:700;color:var(--accent-ink);animation:hint-reveal .2s ease-out both;}
+  .answer-feedback .answer-hint-icon{margin-top:1px;}
+  @keyframes hint-reveal{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:translateY(0);}}
+  @media (prefers-reduced-motion: reduce){.answer-feedback{animation:none;}}
 
   .grid.game2-compact{width:min(74vw,310px);margin-bottom:7px;}
   @media (max-height:699px){
@@ -385,12 +396,14 @@
   .hydroxyl-toggle:active:not(:disabled){transform:translate(1px,2px);box-shadow:0 0 0 var(--shadow);}
   .hydroxyl-toggle:disabled{cursor:default;opacity:1;}
   .gear-btn{
-    flex-shrink:0;width:38px;height:38px;padding:0;box-sizing:border-box;line-height:1;display:inline-flex;align-items:center;justify-content:center;
-    border-radius:50%;border:2px solid var(--border);background:var(--surface);color:var(--text-muted);
-    box-shadow:1px 2px 0 var(--shadow);transition:transform .08s ease, box-shadow .08s ease;
+    flex-shrink:0;width:40px;height:40px;padding:0;box-sizing:border-box;line-height:1;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:13px;border:2px solid var(--accent);background:var(--accent-soft);color:var(--accent-ink);
+    box-shadow:1px 2px 0 var(--shadow);transition:transform .08s ease,box-shadow .08s ease,background .12s ease;
   }
-  .gear-icon{width:32px;height:32px;flex:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;}
-  .gear-btn:active{transform:translate(1px,2px) rotate(20deg);box-shadow:0 0 0 var(--shadow);}
+  .gear-icon{width:20px;height:20px;flex:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;fill:none;transition:transform .16s ease;}
+  .gear-btn:active{transform:translate(1px,2px);box-shadow:0 0 0 var(--shadow);}
+  .gear-btn:active .gear-icon{transform:rotate(28deg);}
+  .gear-btn:focus-visible,.wordbank .preview .answer-hint-trigger:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
 
   .modal-overlay{
     position:fixed;inset:0;background:rgba(40,36,26,0.45);
@@ -484,8 +497,8 @@
     </div>
     <button id="settings-gear" class="gear-btn" style="display:none;" type="button" title="難易度設定" aria-label="難易度設定">
       <svg class="gear-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="3.5"></circle>
-        <path d="M12 3.5v2M12 18.5v2M20.5 12h-2M5.5 12h-2M18.01 5.99 16.6 7.4M7.4 16.6 5.99 18.01M18.01 18.01 16.6 16.6M7.4 7.4 5.99 5.99"></path>
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
       </svg>
     </button>
   </div>
@@ -1969,6 +1982,14 @@
         fill="#d63b2e" font-family="'Hiragino Mincho ProN','Yu Mincho',serif" transform="rotate(-4 100 100)" filter="url(#stampRough2)">誤</text>
       <text x="100" y="102" text-anchor="middle" dominant-baseline="central" font-size="100" font-weight="900"
         fill="#d63b2e" opacity="0.4" font-family="'Hiragino Mincho ProN','Yu Mincho',serif" transform="rotate(-4 100 100)" filter="url(#stampRough3)">誤</text>
+    </svg>`;
+  }
+
+  // ヒント開示用の小さな線画アイコン。絵文字や外部画像に依存しない。
+  function answerHintIconSVG() {
+    return `<svg class="answer-hint-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 18h6M10 22h4"></path>
+      <path d="M8.7 14.5A6 6 0 1 1 15.3 14.5c-.82.62-1.3 1.48-1.3 2.5h-4c0-1.02-.48-1.88-1.3-2.5Z"></path>
     </svg>`;
   }
 
@@ -3791,40 +3812,40 @@
 
     const actualBases = tokensIn(answerTokens, (token) => BASE_NAME_SET.has(token));
     const expectedBases = tokensIn(expectedTokens, (token) => BASE_NAME_SET.has(token));
-    if (actualBases.length === 0) return '見直しポイント：母体名（主鎖・主環）を入れます';
-    if (!exactOrderMatches(actualBases, expectedBases)) return '見直しポイント：母体名（主鎖・主環）を確認しましょう';
+    if (actualBases.length === 0) return '母体名（主鎖・主環）を入れます';
+    if (!exactOrderMatches(actualBases, expectedBases)) return '母体名（主鎖・主環）を確認しましょう';
 
     const actualCyclo = tokensIn(answerTokens, (token) => token === CYCLO_TOKEN);
     const expectedCyclo = tokensIn(expectedTokens, (token) => token === CYCLO_TOKEN);
     if (!game2TokenCountsMatch(actualCyclo, expectedCyclo)) {
-      return expectedCyclo.length ? '見直しポイント：環状構造なので「シクロ」を入れます' : '見直しポイント：鎖状構造に「シクロ」は使いません';
+      return expectedCyclo.length ? '環状構造なので「シクロ」を入れます' : '鎖状構造に「シクロ」は使いません';
     }
 
     const actualAlcohol = tokensIn(answerTokens, (token) => token === ALCOHOL_TOKEN);
     const expectedAlcohol = tokensIn(expectedTokens, (token) => token === ALCOHOL_TOKEN);
     if (!game2TokenCountsMatch(actualAlcohol, expectedAlcohol)) {
-      return expectedAlcohol.length ? '見直しポイント：OH基があるので「オール」を入れます' : '見直しポイント：OH基がない名前に「オール」は使いません';
+      return expectedAlcohol.length ? 'OH基があるので「オール」を入れます' : 'OH基がない名前に「オール」は使いません';
     }
 
     const actualSubstituents = tokensIn(answerTokens, (token) => SUB_NAME_SET.has(token));
     const expectedSubstituents = tokensIn(expectedTokens, (token) => SUB_NAME_SET.has(token));
-    if (!game2TokenCountsMatch(actualSubstituents, expectedSubstituents)) return '見直しポイント：置換基の種類と個数を確認しましょう';
+    if (!game2TokenCountsMatch(actualSubstituents, expectedSubstituents)) return '置換基の種類と個数を確認しましょう';
 
     const actualMultipliers = tokensIn(answerTokens, (token) => MULTIPLIER_SET.has(token));
     const expectedMultipliers = tokensIn(expectedTokens, (token) => MULTIPLIER_SET.has(token));
-    if (!game2TokenCountsMatch(actualMultipliers, expectedMultipliers)) return '見直しポイント：倍数詞（ジ・トリなど）を確認しましょう';
+    if (!game2TokenCountsMatch(actualMultipliers, expectedMultipliers)) return '倍数詞（ジ・トリなど）を確認しましょう';
 
     const actualLocants = tokensIn(answerTokens, (token) => /^\d+$/.test(token));
     const expectedLocants = tokensIn(expectedTokens, (token) => /^\d+$/.test(token));
-    if (!game2TokenCountsMatch(actualLocants, expectedLocants)) return '見直しポイント：位置番号を確認しましょう';
-    if (!exactOrderMatches(actualLocants, expectedLocants)) return '見直しポイント：位置番号の並びと置換基との組み合わせを確認しましょう';
+    if (!game2TokenCountsMatch(actualLocants, expectedLocants)) return '位置番号を確認しましょう';
+    if (!exactOrderMatches(actualLocants, expectedLocants)) return '位置番号の並びと置換基との組み合わせを確認しましょう';
     if (!exactOrderMatches(actualSubstituents, expectedSubstituents)) {
       return expectedLocants.length
-        ? '見直しポイント：位置番号と置換基の組み合わせを確認しましょう'
-        : '見直しポイント：置換基を並べる順番を確認しましょう';
+        ? '位置番号と置換基の組み合わせを確認しましょう'
+        : '置換基を並べる順番を確認しましょう';
     }
-    if (!exactOrderMatches(actualMultipliers, expectedMultipliers)) return '見直しポイント：倍数詞を置く位置を確認しましょう';
-    if (!exactOrderMatches(answerTokens, expectedTokens) || reconstructed === null) return '見直しポイント：語句を置く順番を確認しましょう';
+    if (!exactOrderMatches(actualMultipliers, expectedMultipliers)) return '倍数詞を置く位置を確認しましょう';
+    if (!exactOrderMatches(answerTokens, expectedTokens) || reconstructed === null) return '語句を置く順番を確認しましょう';
     return '';
   }
 
@@ -3847,13 +3868,27 @@
       return;
     }
 
-    // 不正解: 自分の解答と、誤りを特定できた場合だけ見直しポイントを残す。
+    // 不正解: 誤りを特定できた場合だけ、任意で開けるヒントを用意する。
     playIncorrectSound();
     const message = reconstructed === null ? '入力の並びが正しくありません' : reconstructed;
     const feedback = game2FeedbackMessage(reconstructed);
-    const feedbackHtml = feedback ? `<p class="answer-feedback">${feedback}</p>` : '';
+    const feedbackHtml = feedback
+      ? `<button id="answer-hint-btn2" class="answer-hint-trigger" type="button" aria-label="ヒントを表示">${answerHintIconSVG()}<span>ヒント</span></button>`
+      : '';
     preview.innerHTML = `<div class="result-celebration"><span class="result-stamp-inline" aria-hidden="true">${wrongStampSVG()}</span><div class="result-copy"><span class="result-name">${message}</span>${feedbackHtml}</div></div>`
       + `<div class="answer-actions"><button id="retry-btn2">もう一度</button><button id="reveal-answer-btn2" class="secondary">答え</button></div>`;
+    const hintButton = document.getElementById('answer-hint-btn2');
+    if (hintButton) hintButton.addEventListener('click', () => {
+      playUiClickSound();
+      const feedbackEl = document.createElement('p');
+      feedbackEl.className = 'answer-feedback';
+      feedbackEl.setAttribute('role', 'status');
+      feedbackEl.innerHTML = answerHintIconSVG();
+      const feedbackText = document.createElement('span');
+      feedbackText.textContent = feedback;
+      feedbackEl.appendChild(feedbackText);
+      hintButton.replaceWith(feedbackEl);
+    });
     document.getElementById('retry-btn2').addEventListener('click', () => {
       playUiClickSound();
       document.getElementById('wordbank').classList.remove('answered');
