@@ -3666,15 +3666,166 @@
     });
   }
 
+  function parseGame2SubstituentDescriptor(descriptor) {
+    const substituentNames = [...SUB_NAME_SET].sort((a, b) => b.length - a.length);
+    for (const name of substituentNames) {
+      if (!descriptor.endsWith(name)) continue;
+      const multiplier = descriptor.slice(0, -name.length);
+      if (multiplier === '') return [name];
+      if (MULTIPLIER_SET.has(multiplier)) return [multiplier, name];
+    }
+    return null;
+  }
+
+  // メタン置換体や単置換シクロアルカンの、位置番号を省略した接頭部を語句へ戻す。
+  // 例: 「ジクロロフルオロ」→「ジ」「クロロ」「フルオロ」
+  function parseGame2UnlocantedPrefix(prefix) {
+    const pieces = [];
+    for (const name of SUB_NAME_SET) {
+      pieces.push({ text: name, tokens: [name] });
+      for (const multiplier of MULTIPLIER_TOKENS) {
+        pieces.push({ text: multiplier + name, tokens: [multiplier, name] });
+      }
+    }
+    pieces.sort((a, b) => b.text.length - a.text.length);
+    const parsedAt = Array(prefix.length + 1).fill(null);
+    parsedAt[0] = [];
+    for (let index = 0; index < prefix.length; index++) {
+      if (parsedAt[index] === null) continue;
+      for (const piece of pieces) {
+        if (!prefix.startsWith(piece.text, index)) continue;
+        const nextIndex = index + piece.text.length;
+        if (parsedAt[nextIndex] === null) parsedAt[nextIndex] = parsedAt[index].concat(piece.tokens);
+      }
+    }
+    return parsedAt[prefix.length];
+  }
+
+  function parseGame2SubstituentPrefix(rawPrefix) {
+    const prefix = rawPrefix.endsWith('-') ? rawPrefix.slice(0, -1) : rawPrefix;
+    if (prefix === '') return [];
+    if (!/^\d/.test(prefix)) return parseGame2UnlocantedPrefix(prefix);
+
+    const parts = prefix.split('-');
+    if (parts.length % 2 !== 0) return null;
+    const tokens = [];
+    for (let index = 0; index < parts.length; index += 2) {
+      if (!/^\d+(?:,\d+)*$/.test(parts[index])) return null;
+      const descriptorTokens = parseGame2SubstituentDescriptor(parts[index + 1]);
+      if (descriptorTokens === null) return null;
+      tokens.push(...parts[index].split(','), ...descriptorTokens);
+    }
+    return tokens;
+  }
+
+  // 正答名は命名エンジンが生成した正式名なので、同じ文法を逆向きにたどって
+  // ゲーム②で並べるべき語句列へ戻す。最後に再構成して完全一致も確認する。
+  function expectedGame2AnswerTokens(name) {
+    const baseNames = [...BASE_NAME_TOKENS].sort((a, b) => b.length - a.length);
+    const tryCandidate = (prefix, alcoholLocants, cyclo, baseName, alcoholMultiplier = '', hasAlcohol = false) => {
+      const prefixTokens = parseGame2SubstituentPrefix(prefix);
+      if (prefixTokens === null) return null;
+      const tokens = [...prefixTokens, ...alcoholLocants];
+      if (cyclo) tokens.push(CYCLO_TOKEN);
+      tokens.push(baseName);
+      if (alcoholMultiplier) tokens.push(alcoholMultiplier);
+      if (hasAlcohol) tokens.push(ALCOHOL_TOKEN);
+      return reconstructNameFromTokens(tokens) === name ? tokens : null;
+    };
+
+    for (const baseName of baseNames) {
+      for (const cyclo of [false, true]) {
+        const parentName = (cyclo ? CYCLO_TOKEN : '') + baseName;
+
+        // 多価アルコール: 1,2-エタンジオール など。
+        for (const multiplier of MULTIPLIER_TOKENS) {
+          const suffix = parentName + multiplier + ALCOHOL_TOKEN;
+          if (!name.endsWith(suffix)) continue;
+          const beforeSuffix = name.slice(0, -suffix.length);
+          const match = beforeSuffix.match(/^(.*?)(\d+(?:,\d+)*)-$/);
+          if (!match) continue;
+          const candidate = tryCandidate(match[1], match[2].split(','), cyclo, baseName, multiplier, true);
+          if (candidate) return candidate;
+        }
+
+        // 一価アルコール: プロパノール／2-プロパノール など。
+        const alcoholStem = parentName.endsWith('ン') ? parentName.slice(0, -1) + 'ノール' : parentName + 'オール';
+        if (name.endsWith(alcoholStem)) {
+          const beforeStem = name.slice(0, -alcoholStem.length);
+          const locanted = beforeStem.match(/^(.*?)(\d+)-$/);
+          if (locanted) {
+            const candidate = tryCandidate(locanted[1], [locanted[2]], cyclo, baseName, '', true);
+            if (candidate) return candidate;
+          }
+          const candidate = tryCandidate(beforeStem, [], cyclo, baseName, '', true);
+          if (candidate) return candidate;
+        }
+
+        // アルカン・シクロアルカン。
+        if (name.endsWith(parentName)) {
+          const candidate = tryCandidate(name.slice(0, -parentName.length), [], cyclo, baseName);
+          if (candidate) return candidate;
+        }
+      }
+    }
+    return null;
+  }
+
+  function game2TokenCountsMatch(actual, expected) {
+    if (actual.length !== expected.length) return false;
+    const counts = new Map();
+    for (const token of actual) counts.set(token, (counts.get(token) || 0) + 1);
+    for (const token of expected) {
+      const remaining = counts.get(token) || 0;
+      if (remaining === 0) return false;
+      counts.set(token, remaining - 1);
+    }
+    return true;
+  }
+
   function game2FeedbackMessage(reconstructed) {
-    const expectedBase = [...CHAIN_NAMES].reverse().find((name) => name && targetName.includes(name));
-    const selectedBase = answerTokens.find((token) => BASE_NAME_SET.has(token));
-    if (!selectedBase) return 'ヒント：最後に母体名を置きます';
-    if (selectedBase !== expectedBase) return 'ヒント：いちばん長い主鎖を母体名にします';
-    if ((targetName.endsWith('ノール') || targetName.endsWith('オール')) && !answerTokens.includes(ALCOHOL_TOKEN)) return 'ヒント：OHがあるときは「オール」を付けます';
-    if (reconstructed === null) return 'ヒント：数字のあとには置換基、最後に母体名を置きます';
-    if (MULTIPLIER_TOKENS.some((token) => targetName.includes(token)) && !answerTokens.some((token) => MULTIPLIER_SET.has(token))) return 'ヒント：同じ置換基が複数なら数詞を使います';
-    return 'ヒント：位置番号を小さくし、置換基はアルファベット順に並べます';
+    const expectedTokens = expectedGame2AnswerTokens(targetName);
+    if (expectedTokens === null) return '';
+    const tokensIn = (tokens, test) => tokens.filter(test);
+    const exactOrderMatches = (actual, expected) => actual.length === expected.length && actual.every((token, index) => token === expected[index]);
+
+    const actualBases = tokensIn(answerTokens, (token) => BASE_NAME_SET.has(token));
+    const expectedBases = tokensIn(expectedTokens, (token) => BASE_NAME_SET.has(token));
+    if (actualBases.length === 0) return '見直しポイント：母体名（主鎖・主環）を入れます';
+    if (!exactOrderMatches(actualBases, expectedBases)) return '見直しポイント：母体名（主鎖・主環）を確認しましょう';
+
+    const actualCyclo = tokensIn(answerTokens, (token) => token === CYCLO_TOKEN);
+    const expectedCyclo = tokensIn(expectedTokens, (token) => token === CYCLO_TOKEN);
+    if (!game2TokenCountsMatch(actualCyclo, expectedCyclo)) {
+      return expectedCyclo.length ? '見直しポイント：環状構造なので「シクロ」を入れます' : '見直しポイント：鎖状構造に「シクロ」は使いません';
+    }
+
+    const actualAlcohol = tokensIn(answerTokens, (token) => token === ALCOHOL_TOKEN);
+    const expectedAlcohol = tokensIn(expectedTokens, (token) => token === ALCOHOL_TOKEN);
+    if (!game2TokenCountsMatch(actualAlcohol, expectedAlcohol)) {
+      return expectedAlcohol.length ? '見直しポイント：OH基があるので「オール」を入れます' : '見直しポイント：OH基がない名前に「オール」は使いません';
+    }
+
+    const actualSubstituents = tokensIn(answerTokens, (token) => SUB_NAME_SET.has(token));
+    const expectedSubstituents = tokensIn(expectedTokens, (token) => SUB_NAME_SET.has(token));
+    if (!game2TokenCountsMatch(actualSubstituents, expectedSubstituents)) return '見直しポイント：置換基の種類と個数を確認しましょう';
+
+    const actualMultipliers = tokensIn(answerTokens, (token) => MULTIPLIER_SET.has(token));
+    const expectedMultipliers = tokensIn(expectedTokens, (token) => MULTIPLIER_SET.has(token));
+    if (!game2TokenCountsMatch(actualMultipliers, expectedMultipliers)) return '見直しポイント：倍数詞（ジ・トリなど）を確認しましょう';
+
+    const actualLocants = tokensIn(answerTokens, (token) => /^\d+$/.test(token));
+    const expectedLocants = tokensIn(expectedTokens, (token) => /^\d+$/.test(token));
+    if (!game2TokenCountsMatch(actualLocants, expectedLocants)) return '見直しポイント：位置番号を確認しましょう';
+    if (!exactOrderMatches(actualLocants, expectedLocants)) return '見直しポイント：位置番号の並びと置換基との組み合わせを確認しましょう';
+    if (!exactOrderMatches(actualSubstituents, expectedSubstituents)) {
+      return expectedLocants.length
+        ? '見直しポイント：位置番号と置換基の組み合わせを確認しましょう'
+        : '見直しポイント：置換基を並べる順番を確認しましょう';
+    }
+    if (!exactOrderMatches(actualMultipliers, expectedMultipliers)) return '見直しポイント：倍数詞を置く位置を確認しましょう';
+    if (!exactOrderMatches(answerTokens, expectedTokens) || reconstructed === null) return '見直しポイント：語句を置く順番を確認しましょう';
+    return '';
   }
 
   function submitGame2Answer() {
@@ -3696,10 +3847,12 @@
       return;
     }
 
-    // 不正解: 自分の解答と短い学習ヒントを残し、「もう一度」または「答え」を選べる。
+    // 不正解: 自分の解答と、誤りを特定できた場合だけ見直しポイントを残す。
     playIncorrectSound();
     const message = reconstructed === null ? '入力の並びが正しくありません' : reconstructed;
-    preview.innerHTML = `<div class="result-celebration"><span class="result-stamp-inline" aria-hidden="true">${wrongStampSVG()}</span><div class="result-copy"><span class="result-name">${message}</span><p class="answer-feedback">${game2FeedbackMessage(reconstructed)}</p></div></div>`
+    const feedback = game2FeedbackMessage(reconstructed);
+    const feedbackHtml = feedback ? `<p class="answer-feedback">${feedback}</p>` : '';
+    preview.innerHTML = `<div class="result-celebration"><span class="result-stamp-inline" aria-hidden="true">${wrongStampSVG()}</span><div class="result-copy"><span class="result-name">${message}</span>${feedbackHtml}</div></div>`
       + `<div class="answer-actions"><button id="retry-btn2">もう一度</button><button id="reveal-answer-btn2" class="secondary">答え</button></div>`;
     document.getElementById('retry-btn2').addEventListener('click', () => {
       playUiClickSound();
