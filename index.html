@@ -361,12 +361,12 @@
     cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
   }
   .wordbank.answered .row button{opacity:.4;pointer-events:none;}
-  .wordbank .control-row{margin-top:0;margin-bottom:12px;gap:8px;}
-  .wordbank .control-row button{min-height:44px;padding:7px 16px;}
-  .wordbank .pass-row{display:flex;justify-content:flex-end;margin:0 1px 8px;}
-  .wordbank .pass-row .pass-btn{min-width:44px;min-height:44px;padding:4px 8px;border:0;background:transparent;color:var(--text-muted);box-shadow:none;text-decoration:underline;text-underline-offset:3px;font-size:13px;}
-  .wordbank .pass-row .pass-btn:active{transform:none;color:var(--accent-ink);box-shadow:none;}
-  .wordbank.answered .pass-row{display:none;}
+  .wordbank .control-row{flex-wrap:nowrap;margin-top:0;margin-bottom:12px;gap:5px;}
+  .wordbank .control-row button{flex:0 1 auto;min-width:0;min-height:44px;padding:7px 10px;white-space:nowrap;}
+  @media (max-width:360px){
+    .wordbank .control-row{gap:4px;}
+    .wordbank .control-row button{padding-inline:6px;font-size:13px;}
+  }
 
   .wordbank .preview .answer-hint-trigger{
     display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:36px;
@@ -4026,19 +4026,14 @@
     submitBtn.textContent = '解答する';
     submitBtn.className = 'primary';
     submitBtn.addEventListener('click', submitGame2Answer);
-    controlRow.append(undoBtn, clearBtn, submitBtn);
-    wb.appendChild(controlRow);
-
-    const passRow = document.createElement('div');
-    passRow.className = 'pass-row';
     const passBtn = document.createElement('button');
     passBtn.type = 'button';
-    passBtn.className = 'pass-btn';
+    passBtn.className = 'secondary pass-btn';
     passBtn.textContent = 'パス';
     passBtn.title = '答えを見て、少し後でもう一度挑戦する';
     passBtn.addEventListener('click', () => { playUiClickSound(); passGame2Question(); });
-    passRow.appendChild(passBtn);
-    wb.appendChild(passRow);
+    controlRow.append(undoBtn, clearBtn, submitBtn, passBtn);
+    wb.appendChild(controlRow);
 
     const tokenScroll = document.createElement('div');
     tokenScroll.className = 'token-scroll';
