@@ -2752,47 +2752,74 @@
   // 効果音
   // ============================================================
   let audioCtx = null;
+  let audioUnlockInFlight = null;
+  const pendingAudioTasks = [];
   function getAudioCtx() {
     if (!audioCtx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       audioCtx = new AC();
     }
-    if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
   }
-  // ユーザー操作のたびにAudioContextの起動を試み、実際にrunningになるまで諦めない。
-  // (once:trueの1回きりだと、最初のタップでのresume()がブラウザに拒否された場合に
-  //  以後ずっと無音のままになってしまうため。特にiOS Safariで起こりやすい)
+
+  function flushPendingAudio(ctx) {
+    if (!ctx || ctx.state !== 'running') return;
+    const tasks = pendingAudioTasks.splice(0);
+    tasks.forEach((task) => {
+      try { task(ctx); } catch (e) { /* 1音の失敗で残りの効果音を止めない */ }
+    });
+  }
+
+  // iOSではページ読み込みやscriptからのclick()では音声を解禁できない。
+  // 実際のタップ開始時にresumeと無音再生を行い、そのタップで要求された効果音は
+  // AudioContextがrunningになった直後に再生する。これにより「最初の1回だけ無音」を防ぐ。
   function unlockAudio() {
     const ctx = getAudioCtx();
     if (!ctx) return;
-    if (ctx.state !== 'running') {
-      // resume()の完了(非同期)を待たず、この同じジェスチャー内で無音バッファを
-      // 同期的にstart()する。iOS Safariはこれをもって「ユーザー操作で鳴らした」と
-      // 認識し音声出力を解錠するため、resume()だけより1回目のタップで確実に鳴る。
-      try {
-        const buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
-        const source = ctx.createBufferSource();
-        source.buffer = buffer;
-        source.connect(ctx.destination);
-        source.start(0);
-      } catch (e) { /* 解錠用の無音再生に失敗しても致命的ではない */ }
-    }
     if (ctx.state === 'running') {
-      window.removeEventListener('pointerdown', unlockAudio, true);
-      window.removeEventListener('touchend', unlockAudio, true);
-      window.removeEventListener('click', unlockAudio, true);
+      flushPendingAudio(ctx);
+      return;
+    }
+
+    // touchstartとpointerdownが両方届いても、同じ解禁処理は1回だけ実行する。
+    if (audioUnlockInFlight) return;
+    try {
+      const buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    } catch (e) { /* 解禁用の無音再生に失敗してもresumeは試す */ }
+
+    try {
+      audioUnlockInFlight = Promise.resolve(ctx.resume())
+        .then(() => { flushPendingAudio(ctx); })
+        .catch(() => { /* 次の実タップで再試行する */ })
+        .finally(() => { audioUnlockInFlight = null; });
+    } catch (e) {
+      audioUnlockInFlight = null;
     }
   }
   window.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true });
-  window.addEventListener('touchend', unlockAudio, { capture: true, passive: true });
+  window.addEventListener('touchstart', unlockAudio, { capture: true, passive: true });
   window.addEventListener('click', unlockAudio, { capture: true, passive: true });
 
-  function playTone({ freqStart, freqEnd, duration, type = 'sine', volume, delay = 0 }) {
+  function runWhenAudioReady(task) {
     const ctx = getAudioCtx();
-    if (!ctx) return; // Web Audio非対応環境では何もしない
-    try {
+    if (!ctx) return;
+    if (ctx.state === 'running') {
+      try { task(ctx); } catch (e) { /* 再生失敗で操作自体を止めない */ }
+      return;
+    }
+    // 画面復帰直後などに大量の音が溜まらないよう、直近の効果音だけを保持する。
+    if (pendingAudioTasks.length >= 24) pendingAudioTasks.shift();
+    pendingAudioTasks.push(task);
+    unlockAudio();
+  }
+
+  function playTone({ freqStart, freqEnd, duration, type = 'sine', volume, delay = 0 }) {
+    runWhenAudioReady((ctx) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = type;
@@ -2807,14 +2834,12 @@
       gain.connect(ctx.destination);
       osc.start(startAt);
       osc.stop(startAt + duration);
-    } catch (e) { /* 再生に失敗しても操作自体は継続させる */ }
+    });
   }
 
   // フィルターをかけた短いノイズ。各操作音に木質の「コッ」という輪郭を添える。
   function playClick({ freq, duration, volume, q, delay = 0 }) {
-    const ctx = getAudioCtx();
-    if (!ctx) return;
-    try {
+    runWhenAudioReady((ctx) => {
       const startAt = ctx.currentTime + delay;
       const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -2839,7 +2864,7 @@
       filter.connect(gain);
       gain.connect(ctx.destination);
       noise.start(startAt);
-    } catch (e) { /* 再生に失敗しても操作自体は継続させる */ }
+    });
   }
 
   function playWoodNote(freq, { delay = 0, volume = 0.065, duration = 0.065 } = {}) {
