@@ -269,9 +269,12 @@
   .result-celebration{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;}
   .result-stamp-inline{width:62px;height:62px;flex:0 0 62px;filter:drop-shadow(1px 2px 1px rgba(200,60,40,0.18));animation:result-stamp-in .42s cubic-bezier(.2,1.5,.4,1) both;}
   .result-stamp-inline svg{width:100%;height:100%;display:block;}
+  .result-stamp-inline.milestone-stamp{animation:result-stamp-milestone .5s cubic-bezier(.2,1.6,.4,1) both;}
   .result-copy{min-width:0;text-align:left;line-height:1.35;}
   .result-copy .name{overflow-wrap:anywhere;}
+  .success-streak{display:inline-block;margin-bottom:2px;padding:1px 7px;border-radius:999px;background:#fff3c9;color:#9b6413;font-size:12px;font-weight:800;letter-spacing:.03em;line-height:1.35;}
   @keyframes result-stamp-in{0%{transform:rotate(-9deg) scale(1.8);opacity:0;}65%{transform:rotate(-9deg) scale(.9);opacity:1;}100%{transform:rotate(-9deg) scale(1);opacity:1;}}
+  @keyframes result-stamp-milestone{0%{transform:rotate(-12deg) scale(2.08);opacity:0;}58%{transform:rotate(-7deg) scale(.84);opacity:1;}78%{transform:rotate(-10deg) scale(1.08);opacity:1;}100%{transform:rotate(-9deg) scale(1);opacity:1;}}
   @keyframes stamp-in{
     0%{transform:translate(-50%,-50%) rotate(-9deg) scale(2.3);opacity:0;}
     55%{transform:translate(-50%,-50%) rotate(-9deg) scale(.86);opacity:1;}
@@ -281,7 +284,7 @@
   .pop{animation:pop .35s ease;}
   @media (prefers-reduced-motion: reduce){
     .stamp{animation:none;transform:translate(-50%,-50%) rotate(-9deg) scale(1);}
-    .result-stamp-inline{animation:none;}
+    .result-stamp-inline,.result-stamp-inline.milestone-stamp{animation:none;}
     .pop{animation:none;}
     .rotor{transition:none;}
   }
@@ -360,6 +363,10 @@
   .wordbank.answered .row button{opacity:.4;pointer-events:none;}
   .wordbank .control-row{margin-top:0;margin-bottom:12px;gap:8px;}
   .wordbank .control-row button{min-height:44px;padding:7px 16px;}
+  .wordbank .pass-row{display:flex;justify-content:flex-end;margin:0 1px 8px;}
+  .wordbank .pass-row .pass-btn{min-width:44px;min-height:44px;padding:4px 8px;border:0;background:transparent;color:var(--text-muted);box-shadow:none;text-decoration:underline;text-underline-offset:3px;font-size:13px;}
+  .wordbank .pass-row .pass-btn:active{transform:none;color:var(--accent-ink);box-shadow:none;}
+  .wordbank.answered .pass-row{display:none;}
 
   .wordbank .preview .answer-hint-trigger{
     display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:36px;
@@ -2928,16 +2935,20 @@
   }
 
   function playTraceCloseSound(carbonCount) {
-    // 環の閉鎖は、配置音やロールより低い「ドドン！」で締める。
-    // 低域だけでは小型スピーカーで埋もれるため、控えめな胴鳴りも重ねる。
+    // 環の閉鎖は「ドドン！」という固有の手触りを残しつつ、正常構造音と
+    // 同じくらい小型スピーカーで届くよう、中域の胴鳴りと短い明るい余韻を重ねる。
     const depth = Math.min(carbonCount, 12) * 1.5;
     const playKick = (delay, strength) => {
-      playTraceHit({ freq: 300, volume: 0.055 * strength, duration: 0.06, delay, q: 0.68 });
-      playTone({ freqStart: 126 + depth, freqEnd: 72, duration: 0.13, type: 'sine', volume: 0.085 * strength, delay });
-      playTone({ freqStart: 225, freqEnd: 145, duration: 0.075, type: 'triangle', volume: 0.026 * strength, delay });
+      playTraceHit({ freq: 340, volume: 0.08 * strength, duration: 0.07, delay, q: 0.72 });
+      playTone({ freqStart: 132 + depth, freqEnd: 76, duration: 0.14, type: 'sine', volume: 0.10 * strength, delay });
+      playTone({ freqStart: 285, freqEnd: 180, duration: 0.10, type: 'triangle', volume: 0.062 * strength, delay });
     };
     playKick(0, 0.72);
-    playKick(0.105, 1);
+    playKick(0.10, 1);
+    // 低音だけを上げず、閉じた瞬間に小さな光沢を足す。通常の正常構造音とは
+    // 別の音型なので、環が閉じた感覚を保ったまま格だけを揃えられる。
+    playTone({ freqStart: 720, freqEnd: 760, duration: 0.12, type: 'triangle', volume: 0.12, delay: 0.115 });
+    playTone({ freqStart: 1080, freqEnd: 1080, duration: 0.075, type: 'sine', volume: 0.052, delay: 0.185 });
   }
   // 構造が正常になった瞬間: 明るい2音の上昇チャイム + ふわっと軽いきらめき
   function playValidSound() {
@@ -2946,11 +2957,15 @@
     playTone({ freqStart: 1320, freqEnd: 1320, duration: 0.1, type: 'triangle', volume: 0.07, delay: 0.15 });
   }
   // 正解: 明るい上昇アルペジオ(ド・ミ・ソ・高ド)で弾む達成感を出す
-  function playCorrectSound() {
+  function playCorrectSound({ sparkle = false } = {}) {
     playTone({ freqStart: 523.25, freqEnd: 523.25, duration: 0.08, type: 'sine', volume: 0.15 });
     playTone({ freqStart: 659.25, freqEnd: 659.25, duration: 0.08, type: 'sine', volume: 0.16, delay: 0.06 });
     playTone({ freqStart: 783.99, freqEnd: 783.99, duration: 0.1, type: 'sine', volume: 0.17, delay: 0.12 });
     playTone({ freqStart: 1046.5, freqEnd: 1046.5, duration: 0.22, type: 'triangle', volume: 0.16, delay: 0.19 });
+    if (sparkle) {
+      playTone({ freqStart: 1567.98, freqEnd: 1567.98, duration: 0.08, type: 'triangle', volume: 0.055, delay: 0.27 });
+      playTone({ freqStart: 2093.0, freqEnd: 2093.0, duration: 0.12, type: 'sine', volume: 0.045, delay: 0.33 });
+    }
   }
   // 不正解: やわらかい2音の下降(正解音と対になるが、きつくならないよう控えめに)
   function playIncorrectSound() {
@@ -3307,10 +3322,38 @@
   // ゲーム①(組み立てて当てる)
   // ============================================================
   let game1Checked = null; // null | 'correct' | 'incorrect'
+  let game1CorrectCelebration = null;
+
+  // 連続正解はその場の気持ちよさのためだけに使い、保存・常時表示はしない。
+  const correctStreaks = { game1: 0, game2: 0 };
+  function resetCorrectStreak(game) {
+    correctStreaks[game] = 0;
+  }
+  function resetAllCorrectStreaks() {
+    resetCorrectStreak('game1');
+    resetCorrectStreak('game2');
+  }
+  function recordCorrectStreak(game) {
+    const count = ++correctStreaks[game];
+    const milestone = count === 3 || count === 5 || (count >= 10 && count % 10 === 0);
+    return {
+      count,
+      label: milestone ? `${count}連続！` : '',
+      strongStamp: count === 5 || (count >= 10 && count % 10 === 0),
+      // 5連続の小さなごほうびに加え、10連続目以降は毎問きらめきを重ねる。
+      sparkle: count === 5 || count >= 10,
+    };
+  }
+  function streakLabelMarkup(celebration) {
+    return celebration?.label ? `<span class="success-streak">${celebration.label}</span><br>` : '';
+  }
 
   // 直近の名称と構造パターンを避け、同じ見た目・同じ答えの連続を減らす。
   const recentGame1Questions = [];
   const recentGame2Questions = [];
+  const game2ReviewQueue = [];
+  let game2PresentedQuestionCount = 0;
+  let currentGame2Question = null;
   function questionGridSignature(g) {
     return g.flat().map((panel) => panel ? `${panel.type}:${panel.rotation}:${panel.element || 'C'}` : '.').join('|');
   }
@@ -3330,6 +3373,31 @@
     return fallback; // 設定が狭すぎるときだけ、重複より出題継続を優先する。
   }
 
+  function questionKey(question) {
+    return `${question.name}\u0000${questionGridSignature(question.grid)}`;
+  }
+  function resetGame2ReviewQueue() {
+    game2ReviewQueue.length = 0;
+    game2PresentedQuestionCount = 0;
+    currentGame2Question = null;
+  }
+  function scheduleGame2Review(question) {
+    if (!question) return;
+    const key = questionKey(question);
+    if (game2ReviewQueue.some((item) => item.key === key)) return;
+    const interveningQuestions = 3 + Math.floor(Math.random() * 3); // 3〜5問後
+    game2ReviewQueue.push({
+      key,
+      question,
+      readyAt: game2PresentedQuestionCount + interveningQuestions + 1,
+    });
+  }
+  function takeReadyGame2Review() {
+    const nextQuestionNumber = game2PresentedQuestionCount + 1;
+    const index = game2ReviewQueue.findIndex((item) => item.readyAt <= nextQuestionNumber);
+    return index === -1 ? null : game2ReviewQueue.splice(index, 1)[0].question;
+  }
+
   function startGame1() {
     clearPaletteSelection();
     interactionsEnabled = true;
@@ -3338,6 +3406,7 @@
     targetName = question.name;
     grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
     game1Checked = null;
+    game1CorrectCelebration = null;
     wasStructureValid = false;
     highlightStartTime = 0;
     stopHighlightAnimation();
@@ -3348,7 +3417,14 @@
   function checkGame1Answer() {
     const result = generateName(grid);
     game1Checked = (result.ok && result.name === targetName) ? 'correct' : 'incorrect';
-    if (game1Checked === 'correct') playCorrectSound(); else playIncorrectSound();
+    if (game1Checked === 'correct') {
+      game1CorrectCelebration = recordCorrectStreak('game1');
+      playCorrectSound({ sparkle: game1CorrectCelebration.sparkle });
+    } else {
+      game1CorrectCelebration = null;
+      resetCorrectStreak('game1');
+      playIncorrectSound();
+    }
     renderGame1Objective();
   }
 
@@ -3358,7 +3434,8 @@
     // 「お題：」ラベルはやさしめだけ表示する(まあまあ・そこそこは名前だけ見せる)
     const objectiveLabel = difficulty === 'easy' ? 'お題：' : '';
     if (game1Checked === 'correct') {
-      obj.innerHTML = `<div class="result-celebration"><span class="result-stamp-inline" aria-hidden="true">${correctStampSVG()}</span><div class="result-copy">正解！<br><span class="name">${displayCompoundName(targetName)}</span></div></div>`
+      const stampClass = game1CorrectCelebration?.strongStamp ? ' milestone-stamp' : '';
+      obj.innerHTML = `<div class="result-celebration"><span class="result-stamp-inline${stampClass}" aria-hidden="true">${correctStampSVG()}</span><div class="result-copy">${streakLabelMarkup(game1CorrectCelebration)}正解！<br><span class="name">${displayCompoundName(targetName)}</span></div></div>`
         + `<div class="objective-actions"><button id="next-btn1">次へ</button></div>`;
       document.getElementById('next-btn1').addEventListener('click', () => { playUiClickSound(); startGame1(); });
     } else if (game1Checked === 'incorrect') {
@@ -3501,8 +3578,13 @@
   function startGame2() {
     clearPaletteSelection();
     interactionsEnabled = false;
-    const question = generateAvoidingRecentRepeat(buildGame2Opts(difficulty), recentGame2Questions);
+    // パスした問題は、通常の直近重複回避を意図的に越えて3〜5問後に一度だけ戻す。
+    // それ以外は従来どおり、同じ見た目・同じ答えの連続を避けて生成する。
+    const question = takeReadyGame2Review()
+      || generateAvoidingRecentRepeat(buildGame2Opts(difficulty), recentGame2Questions);
+    game2PresentedQuestionCount++;
     rememberQuestion(recentGame2Questions, question);
+    currentGame2Question = question;
     targetName = question.name;
     grid = question.grid;
     answerTokens = [];
@@ -3858,14 +3940,17 @@
     preview.classList.add('result');
 
     if (correct) {
-      playCorrectSound();
-      preview.innerHTML = `<div class="result-celebration"><span class="result-stamp-inline" aria-hidden="true">${correctStampSVG()}</span><div class="result-copy">正解！<br><span class="result-name name">${displayCompoundName(targetName)}</span></div></div>`
+      const celebration = recordCorrectStreak('game2');
+      playCorrectSound({ sparkle: celebration.sparkle });
+      const stampClass = celebration.strongStamp ? ' milestone-stamp' : '';
+      preview.innerHTML = `<div class="result-celebration"><span class="result-stamp-inline${stampClass}" aria-hidden="true">${correctStampSVG()}</span><div class="result-copy">${streakLabelMarkup(celebration)}正解！<br><span class="result-name name">${displayCompoundName(targetName)}</span></div></div>`
         + `<div class="answer-actions"><button id="next-btn2">次へ</button></div>`;
       document.getElementById('next-btn2').addEventListener('click', () => { playUiClickSound(); startGame2(); });
       return;
     }
 
     // 不正解: 誤りを特定できた場合だけ、任意で開けるヒントを用意する。
+    resetCorrectStreak('game2');
     playIncorrectSound();
     const message = reconstructed === null ? '入力の並びが正しくありません' : reconstructed;
     const feedback = game2FeedbackMessage(reconstructed);
@@ -3902,6 +3987,21 @@
     });
   }
 
+  function passGame2Question() {
+    if (!currentGame2Question) return;
+    // パスは誤答として扱わない。答えを見せてから、一度だけ間隔を空けて再出題する。
+    resetCorrectStreak('game2');
+    scheduleGame2Review(currentGame2Question);
+    const wordbank = document.getElementById('wordbank');
+    const preview = document.getElementById('answer-preview');
+    wordbank.classList.add('answered');
+    preview.classList.remove('editing');
+    preview.classList.add('result', 'answer-revealed');
+    preview.innerHTML = `<div class="result-copy">答え：<span class="name">${displayCompoundName(targetName)}</span></div>`
+      + `<div class="answer-actions"><button id="next-btn2" class="secondary">次へ</button></div>`;
+    document.getElementById('next-btn2').addEventListener('click', () => { playUiClickSound(); startGame2(); });
+  }
+
   function buildWordBank() {
     const wb = document.getElementById('wordbank');
     wb.innerHTML = '';
@@ -3928,6 +4028,17 @@
     submitBtn.addEventListener('click', submitGame2Answer);
     controlRow.append(undoBtn, clearBtn, submitBtn);
     wb.appendChild(controlRow);
+
+    const passRow = document.createElement('div');
+    passRow.className = 'pass-row';
+    const passBtn = document.createElement('button');
+    passBtn.type = 'button';
+    passBtn.className = 'pass-btn';
+    passBtn.textContent = 'パス';
+    passBtn.title = '答えを見て、少し後でもう一度挑戦する';
+    passBtn.addEventListener('click', () => { playUiClickSound(); passGame2Question(); });
+    passRow.appendChild(passBtn);
+    wb.appendChild(passRow);
 
     const tokenScroll = document.createElement('div');
     tokenScroll.className = 'token-scroll';
@@ -3996,6 +4107,8 @@
       setupPalette();
       refreshAll();
     } else {
+      resetCorrectStreak('game2');
+      resetGame2ReviewQueue();
       startGame2();
     }
     return enabled;
@@ -4026,6 +4139,8 @@
 
   function setMode(mode) {
     clearPaletteSelection();
+    resetAllCorrectStreaks();
+    resetGame2ReviewQueue();
     currentMode = mode;
     // 「練習」はアルカン並べ専用の難度なので、アルカン名付けへ移るときは既定の難度に戻す
     if (mode === 'game2' && difficulty === 'practice') difficulty = 'easy';
@@ -4190,6 +4305,8 @@
     }
     // 名付け中の難易度を編集した場合は、その設定で問題と語群を作り直して常に一致させる。
     if (modalState.game === 'game2' && currentMode === 'game2' && modalState.tier === difficulty) {
+      resetCorrectStreak('game2');
+      resetGame2ReviewQueue();
       startGame2();
     }
   }
@@ -4442,6 +4559,8 @@
   document.querySelectorAll('.diff-tab[data-diff]').forEach((btn) => {
     btn.addEventListener('click', () => {
       playDifficultySound(btn.dataset.diff);
+      resetAllCorrectStreaks();
+      resetGame2ReviewQueue();
       difficulty = btn.dataset.diff;
       refreshDiffTabsUI();
       applyGridSize();
