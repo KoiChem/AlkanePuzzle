@@ -397,7 +397,7 @@
   .hydroxyl-toggle:disabled{cursor:default;opacity:1;}
   .gear-btn{
     flex-shrink:0;width:40px;height:40px;padding:0;box-sizing:border-box;line-height:1;display:inline-flex;align-items:center;justify-content:center;
-    border-radius:13px;border:2px solid var(--accent);background:var(--accent-soft);color:var(--accent-ink);
+    border-radius:13px;border:2px solid var(--border);background:var(--surface);color:var(--text-muted);
     box-shadow:1px 2px 0 var(--shadow);transition:transform .08s ease,box-shadow .08s ease,background .12s ease;
   }
   .gear-icon{width:20px;height:20px;flex:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;fill:none;transition:transform .16s ease;}
@@ -423,7 +423,7 @@
   .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
   .modal-header h2{font-size:18px;font-weight:800;margin:0;color:var(--ink);}
   .modal-close{
-    width:32px;height:32px;font-size:18px;border-radius:50%;
+    flex:0 0 32px;width:32px;height:32px;padding:0;box-sizing:border-box;line-height:1;display:inline-flex;align-items:center;justify-content:center;font-size:18px;border-radius:50%;
     border:2px solid var(--border);background:var(--surface);color:var(--text-muted);
   }
   .modal-game-tabs, .modal-tier-tabs{display:flex;gap:6px;margin-bottom:10px;}
@@ -2091,9 +2091,9 @@
   // ============================================================
   // モーダルで編集できる項目の既定値。ここが「今の設定」の基準になる。
   const DEFAULT_GAME1_OPTS = {
-    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, gridCols: 7, gridRows: 5, traceEnabled: true, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
-    medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  gridCols: 7, gridRows: 5, traceEnabled: true, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
-    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  gridCols: 5, gridRows: 5, traceEnabled: true, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
+    medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  gridCols: 5, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
   };
   const DEFAULT_GAME2_OPTS = {
     easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 3, ringSizes: [4, 6],     forceRingSubstituent: false, bendMin: 0, bendMax: 1, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
@@ -2119,7 +2119,7 @@
   // v1の「むずかしめ」はOH出題がONだった。完全に既定値のまま使われていた設定だけを
   // 新既定値へ移し、利用者が調整した設定は保持する。
   const LEGACY_V1_HARD_DEFAULTS = {
-    game1: { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true, gridCols: 5, gridRows: 5, traceEnabled: true, alcoholEnabled: true },
+    game1: { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true, gridCols: 5, gridRows: 5, alcoholEnabled: true },
     game2: { typeMin: 1, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true, bendMin: 4, bendMax: 99, alcoholEnabled: true },
   };
   // OH既定値の移行後も、名付ける「そこそこ」の旧既定値だけを側鎖種類2〜4へ進める。
@@ -2231,12 +2231,9 @@
     return r >= 0 && r < ROWS && c >= 0 && c < COLS && isPlayableCol(c) && isPlayableRow(r);
   }
 
-  // 「なぞって描く」機能が今この場面で有効かどうか。アルカン並べでのみ使い、
-  // 「練習」は難度タブに無いので「やさしめ」の設定に準じる。
+  // 「なぞって描く」はアルカン並べでは常に有効。名付けるは盤面を操作しないため対象外。
   function isTraceEnabledNow() {
-    if (currentMode !== 'game1') return false;
-    const tier = difficulty === 'practice' ? 'easy' : difficulty;
-    return !!(gameSettings.game1[tier] && gameSettings.game1[tier].traceEnabled);
+    return currentMode === 'game1';
   }
 
   // 非表示マスの見た目を更新し、そこに残っているパネルは取り除く。
@@ -4171,7 +4168,6 @@
     if (game === 'game1') {
       form.appendChild(makeStepperRow('枠数(横)', s, 'gridCols', 3, COLS));
       form.appendChild(makeStepperRow('枠数(縦)', s, 'gridRows', 3, ROWS));
-      form.appendChild(makeToggleRow('なぞって描く', s, 'traceEnabled'));
     } else {
       form.appendChild(makeRangeStepperRow('折れ曲がり炭素数', s, 'bendMin', 'bendMax', 0, 10));
     }
@@ -4220,7 +4216,7 @@
     const fmtTier = (s, isGame1) => {
       const common = `typeMin: ${s.typeMin}, typeMax: ${s.typeMax}, lenMin: ${s.lenMin}, lenMax: ${s.lenMax}, subMin: ${s.subMin}, subMax: ${s.subMax}, ringSizes: [${s.ringSizes.join(', ')}], alcoholEnabled: ${s.alcoholEnabled}, alcoholRate: ${s.alcoholRate}, hydroxylLimitOne: ${s.hydroxylLimitOne}`;
       const rest = isGame1
-        ? `forceRingSubstituent: ${s.forceRingSubstituent}, gridCols: ${s.gridCols}, gridRows: ${s.gridRows}, traceEnabled: ${s.traceEnabled}`
+        ? `forceRingSubstituent: ${s.forceRingSubstituent}, gridCols: ${s.gridCols}, gridRows: ${s.gridRows}`
         : `forceRingSubstituent: ${s.forceRingSubstituent}, bendMin: ${s.bendMin}, bendMax: ${s.bendMax}`;
       return `    ${common}, ${rest}`;
     };
