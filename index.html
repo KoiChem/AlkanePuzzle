@@ -1735,26 +1735,35 @@
     return buildRingGridFromPath(templatePath(), forceSubstituent, subMin, subMax, typeRange, forceHydroxyl, hydroxylLimitOne);
   }
 
-  // 名前文字列に含まれる置換基の「種類数」を数える(メチル/エチルのみが対象なので単純な部分文字列チェックで十分)
-  function countDistinctTypesInName(name) {
-    let n = 0;
-    if (name.includes('メチル')) n++;
-    if (name.includes('エチル')) n++;
-    if (name.includes('フルオロ')) n++;
-    if (name.includes('クロロ')) n++;
-    if (name.includes('ブロモ')) n++;
-    if (name.includes('ヨード')) n++;
-    if (name.endsWith('ノール') || name.endsWith('オール')) n++;
-    return n;
+  // 正式名に現れる置換基・OH基の種類を、設定と重複回避で共通利用する。
+  // 個数は無視するため、クロロとジクロロは同じ「クロロ」組み合わせになる。
+  function groupTypesInName(name) {
+    const types = [];
+    if (name.includes('メチル')) types.push('メチル');
+    if (name.includes('エチル')) types.push('エチル');
+    if (name.includes('フルオロ')) types.push('フルオロ');
+    if (name.includes('クロロ')) types.push('クロロ');
+    if (name.includes('ブロモ')) types.push('ブロモ');
+    if (name.includes('ヨード')) types.push('ヨード');
+    if (name.endsWith('ノール') || name.endsWith('オール')) types.push('OH');
+    return types;
+  }
+  function groupTypeSignature(name) {
+    const types = groupTypesInName(name);
+    return types.length ? types.join('|') : 'なし';
   }
 
   // 主鎖が炭素1個だけの構造(ハロゲン化メタン)を生成する。やさしめ難度でのみ登場させる。
-  function generateMethaneGrid(forceHydroxyl = false, maxTypeCount = Infinity) {
+  function generateMethaneGrid(forceHydroxyl = false, maxTypeCount = Infinity, subMin = 1, subMax = 4) {
     const dirsByCount = { 1: ['E'], 2: ['E', 'W'], 3: ['E', 'W', 'N'], 4: ['E', 'W', 'N', 'S'] };
     const typeByCount = { 1: 1, 2: 2, 3: 4, 4: 5 };
+    const minCount = Math.max(1, Math.min(4, Number(subMin) || 0));
+    const maxCount = Math.max(0, Math.min(4, Number(subMax) || 0));
+    if (minCount > maxCount) return null; // 例: 置換基数0〜0ではハロゲン化メタンを出さない
     // OHを必ず1種類として数える設定で種類数上限が1なら、OHだけのメタノールにする。
     // OHとハロゲンの混在を何度も生成してから棄却するのを避け、出題率も安定させる。
-    const count = forceHydroxyl && maxTypeCount <= 1 ? 1 : randInt(1, 4);
+    if (forceHydroxyl && maxTypeCount <= 1 && minCount > 1) return null;
+    const count = forceHydroxyl && maxTypeCount <= 1 ? 1 : randInt(minCount, maxCount);
     const dirs = dirsByCount[count];
     const grid = emptyGrid();
     const cr = 2, cc = Math.floor(COLS / 2);
@@ -1797,7 +1806,7 @@
   //   maxWidth / maxHeight: 出題する構造が収まるべき列数・行数の上限(盤面を狭めている難度で使う)
   function generateStructureWithOptions(opts) {
     const {
-      typeMin = 1, typeMax = 1, lenMin = 2, lenMax = 7, useBent = false, forceTurn = false, forceRingSubstituent = false,
+      typeMin = 1, typeMax = 1, lenMin = 2, lenMax = 7, subMin = 0, subMax = 4, useBent = false, forceTurn = false, forceRingSubstituent = false,
       ringSizes = [4, 6], bendRange = null, allowMethane = false, categoryWeights = null, alcoholEnabled = false, alcoholRate = 40, hydroxylLimitOne = false,
       maxWidth = COLS, maxHeight = ROWS,
     } = opts || {};
@@ -1821,13 +1830,20 @@
       // 分岐の位置によっては最長鎖ルールの都合で主鎖の解釈が変わり、
       // 意図せず種類数が設定範囲から外れることがあるため、実際の結果を見てから判定する。
       // ただし置換基が1つも無い構造(種類数0)は、下限が何であっても許容する。
-      const typeCount = countDistinctTypesInName(result.name);
+      const groupSummary = namedGroupSummary(result.name);
+      if (!groupSummary || groupSummary.total < subMin || groupSummary.total > subMax) return null;
+      const typeCount = groupSummary.types.length;
       if (typeCount > typeMax) return null;
       if (typeCount > 0 && typeCount < typeMin) return null;
       return { grid: g, name: result.name, fellBack: false };
     }
-    function tryMethane() { try { return finalize(generateMethaneGrid(forceHydroxyl, typeMax)); } catch (e) { return null; } }
-    function tryCyclo() { try { return finalize(generateCycloalkaneGrid(forceRingSubstituent, ringSizes, opts.subMin, opts.subMax, typeRange, forceHydroxyl, hydroxylLimitOne)); } catch (e) { return null; } }
+    function tryMethane() {
+      try {
+        const g = generateMethaneGrid(forceHydroxyl, typeMax, subMin, subMax);
+        return g ? finalize(g) : null;
+      } catch (e) { return null; }
+    }
+    function tryCyclo() { try { return finalize(generateCycloalkaneGrid(forceRingSubstituent, ringSizes, subMin, subMax, typeRange, forceHydroxyl, hydroxylLimitOne)); } catch (e) { return null; } }
     function tryChainLen(len) {
       try {
         const lenOpts = { ...opts, lenMin: len, lenMax: len, forceHydroxyl, hydroxylLimitOne };
@@ -1838,8 +1854,12 @@
 
     // 問題形式(メタン／鎖状／環状)を先に重み付きで選び、鎖状なら主鎖長を均等に選ぶ。
     // これで主鎖範囲を変えてもメタン・環状の出題率が意図せず変わらない。
+    const methaneMinCount = Math.max(1, Number(subMin) || 0);
+    const methaneMaxCount = Math.min(4, Number(subMax) || 0);
+    const methaneEligible = allowMethane && methaneMinCount <= methaneMaxCount
+      && !(forceHydroxyl && typeMax <= 1 && methaneMinCount > 1);
     const categories = [];
-    if (allowMethane) categories.push({ kind: 'methane' });
+    if (methaneEligible) categories.push({ kind: 'methane' });
     for (let l = Math.max(2, lenMin); l <= Math.max(2, lenMax); l++) categories.push({ kind: 'chain', len: l });
     categories.push({ kind: 'cyclo' });
     const chainCategories = categories.filter((cat) => cat.kind === 'chain');
@@ -1851,7 +1871,7 @@
     }
 
     const familyChoices = [
-      ...(allowMethane ? [{ kind: 'methane', weight: categoryWeights?.methane ?? 10 }] : []),
+      ...(methaneEligible ? [{ kind: 'methane', weight: categoryWeights?.methane ?? 10 }] : []),
       ...(chainCategories.length ? [{ kind: 'chain', weight: categoryWeights?.chain ?? 75 }] : []),
       { kind: 'cyclo', weight: categoryWeights?.cyclo ?? 15 },
     ].filter((item) => item.weight > 0);
@@ -2101,13 +2121,26 @@
   // モーダルで編集できる項目の既定値。ここが「今の設定」の基準になる。
   const DEFAULT_GAME1_OPTS = {
     easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
-    medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
-    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  gridCols: 5, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8,  subMin: 0, subMax: 4, ringSizes: [6, 8],     forceRingSubstituent: true,  gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 0, subMax: 4, ringSizes: [6, 8, 10], forceRingSubstituent: true,  gridCols: 5, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
   };
   const DEFAULT_GAME2_OPTS = {
-    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 3, ringSizes: [4, 6],     forceRingSubstituent: false, bendMin: 0, bendMax: 1, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
-    medium: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  bendMin: 2, bendMax: 3, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
-    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  bendMin: 4, bendMax: 99, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, bendMin: 0, bendMax: 1, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
+    medium: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8,  subMin: 0, subMax: 4, ringSizes: [6, 8],     forceRingSubstituent: true,  bendMin: 2, bendMax: 3, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 0, subMax: 4, ringSizes: [6, 8, 10], forceRingSubstituent: true,  bendMin: 4, bendMax: 99, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+  };
+  // 0〜4への既定値変更前の設定。完全に旧既定値のままの難度だけを移行し、
+  // 他項目を調整している利用者の置換基数設定は保持する。
+  const LEGACY_SUB_COUNT_DEFAULTS = {
+    game1: {
+      medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8, subMin: 3, subMax: 6, ringSizes: [6, 8], forceRingSubstituent: true, gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+      hard: { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true, gridCols: 5, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    },
+    game2: {
+      easy: { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6, subMin: 0, subMax: 3, ringSizes: [4, 6], forceRingSubstituent: false, bendMin: 0, bendMax: 1, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
+      medium: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8, subMin: 3, subMax: 6, ringSizes: [6, 8], forceRingSubstituent: true, bendMin: 2, bendMax: 3, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+      hard: { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true, bendMin: 4, bendMax: 99, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    },
   };
   // モーダルには出さず内部で固定する値。
   // 屈曲主鎖: 並べ・名付けとも常にON(並べは盤面の曲がりが見えないため露出の意味が薄く、
@@ -2159,11 +2192,27 @@
       || matchesLegacyDefault(hard, LEGACY_INDEX_GAME2_HARD_DEFAULT)) hard.typeMin = 2;
     return saved;
   }
+  function migrateLegacySubCountDefaults(saved) {
+    if (!saved) return saved;
+    for (const game of ['game1', 'game2']) {
+      for (const [tier, legacyTier] of Object.entries(LEGACY_SUB_COUNT_DEFAULTS[game])) {
+        const savedTier = saved[game] && saved[game][tier];
+        if (!savedTier) continue;
+        const unchanged = Object.entries(legacyTier).every(([key, value]) => {
+          if (key === 'alcoholEnabled' || savedTier[key] === undefined) return true;
+          return JSON.stringify(savedTier[key]) === JSON.stringify(value);
+        });
+        if (unchanged) { savedTier.subMin = 0; savedTier.subMax = 4; }
+      }
+    }
+    return saved;
+  }
   function loadGameSettings() {
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)); } catch (e) { saved = null; }
     saved = migrateLegacyHydroxylDefaults(saved);
     saved = migrateLegacyGame2HardDefault(saved);
+    saved = migrateLegacySubCountDefaults(saved);
     const merge = (defaults, savedGame) => {
       const out = {};
       for (const tier of ['easy', 'medium', 'hard']) {
@@ -3359,20 +3408,39 @@
   function questionGridSignature(g) {
     return g.flat().map((panel) => panel ? `${panel.type}:${panel.rotation}:${panel.element || 'C'}` : '.').join('|');
   }
+  function questionTypeSignature(result) {
+    return namedGroupSummary(result.name)?.signature || groupTypeSignature(result.name);
+  }
   function rememberQuestion(history, result) {
-    history.push({ name: result.name, signature: questionGridSignature(result.grid) });
+    history.push({
+      name: result.name,
+      signature: questionGridSignature(result.grid),
+      typeSignature: questionTypeSignature(result),
+    });
     if (history.length > 8) history.shift();
   }
   function generateAvoidingRecentRepeat(opts, history) {
-    let fallback = generateStructureWithOptions(opts);
     const recentNames = new Set(history.slice(-8).map((item) => item.name));
     const recentSignatures = new Set(history.slice(-4).map((item) => item.signature));
+    const previous = history[history.length - 1] || null;
+    const candidates = [];
     for (let i = 0; i < 12; i++) {
-      const result = i === 0 ? fallback : generateStructureWithOptions(opts);
+      const result = generateStructureWithOptions(opts);
       const signature = questionGridSignature(result.grid);
-      if (!recentNames.has(result.name) && !recentSignatures.has(signature)) return result;
+      const typeSignature = questionTypeSignature(result);
+      const nameIsFresh = !recentNames.has(result.name);
+      const gridIsFresh = !recentSignatures.has(signature);
+      const typeIsFresh = !previous || typeSignature !== previous.typeSignature;
+      candidates.push({ result, signature, typeSignature, nameIsFresh, gridIsFresh, typeIsFresh });
+      if (nameIsFresh && gridIsFresh && typeIsFresh) return result;
     }
-    return fallback; // 設定が狭すぎるときだけ、重複より出題継続を優先する。
+    // 全条件を満たせない狭い設定では、まず直前と種類の組み合わせが変わる候補を優先する。
+    // それも不可能なときだけ従来どおり、名称・盤面が新しい候補、最後に先頭候補へ緩和する。
+    const changedCombination = candidates.find((item) => item.typeIsFresh
+      && (!previous || item.result.name !== previous.name) && (!previous || item.signature !== previous.signature));
+    if (changedCombination) return changedCombination.result;
+    const otherwiseFresh = candidates.find((item) => item.nameIsFresh && item.gridIsFresh);
+    return (otherwiseFresh || candidates[0]).result;
   }
 
   function questionKey(question) {
@@ -3394,9 +3462,10 @@
       readyAt: game2PresentedQuestionCount + interveningQuestions + 1,
     });
   }
-  function takeReadyGame2Review() {
+  function takeReadyGame2Review(previousTypeSignature = null) {
     const nextQuestionNumber = game2PresentedQuestionCount + 1;
-    const index = game2ReviewQueue.findIndex((item) => item.readyAt <= nextQuestionNumber);
+    const index = game2ReviewQueue.findIndex((item) => item.readyAt <= nextQuestionNumber
+      && (!previousTypeSignature || questionTypeSignature(item.question) !== previousTypeSignature));
     return index === -1 ? null : game2ReviewQueue.splice(index, 1)[0].question;
   }
 
@@ -3582,7 +3651,8 @@
     interactionsEnabled = false;
     // パスした問題は、通常の直近重複回避を意図的に越えて3〜5問後に一度だけ戻す。
     // それ以外は従来どおり、同じ見た目・同じ答えの連続を避けて生成する。
-    const question = takeReadyGame2Review()
+    const previousTypeSignature = recentGame2Questions[recentGame2Questions.length - 1]?.typeSignature || null;
+    const question = takeReadyGame2Review(previousTypeSignature)
       || generateAvoidingRecentRepeat(buildGame2Opts(difficulty), recentGame2Questions);
     game2PresentedQuestionCount++;
     rememberQuestion(recentGame2Questions, question);
@@ -3871,6 +3941,23 @@
       }
     }
     return null;
+  }
+
+  // 正式名を解答トークンへ戻し、最終的に命名された置換基・OH基の総数を数える。
+  // 生成時に置いた枝数ではなく、最長鎖・主環を選び直した後の名称を基準にすることで、
+  // すべての問題形式を同じ設定境界で検査できる。
+  function namedGroupSummary(name) {
+    const tokens = expectedGame2AnswerTokens(name);
+    if (tokens === null) return null;
+    let total = 0;
+    const countForIndex = (index) => {
+      const multiplierIndex = MULTIPLIER_PREFIX.indexOf(tokens[index - 1]);
+      return multiplierIndex >= 2 ? multiplierIndex : 1;
+    };
+    tokens.forEach((token, index) => {
+      if (SUB_NAME_SET.has(token) || token === ALCOHOL_TOKEN) total += countForIndex(index);
+    });
+    return { total, types: groupTypesInName(name), signature: groupTypeSignature(name) };
   }
 
   function game2TokenCountsMatch(actual, expected) {
