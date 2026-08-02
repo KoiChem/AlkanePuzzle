@@ -96,6 +96,14 @@
   .base{background:var(--orange);border-color:var(--orange-line)}
   .answer-box{width:100%;min-height:42px;padding:6px;border:2px dashed var(--border);border-radius:10px;background:var(--paper);display:flex;align-items:center;justify-content:center;gap:3px;position:relative}
   .insert-line{width:3px;height:28px;border-radius:2px;background:var(--accent)}
+  .gesture-demo{display:grid;gap:8px}
+  .gesture-block{display:grid;gap:4px}
+  .gesture-block+.gesture-block{padding-top:8px;border-top:1px dashed var(--border)}
+  .gesture-action{display:flex;align-items:center;justify-content:center;gap:5px;color:var(--accent-ink);font-size:10.5px;font-weight:900;line-height:1.2}
+  .gesture-action svg{width:17px;height:17px;color:var(--accent)}
+  .token.moving{outline:2px solid rgba(42,157,143,.28);transform:translateY(-1px);box-shadow:1px 3px 0 var(--shadow)}
+  .delete-zone{min-height:39px;padding:5px 8px;border:2px dashed #d28f84;border-radius:10px;background:#fff1ee;display:flex;align-items:center;justify-content:center;gap:8px}
+  .delete-label{color:#9f4f43;font-size:11px;font-weight:900}
   .legend{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px}
   .legend-item{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted)}
   .legend-dot{width:14px;height:14px;border:2px solid;border-radius:5px;flex:0 0 14px}
@@ -262,12 +270,20 @@
         </article>
 
         <article class="op-card">
-          <h3>並べ替え・枠外削除</h3>
-          <div class="answer-demo">
-            <div class="answer-box"><span class="token number">2</span><span class="token sub">メチル</span><span class="token base">ブタン</span></div>
-            <svg class="flow-arrow" style="margin:auto;transform:rotate(-90deg)" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <p class="gesture-note">解答欄内では並べ替え。上または下へ動かし、「削除」が反応したら離します。</p>
+          <h3>並べ替え・削除</h3>
+          <div class="gesture-demo">
+            <div class="gesture-block">
+              <div class="answer-box"><span class="token number">2</span><span class="token sub moving">メチル</span><span class="token base">ブタン</span></div>
+              <div class="gesture-action"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15m-5-5 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>横へドラッグして移動</span></div>
+              <div class="answer-box"><span class="token sub moving">メチル</span><span class="token number">2</span><span class="token base">ブタン</span></div>
+            </div>
+            <div class="gesture-block">
+              <div class="answer-box"><span class="token number">2</span><span class="token sub moving">メチル</span><span class="token base">ブタン</span></div>
+              <div class="gesture-action"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15m-5-5 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>上か下の枠外へドラッグ</span></div>
+              <div class="delete-zone"><span class="token sub moving">メチル</span><span class="delete-label">削除</span></div>
+            </div>
           </div>
+          <p class="gesture-note">移動先または「削除」が反応したところで離します。</p>
         </article>
       </div>
 

@@ -206,6 +206,14 @@
   .operation-answer{width:100%;min-height:40px;padding:5px;border:2px dashed var(--border);border-radius:10px;background:var(--paper);display:flex;align-items:center;justify-content:center;gap:3px;}
   .operation-insert{width:3px;height:27px;border-radius:2px;background:var(--accent);}
   .operation-demo{display:grid;gap:5px;}.operation-caption{text-align:center;margin-top:5px;}
+  .operation-gesture-demo{display:grid;gap:8px;}
+  .operation-gesture-block{display:grid;gap:4px;}
+  .operation-gesture-block+.operation-gesture-block{padding-top:8px;border-top:1px dashed var(--border);}
+  .operation-gesture-action{display:flex;align-items:center;justify-content:center;gap:5px;color:var(--accent-ink);font-size:10.5px;font-weight:800;line-height:1.2;}
+  .operation-gesture-action svg{width:17px;height:17px;color:var(--accent);}
+  .operation-token.moving{outline:2px solid rgba(42,157,143,.28);transform:translateY(-1px);box-shadow:1px 3px 0 var(--shadow);}
+  .operation-delete-zone{min-height:37px;padding:4px 7px;border:2px dashed #d28f84;border-radius:10px;background:#fff1ee;display:flex;align-items:center;justify-content:center;gap:7px;}
+  .operation-delete-label{color:#9f4f43;font-size:10.5px;font-weight:800;}
   .operation-legend{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px;}.operation-legend span{font-size:10.5px;color:var(--text-muted);}
   .operation-buttons{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:7px;}.operation-fake-btn{min-height:34px;padding:5px 2px;border:2px solid var(--border);border-radius:10px 8px 11px 9px;background:var(--surface);font-size:10px;font-weight:800;text-align:center;display:grid;place-items:center;}.operation-fake-btn.primary{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);}
   .operation-button-notes{display:grid;grid-template-columns:1fr 1fr;gap:5px;}.operation-button-notes p{margin:0;padding:7px 8px;border:1px dashed var(--border);border-radius:9px;font-size:10.5px;line-height:1.45;color:var(--text-muted);}.operation-button-notes strong{color:var(--ink);}
@@ -706,7 +714,7 @@
           <article class="operation-card"><h4>タップで追加</h4><div class="operation-demo"><div class="operation-tokens"><span class="operation-token number">2</span><span class="operation-token sub">メチル</span><span class="operation-token base">ブタン</span></div><svg class="operation-arrow" style="margin:auto;transform:rotate(90deg)" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><div class="operation-answer"><span class="operation-token number">2</span><span class="operation-token sub">メチル</span><span class="operation-token base">ブタン</span></div></div><p class="operation-caption">縦線がなければ、解答の最後へ追加されます。</p></article>
           <article class="operation-card"><h4>タップで途中へ入れる</h4><div class="operation-demo"><div class="operation-answer"><span class="operation-token number">2</span><span class="operation-insert"></span><span class="operation-token base">ブタン</span></div><p class="operation-caption">チップの左側・右側をタップして縦線を置き、語群をタップします。</p><div class="operation-answer"><span class="operation-token number">2</span><span class="operation-token sub">メチル</span><span class="operation-token base">ブタン</span></div></div></article>
           <article class="operation-card"><h4>ドラッグで任意の場所へ追加</h4><div class="operation-demo"><div class="operation-tokens"><span class="operation-token sub">メチル</span></div><svg class="operation-arrow" style="margin:auto;transform:rotate(90deg)" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><div class="operation-answer"><span class="operation-token number">2</span><span class="operation-insert"></span><span class="operation-token base">ブタン</span></div></div><p class="operation-caption">語群の語句をつかみ、解答欄の好きな位置で離します。</p></article>
-          <article class="operation-card"><h4>並べ替え・削除</h4><div class="operation-answer"><span class="operation-token number">2</span><span class="operation-token base">ブタン</span><span class="operation-insert"></span><span class="operation-token sub">メチル</span></div><p class="operation-caption">チップをドラッグして移動。解答欄の上か下へ動かし、「削除」が反応したら離します。</p></article>
+          <article class="operation-card"><h4>並べ替え・削除</h4><div class="operation-gesture-demo"><div class="operation-gesture-block"><div class="operation-answer"><span class="operation-token number">2</span><span class="operation-token sub moving">メチル</span><span class="operation-token base">ブタン</span></div><div class="operation-gesture-action"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15m-5-5 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>横へドラッグして移動</span></div><div class="operation-answer"><span class="operation-token sub moving">メチル</span><span class="operation-token number">2</span><span class="operation-token base">ブタン</span></div></div><div class="operation-gesture-block"><div class="operation-answer"><span class="operation-token number">2</span><span class="operation-token sub moving">メチル</span><span class="operation-token base">ブタン</span></div><div class="operation-gesture-action"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15m-5-5 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>上か下の枠外へドラッグ</span></div><div class="operation-delete-zone"><span class="operation-token sub moving">メチル</span><span class="operation-delete-label">削除</span></div></div></div><p class="operation-caption">移動先または「削除」が反応したところで離します。</p></article>
         </div>
         <div class="operation-legend"><span>青：位置番号</span><span>紫：ジ・トリなど</span><span>緑：置換基</span><span>橙：母体名など</span></div>
         <aside class="operation-tip"><strong>語群をスクロールするには</strong><p>語句と語句の間を上下になぞります。語句ボタンをつかむと、その語句のドラッグになります。</p></aside>
@@ -2303,12 +2311,12 @@
   // モーダルで編集できる項目の既定値。ここが「今の設定」の基準になる。
   const DEFAULT_GAME1_OPTS = {
     easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
-    medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8,  subMin: 2, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
     hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  gridCols: 5, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
   };
   const DEFAULT_GAME2_OPTS = {
     easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, bendMin: 0, bendMax: 1, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
-    medium: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8,  subMin: 2, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  bendMin: 2, bendMax: 3, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    medium: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  bendMin: 2, bendMax: 3, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
     hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  bendMin: 4, bendMax: 99, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
   };
   // 0〜4への既定値変更前の設定。完全に旧既定値のままの難度だけを移行し、
@@ -2335,6 +2343,12 @@
       medium: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8, subMin: 0, subMax: 4, ringSizes: [6, 8], forceRingSubstituent: true, bendMin: 2, bendMax: 3, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
       hard: { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 0, subMax: 4, ringSizes: [6, 8, 10], forceRingSubstituent: true, bendMin: 4, bendMax: 99, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
     },
+  };
+  // 直前の段階別既定値では「まあまあ」が2〜6だった。ほかの項目も含めてその既定値の
+  // まま残っている場合だけ、今回の3〜6へ進める。
+  const LEGACY_TWO_TO_SIX_SUB_COUNT_DEFAULTS = {
+    game1: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8, subMin: 2, subMax: 6, ringSizes: [6, 8], forceRingSubstituent: true, gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    game2: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8, subMin: 2, subMax: 6, ringSizes: [6, 8], forceRingSubstituent: true, bendMin: 2, bendMax: 3, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
   };
   // モーダルには出さず内部で固定する値。
   // 屈曲主鎖: 並べ・名付けとも常にON(並べは盤面の曲がりが見えないため露出の意味が薄く、
@@ -2403,7 +2417,7 @@
   }
   function migrateUniformSubCountDefaults(saved) {
     if (!saved) return saved;
-    const targetRanges = { medium: [2, 6], hard: [4, 8] };
+    const targetRanges = { medium: [3, 6], hard: [4, 8] };
     for (const game of ['game1', 'game2']) {
       for (const [tier, legacyTier] of Object.entries(LEGACY_UNIFORM_SUB_COUNT_DEFAULTS[game])) {
         const savedTier = saved[game] && saved[game][tier];
@@ -2417,6 +2431,20 @@
     }
     return saved;
   }
+  function migrateTwoToSixSubCountDefaults(saved) {
+    if (!saved) return saved;
+    for (const game of ['game1', 'game2']) {
+      const savedTier = saved[game] && saved[game].medium;
+      const legacyTier = LEGACY_TWO_TO_SIX_SUB_COUNT_DEFAULTS[game];
+      if (!savedTier) continue;
+      const unchanged = Object.entries(legacyTier).every(([key, value]) => {
+        if (key === 'alcoholEnabled' || savedTier[key] === undefined) return true;
+        return JSON.stringify(savedTier[key]) === JSON.stringify(value);
+      });
+      if (unchanged) { savedTier.subMin = 3; savedTier.subMax = 6; }
+    }
+    return saved;
+  }
   function loadGameSettings() {
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)); } catch (e) { saved = null; }
@@ -2424,6 +2452,7 @@
     saved = migrateLegacyGame2HardDefault(saved);
     saved = migrateLegacySubCountDefaults(saved);
     saved = migrateUniformSubCountDefaults(saved);
+    saved = migrateTwoToSixSubCountDefaults(saved);
     const merge = (defaults, savedGame) => {
       const out = {};
       for (const tier of ['easy', 'medium', 'hard']) {
