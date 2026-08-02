@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>操作ガイド内容確認｜アルカンパズル</title>
+<style>
+  :root{
+    --bg:#faf8f0;--paper:#fffdf6;--surface:#fffdf6;--grid-line:rgba(90,150,190,.13);
+    --border:#d8d3c0;--ink:#33302a;--muted:#777264;--accent:#2a9d8f;--accent-ink:#1f8175;
+    --accent-soft:#d7f0ec;--shadow:rgba(60,55,40,.14);--blue:#e3f0fb;--blue-line:#8fbfe4;
+    --purple:#f1e8fb;--purple-line:#c1a0e6;--green:#e6f6ea;--green-line:#94cfa3;
+    --orange:#fdf0e0;--orange-line:#e8b877;
+    --font:'Hiragino Maru Gothic ProN','ヒラギノ丸ゴ ProN W4','Yu Gothic',YuGothic,
+      'Rounded Mplus 1c',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;color:var(--ink);font-family:var(--font);font-weight:600;
+    background:
+      linear-gradient(var(--grid-line) 1px,transparent 1px) 0 0/22px 22px,
+      linear-gradient(90deg,var(--grid-line) 1px,transparent 1px) 0 0/22px 22px,var(--bg);
+  }
+  button{font:inherit;color:inherit}
+  .guide-shell{
+    width:min(100%,500px);min-height:100vh;margin:0 auto;padding:18px 14px 36px;background:var(--paper);
+    box-shadow:0 0 26px var(--shadow);
+  }
+  .guide-head{text-align:center;margin-bottom:12px}
+  .guide-kicker{margin:0 0 2px;color:var(--accent-ink);font-size:12px;font-weight:800;letter-spacing:.08em}
+  h1{font-size:22px;margin:0 0 4px;font-weight:900}
+  .guide-lead{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+  .mode-tabs{display:flex;gap:7px;margin:14px 0;position:sticky;top:6px;z-index:5;padding:4px;background:rgba(255,253,246,.96);border-radius:15px}
+  .mode-tab{
+    flex:1;min-height:42px;border:2px solid var(--border);border-radius:12px 10px 13px 11px;
+    background:var(--surface);color:var(--muted);box-shadow:1px 2px 0 var(--shadow);font-size:14px;font-weight:800;
+  }
+  .mode-tab[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink)}
+  .mode-panel[hidden]{display:none}
+  .section{margin-top:18px}
+  .section-title{display:flex;align-items:center;gap:7px;margin:0 0 9px;font-size:16px;font-weight:900}
+  .section-no{
+    display:inline-grid;place-items:center;flex:0 0 25px;width:25px;height:25px;border-radius:50%;
+    background:var(--accent-soft);color:var(--accent-ink);font-size:13px;
+  }
+  .quick-card,.op-card,.tip,.details-box{
+    background:var(--surface);border:2px solid var(--border);border-radius:16px 14px 18px 13px;
+    box-shadow:1px 2px 0 var(--shadow);
+  }
+  .quick-card{padding:12px 8px}
+  .quick-flow{display:grid;grid-template-columns:1fr 18px 1fr 18px 1fr;align-items:center;gap:3px}
+  .quick-step{text-align:center;min-width:0}
+  .quick-visual{height:62px;display:grid;place-items:center;margin-bottom:3px}
+  .quick-step strong{display:block;font-size:12px;font-weight:900;line-height:1.35}
+  .quick-step span{display:block;color:var(--muted);font-size:10.5px;line-height:1.35;margin-top:2px}
+  .flow-arrow{color:var(--accent);width:18px;height:18px}
+  .op-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .op-card{padding:12px}
+  .op-card h3{font-size:14px;margin:0 0 9px;font-weight:900;color:var(--accent-ink)}
+  .action-row{display:grid;grid-template-columns:54px 1fr;gap:9px;align-items:center;padding:8px 0;border-top:1px dashed var(--border)}
+  .action-row:first-of-type{border-top:0;padding-top:0}
+  .action-row:last-child{padding-bottom:0}
+  .action-copy strong{font-size:12.5px;font-weight:900;display:block;margin-bottom:2px}
+  .action-copy p{font-size:11.5px;line-height:1.48;color:var(--muted);margin:0}
+  .mini-stage{height:52px;display:grid;place-items:center;position:relative}
+  .atom-card{
+    width:42px;height:42px;border:2px solid var(--border);border-radius:11px 9px 12px 10px;background:var(--paper);
+    display:grid;place-items:center;position:relative;box-shadow:1px 2px 0 var(--shadow);
+  }
+  .atom-card.selected{border-color:var(--accent);background:var(--accent-soft);outline:2px solid rgba(42,157,143,.22)}
+  .carbon{width:15px;height:15px;border-radius:50%;background:var(--ink);position:relative}
+  .carbon::before,.carbon::after{content:"";position:absolute;background:var(--ink);left:50%;top:50%;transform:translate(-50%,-50%)}
+  .carbon::before{width:32px;height:3px}.carbon::after{width:3px;height:32px}
+  .tap-ring{position:absolute;width:25px;height:25px;border:2px solid var(--accent);border-radius:50%;right:0;bottom:0}
+  .tap-ring::after{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:var(--accent);left:7px;top:7px}
+  .drag-arrow{position:absolute;width:42px;height:26px;color:var(--accent);right:-4px;bottom:-1px}
+  .trace-svg{width:52px;height:52px;color:var(--accent)}
+  .tap-stack{display:flex;gap:3px;align-items:center;justify-content:center}
+  .tap-badge{width:22px;height:22px;border:2px solid var(--accent);border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:900;color:var(--accent-ink)}
+  .tip{margin-top:9px;padding:10px 12px;border-style:dashed;background:var(--accent-soft)}
+  .tip strong{display:block;font-size:12.5px;font-weight:900;color:var(--accent-ink);margin-bottom:3px}
+  .tip p,.tip ul{font-size:11.5px;line-height:1.55;margin:0;color:var(--ink)}
+  .tip ul{padding-left:18px}.tip li+li{margin-top:3px}
+  details{margin-top:10px;border:2px solid var(--border);border-radius:14px 12px 15px 11px;background:var(--surface);overflow:hidden}
+  summary{cursor:pointer;list-style:none;padding:11px 13px;font-size:12.5px;font-weight:900;color:var(--accent-ink);display:flex;align-items:center;justify-content:space-between}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"＋";font-size:17px;line-height:1}details[open] summary::after{content:"−"}
+  .details-body{border-top:1px dashed var(--border);padding:9px 13px 12px}
+  .details-body ul{margin:0;padding-left:18px;font-size:11.5px;line-height:1.6;color:var(--muted)}
+  .details-body li+li{margin-top:4px}
+  .token-scene{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px}
+  .token{display:inline-flex;align-items:center;justify-content:center;min-height:27px;padding:3px 7px;border:2px solid;border-radius:9px 7px 10px 8px;font-size:11px;font-weight:900;box-shadow:1px 1px 0 var(--shadow)}
+  .number{background:var(--blue);border-color:var(--blue-line)}
+  .mult{background:var(--purple);border-color:var(--purple-line)}
+  .sub{background:var(--green);border-color:var(--green-line)}
+  .base{background:var(--orange);border-color:var(--orange-line)}
+  .answer-box{width:100%;min-height:42px;padding:6px;border:2px dashed var(--border);border-radius:10px;background:var(--paper);display:flex;align-items:center;justify-content:center;gap:3px;position:relative}
+  .insert-line{width:3px;height:28px;border-radius:2px;background:var(--accent)}
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px}
+  .legend-item{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted)}
+  .legend-dot{width:14px;height:14px;border:2px solid;border-radius:5px;flex:0 0 14px}
+  .answer-demo{display:grid;gap:6px}
+  .gesture-note{text-align:center;color:var(--muted);font-size:10.5px;line-height:1.4}
+  .button-row{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}
+  .fake-button{min-height:34px;padding:5px 2px;border:2px solid var(--border);border-radius:10px 8px 11px 9px;background:var(--surface);font-size:10.5px;font-weight:900;text-align:center}
+  .fake-button.primary{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
+  .button-explain{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px}
+  .button-explain p{margin:0;padding:7px 8px;border:1px dashed var(--border);border-radius:9px;font-size:10.5px;line-height:1.45;color:var(--muted)}
+  .button-explain strong{color:var(--ink);font-weight:900}
+  .result-flow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .result-card{padding:9px;border:2px solid var(--border);border-radius:12px 10px 13px 9px;background:var(--surface)}
+  .result-card strong{display:block;color:var(--accent-ink);font-size:12px;margin-bottom:3px}.result-card p{margin:0;font-size:10.8px;line-height:1.5;color:var(--muted)}
+  .rule-link{margin-top:14px;text-align:center;padding:10px 12px;border-top:1px dashed var(--border);color:var(--muted);font-size:11px;line-height:1.55}
+  .rule-link strong{color:var(--accent-ink)}
+  .visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  @media(max-width:380px){
+    .guide-shell{padding-inline:10px}.op-grid{grid-template-columns:1fr}.quick-card{padding-inline:5px}
+    .quick-flow{grid-template-columns:1fr 14px 1fr 14px 1fr}.flow-arrow{width:14px}
+    .quick-step strong{font-size:11px}.quick-step span{font-size:10px}.button-explain{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<main class="guide-shell">
+  <header class="guide-head">
+    <p class="guide-kicker">初めてでも30秒</p>
+    <h1>操作ガイド</h1>
+    <p class="guide-lead">まずは上の3ステップだけ見れば遊べます。</p>
+  </header>
+
+  <div class="mode-tabs" role="tablist" aria-label="ゲームを選ぶ">
+    <button class="mode-tab" id="tab-arrange" role="tab" aria-selected="true" aria-controls="panel-arrange" type="button">並べる</button>
+    <button class="mode-tab" id="tab-naming" role="tab" aria-selected="false" aria-controls="panel-naming" type="button">名付ける</button>
+  </div>
+
+  <section class="mode-panel" id="panel-arrange" role="tabpanel" aria-labelledby="tab-arrange">
+    <h2 class="section-title"><span class="section-no">1</span>まずは、この3つ</h2>
+    <div class="quick-card">
+      <div class="quick-flow">
+        <div class="quick-step">
+          <div class="quick-visual"><div class="atom-card selected"><span class="carbon"></span><span class="tap-ring"></span></div></div>
+          <strong>カードを選ぶ</strong><span>下のデッキをタップ</span>
+        </div>
+        <svg class="flow-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="quick-step">
+          <div class="quick-visual">
+            <svg class="trace-svg" viewBox="0 0 54 54" aria-hidden="true"><path d="M8 41 20 29l12 0 13-15" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><g fill="#33302a"><circle cx="8" cy="41" r="5"/><circle cx="20" cy="29" r="5"/><circle cx="32" cy="29" r="5"/><circle cx="45" cy="14" r="5"/></g></svg>
+          </div>
+          <strong>置く・なぞる</strong><span>タップかドラッグ</span>
+        </div>
+        <svg class="flow-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="quick-step">
+          <div class="quick-visual"><div class="tap-stack"><span class="tap-badge">1</span><span class="tap-badge">2</span><span class="tap-badge">3</span></div></div>
+          <strong>向きを整える</strong><span>回転・逆回転・削除</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title"><span class="section-no">2</span>よく使う操作</h2>
+      <div class="op-grid">
+        <article class="op-card">
+          <h3>デッキ操作</h3>
+          <div class="action-row">
+            <div class="mini-stage"><div class="atom-card selected"><span class="carbon"></span><span class="tap-ring"></span></div></div>
+            <div class="action-copy"><strong>タップで選択</strong><p>続けてグリッドをタップすると、同じカードを何枚でも置けます。</p></div>
+          </div>
+          <div class="action-row">
+            <div class="mini-stage"><div class="atom-card"><span class="carbon"></span><svg class="drag-arrow" viewBox="0 0 44 28" aria-hidden="true"><path d="M4 22c11 0 17-15 31-15m-6-4 7 4-5 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+            <div class="action-copy"><strong>ドラッグで1枚配置</strong><p>カードをつかんで、置きたいマスで離します。</p></div>
+          </div>
+        </article>
+
+        <article class="op-card">
+          <h3>グリッド操作</h3>
+          <div class="action-row">
+            <div class="mini-stage"><svg class="trace-svg" viewBox="0 0 54 54" aria-hidden="true"><path d="M8 41 20 29l12 0 13-15" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><g fill="#33302a"><circle cx="8" cy="41" r="5"/><circle cx="20" cy="29" r="5"/><circle cx="32" cy="29" r="5"/><circle cx="45" cy="14" r="5"/></g></svg></div>
+            <div class="action-copy"><strong>空きマスからなぞる</strong><p>指が通った順に炭素鎖ができます。</p></div>
+          </div>
+          <div class="action-row">
+            <div class="mini-stage"><div class="tap-stack"><span class="tap-badge">1</span><span class="tap-badge">2</span><span class="tap-badge">3</span></div></div>
+            <div class="action-copy"><strong>1・2・3タップ</strong><p>回転／逆回転／削除。ドラッグすると移動できます。</p></div>
+          </div>
+        </article>
+      </div>
+
+      <aside class="tip">
+        <strong>カード選択を解除するには</strong>
+        <ul>
+          <li>選択中のカードをもう一度タップ</li>
+          <li>同じグリッドマスを素早く2回タップ</li>
+          <li>異なる3マス以上をなぞる</li>
+        </ul>
+      </aside>
+
+      <details>
+        <summary>知っておくと便利な操作</summary>
+        <div class="details-body">
+          <ul>
+            <li>炭素鎖をなぞりながら1マス引き返すと、直前の1マスを取り消せます。</li>
+            <li>3マス以上なぞって始点へ戻ると、環状構造として閉じます。</li>
+            <li>配置済みカードを別のカードで上書きできます。配置済みカードをグリッド外へドラッグすると削除できます。</li>
+            <li>ハロゲンとOH基は向きがないため、1・2タップでは回転しません。3タップで削除できます。</li>
+            <li>練習で正常な分子が複数あるときは、別の分子への最初のタップが「その分子を選ぶ」操作になります。</li>
+          </ul>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <section class="mode-panel" id="panel-naming" role="tabpanel" aria-labelledby="tab-naming" hidden>
+    <h2 class="section-title"><span class="section-no">1</span>まずは、この3つ</h2>
+    <div class="quick-card">
+      <div class="quick-flow">
+        <div class="quick-step">
+          <div class="quick-visual"><svg class="trace-svg" viewBox="0 0 54 54" aria-hidden="true"><path d="M8 28h38" stroke="#33302a" stroke-width="4" stroke-linecap="round"/><g fill="#33302a"><circle cx="8" cy="28" r="6"/><circle cx="27" cy="28" r="6"/><circle cx="46" cy="28" r="6"/></g></svg></div>
+          <strong>分子を見る</strong><span>主鎖と枝を確認</span>
+        </div>
+        <svg class="flow-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="quick-step">
+          <div class="quick-visual"><div class="token-scene"><span class="token number">2</span><span class="token sub">メチル</span><span class="token base">ブタン</span></div></div>
+          <strong>語句をタップ</strong><span>正しい順に並べる</span>
+        </div>
+        <svg class="flow-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="quick-step">
+          <div class="quick-visual"><div class="fake-button primary" style="width:72px;display:grid;place-items:center">解答する</div></div>
+          <strong>答え合わせ</strong><span>迷ったらパスもOK</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title"><span class="section-no">2</span>語句を並べる</h2>
+      <div class="op-grid">
+        <article class="op-card">
+          <h3>タップで追加</h3>
+          <div class="answer-demo">
+            <div class="token-scene"><span class="token number">2</span><span class="token sub">メチル</span><span class="token base">ブタン</span></div>
+            <svg class="flow-arrow" style="margin:auto;transform:rotate(90deg)" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="answer-box"><span class="token number">2</span><span class="token sub">メチル</span><span class="token base">ブタン</span></div>
+          </div>
+          <p class="gesture-note">縦線がなければ、解答の最後に追加されます。</p>
+        </article>
+
+        <article class="op-card">
+          <h3>途中へ入れる</h3>
+          <div class="answer-demo">
+            <div class="answer-box"><span class="token number">2</span><span class="insert-line" aria-hidden="true"></span><span class="token base">ブタン</span></div>
+            <p class="gesture-note">チップの左側・右側をタップして縦線を置き、語群をタップします。</p>
+            <div class="answer-box"><span class="token number">2</span><span class="token sub">メチル</span><span class="token base">ブタン</span></div>
+          </div>
+        </article>
+
+        <article class="op-card">
+          <h3>ドラッグで任意の場所へ追加</h3>
+          <div class="answer-demo">
+            <div class="token-scene"><span class="token sub">メチル</span></div>
+            <svg class="flow-arrow" style="margin:auto;transform:rotate(90deg)" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="answer-box"><span class="token number">2</span><span class="insert-line" aria-hidden="true"></span><span class="token base">ブタン</span></div>
+          </div>
+          <p class="gesture-note">語群の語句をつかみ、解答欄の好きな位置で離します。</p>
+        </article>
+
+        <article class="op-card">
+          <h3>並べ替え・枠外削除</h3>
+          <div class="answer-demo">
+            <div class="answer-box"><span class="token number">2</span><span class="token sub">メチル</span><span class="token base">ブタン</span></div>
+            <svg class="flow-arrow" style="margin:auto;transform:rotate(-90deg)" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <p class="gesture-note">解答欄内では並べ替え。上または下へ動かし、「削除」が反応したら離します。</p>
+          </div>
+        </article>
+      </div>
+
+      <div class="legend" aria-label="語句の色分け">
+        <span class="legend-item"><span class="legend-dot number"></span>青：位置番号</span>
+        <span class="legend-item"><span class="legend-dot mult"></span>紫：ジ・トリなど</span>
+        <span class="legend-item"><span class="legend-dot sub"></span>緑：置換基</span>
+        <span class="legend-item"><span class="legend-dot base"></span>橙：母体名など</span>
+      </div>
+
+      <aside class="tip">
+        <strong>語群をスクロールするには</strong>
+        <p>語句と語句の間を上下になぞります。語句ボタンをつかむと、その語句のドラッグになります。</p>
+      </aside>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title"><span class="section-no">3</span>4つのボタン</h2>
+      <div class="quick-card">
+        <div class="button-row" aria-label="解答操作ボタン">
+          <span class="fake-button">1つ戻す</span><span class="fake-button">クリア</span><span class="fake-button primary">解答する</span><span class="fake-button">パス</span>
+        </div>
+        <div class="button-explain">
+          <p><strong>1つ戻す</strong><br>直前の追加・移動・削除を1手戻します。</p>
+          <p><strong>クリア</strong><br>解答欄をすべて空にします。</p>
+          <p><strong>解答する</strong><br>できた名前を判定します。</p>
+          <p><strong>パス</strong><br>答えを見て次へ。3〜5問後にもう一度出ます。</p>
+        </div>
+      </div>
+
+      <details>
+        <summary>答え合わせのあと</summary>
+        <div class="details-body">
+          <div class="result-flow">
+            <div class="result-card"><strong>もう一度</strong><p>同じ解答を残したまま、編集へ戻ります。</p></div>
+            <div class="result-card"><strong>ヒント</strong><p>確認点を絞れるときだけ表示されます。</p></div>
+            <div class="result-card"><strong>答え</strong><p>正しい名前を確認して次へ進みます。</p></div>
+            <div class="result-card"><strong>次へ</strong><p>新しい問題を始めます。</p></div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <p class="rule-link"><strong>主鎖や位置番号の決め方は「命名ルール」へ。</strong><br>この操作ガイドは、画面の使い方だけをまとめています。</p>
+  </section>
+</main>
+
+<script>
+  (() => {
+    const tabs = [...document.querySelectorAll('[role="tab"]')];
+    const panels = [...document.querySelectorAll('[role="tabpanel"]')];
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        tabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
+        panels.forEach((panel) => { panel.hidden = panel.id !== tab.getAttribute('aria-controls'); });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  })();
+</script>
+</body>
+</html>
