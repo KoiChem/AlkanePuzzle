@@ -236,6 +236,8 @@
   }
   .status .name{color:var(--accent-ink);font-size:20px;font-weight:800;font-family:inherit;display:inline-block;margin-top:2px;}
   .common-name{font-size:.72em;color:var(--text-muted);font-weight:700;white-space:nowrap;}
+  /* 化合物名の末尾1〜3文字だけが次行へ落ちる「泣き別れ」を防ぐ */
+  .compound-name-tail{white-space:nowrap;}
   .status button, .objective button, .wordbank button{font-family:var(--font-hand);}
   .status button{
     margin-top:8px;font-size:14px;font-weight:800;padding:7px 18px;
@@ -1215,12 +1217,16 @@
     '1,2,3,4,5-ペンタンペンタオール': 'キシリトール',
   };
   function displayCompoundName(name) {
+    const characters = Array.from(name);
+    const tailStart = Math.max(0, characters.length - 4);
+    const protectedName = characters.slice(0, tailStart).join('')
+      + `<span class="compound-name-tail">${characters.slice(tailStart).join('')}</span>`;
     const commonName = COMMON_ALCOHOL_NAME[name];
-    return commonName ? `${name}<span class="common-name">（${commonName}）</span>` : name;
+    return commonName ? `${protectedName}<span class="common-name">（${commonName}）</span>` : protectedName;
   }
 
-  // 狭い画面で名称の末尾1〜3文字だけが次の行へ孤立したときに限り、
-  // 読みやすさを保てる範囲で文字サイズと字間を少し詰めて前の行へ収める。
+  // 末尾4文字が次の行へ分かれた場合だけ、その行自体を前の行へ吸収できるか試す。
+  // 行数が減らない調整は採用せず通常サイズへ戻し、縮め損を防ぐ。
   const COMPOUND_NAME_FIT = {
     objective: { minFontSize: 18 },
     answer: { minFontSize: 16 },
@@ -1251,27 +1257,29 @@
   function compoundNameVisibleCharacterCount(text) {
     return Array.from(text.replace(/[\s\-‐‑–—,，.。:：;；()（）［］\[\]]/g, '')).length;
   }
-  function hasShortTrailingCompoundNameLine(element) {
+  function compoundNameFitCandidate(element) {
     const lines = compoundNameTextLines(element);
-    return lines.length >= 2 && lines.length <= 3
-      && compoundNameVisibleCharacterCount(lines[lines.length - 1]) <= 3;
+    const trailingCount = lines.length ? compoundNameVisibleCharacterCount(lines[lines.length - 1]) : 0;
+    return { lineCount: lines.length, trailingCount };
   }
   function fitCompoundName(element, kind) {
     if (!element) return;
     element.style.fontSize = '';
     element.style.letterSpacing = '';
-    if (!hasShortTrailingCompoundNameLine(element)) return;
+    const initial = compoundNameFitCandidate(element);
+    if (initial.lineCount < 2 || initial.lineCount > 3 || initial.trailingCount > 4) return;
 
     const baseFontSize = parseFloat(getComputedStyle(element).fontSize);
     const minFontSize = COMPOUND_NAME_FIT[kind].minFontSize;
-    for (let size = baseFontSize - 0.5; size >= minFontSize; size -= 0.5) {
-      element.style.fontSize = `${size}px`;
-      if (!hasShortTrailingCompoundNameLine(element)) return;
+    for (let size = baseFontSize; size >= minFontSize; size -= 0.5) {
+      for (const spacing of [0, -0.01, -0.02, -0.03]) {
+        element.style.fontSize = size === baseFontSize ? '' : `${size}px`;
+        element.style.letterSpacing = spacing === 0 ? '' : `${spacing}em`;
+        if (compoundNameFitCandidate(element).lineCount < initial.lineCount) return;
+      }
     }
-    for (const spacing of [-0.01, -0.02, -0.03]) {
-      element.style.letterSpacing = `${spacing}em`;
-      if (!hasShortTrailingCompoundNameLine(element)) return;
-    }
+    element.style.fontSize = '';
+    element.style.letterSpacing = '';
   }
   function fitCompoundNamesWithin(root, kind) {
     if (!root) return;
