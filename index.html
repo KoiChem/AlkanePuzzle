@@ -2996,6 +2996,7 @@
   const AUDIO_STARTUP_LEAD = 0.07;
   const AUDIO_PRIME_DURATION = 0.14;
   const AUDIO_RESUME_TIMEOUT = 1000;
+  const AUDIO_PENDING_REPLAY_MAX = 0.32;
   let audioWarmUntil = 0;
   let audioNeedsRecreate = false;
   let primedAudioCtx = null;
@@ -3039,7 +3040,6 @@
   function discardAudioCtx() {
     const staleCtx = audioCtx;
     audioCtx = null;
-    pendingAudioTasks.length = 0;
     primedAudioCtx = null;
     audioWarmUntil = 0;
     traceNoiseBuffer = null;
@@ -3072,16 +3072,35 @@
     return Math.max(ctx.currentTime, audioWarmUntil) + delay;
   }
 
-  function flushPendingAudio(ctx) {
-    if (!ctx || ctx !== audioCtx || ctx.state !== 'running' || audioNeedsRecreate) return;
-    primeAudioOutput(ctx);
-    const tasks = pendingAudioTasks.splice(0);
-    tasks.forEach((task) => {
-      try { task(ctx); } catch (e) { /* 1音の失敗で残りの効果音を止めない */ }
+  function audioQueueNow() {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now()
+      : Date.now();
+  }
+
+  // 初回スワイプ中に溜まった各打音は、AudioContextの解禁後も順番が分かるよう
+  // 入力時刻の間隔を保って予約する。長いスワイプだけは320ms以内へ圧縮し、
+  // 指を離した後に長時間音だけが続かないようにする。
+  function schedulePendingAudioTasks(ctx) {
+    const queued = pendingAudioTasks.splice(0);
+    if (queued.length === 0) return;
+    const firstAt = queued[0].queuedAt;
+    const span = Math.max(0, queued[queued.length - 1].queuedAt - firstAt);
+    const maxSpanMs = AUDIO_PENDING_REPLAY_MAX * 1000;
+    const timeScale = span > maxSpanMs ? maxSpanMs / span : 1;
+    queued.forEach(({ task, queuedAt }) => {
+      const queuedDelay = Math.max(0, queuedAt - firstAt) * timeScale / 1000;
+      try { task(ctx, queuedDelay); } catch (e) { /* 1音の失敗で残りの効果音を止めない */ }
     });
   }
 
-  function resumeAudio(ctx) {
+  function flushPendingAudio(ctx) {
+    if (!ctx || ctx !== audioCtx || ctx.state !== 'running' || audioNeedsRecreate) return;
+    primeAudioOutput(ctx);
+    schedulePendingAudioTasks(ctx);
+  }
+
+  function resumeAudio(ctx, armRecovery = true) {
     if (ctx.state === 'running') {
       flushPendingAudio(ctx);
       return;
@@ -3099,9 +3118,11 @@
     }
     // WebKitにはresume()が解決も拒否もされない状態がある。処理中フラグで
     // 次の操作を塞がず、タイムアウト後は次の実操作内でContextごと作り直す。
-    setTimeout(() => {
-      if (!settled && ctx === audioCtx && ctx.state !== 'running') audioNeedsRecreate = true;
-    }, AUDIO_RESUME_TIMEOUT);
+    if (armRecovery) {
+      setTimeout(() => {
+        if (!settled && ctx === audioCtx && ctx.state !== 'running') audioNeedsRecreate = true;
+      }, AUDIO_RESUME_TIMEOUT);
+    }
   }
 
   // iOSではページ読み込みやscriptからのclick()では音声を解禁できない。
@@ -3116,18 +3137,39 @@
     const ctx = getAudioCtx();
     if (!ctx) return;
     primeAudioOutput(ctx);
-    resumeAudio(ctx);
+    const pointerType = event && event.pointerType;
+    const activationCanStartAudio = !event
+      || event.type === 'click'
+      || event.type === 'keydown'
+      || event.type === 'touchend'
+      || event.type === 'pointerup'
+      || (event.type === 'pointerdown' && pointerType === 'mouse');
+    if (activationCanStartAudio && pendingAudioTasks.length > 0) {
+      // iOSではスワイプ後のresume()だけが拒否されることがある。実操作の同期処理内で
+      // 実音ノードのstart()まで予約し、AudioContext側にも音声開始の意図を渡す。
+      schedulePendingAudioTasks(ctx);
+    }
+    // touch/pointerの押し始めはスクロール開始にもなり得るため、そこでの未解決resumeを
+    // タイムアウト扱いにしない。復旧判定は指を離す操作または明確なクリックで行う。
+    resumeAudio(ctx, activationCanStartAudio);
   }
   window.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true });
+  window.addEventListener('pointerup', unlockAudio, { capture: true, passive: true });
   window.addEventListener('touchstart', unlockAudio, { capture: true, passive: true });
   window.addEventListener('touchend', unlockAudio, { capture: true, passive: true });
   window.addEventListener('click', unlockAudio, { capture: true, passive: true });
   window.addEventListener('keydown', unlockAudio, { capture: true, passive: true });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && audioCtx) audioNeedsRecreate = true;
+    if (document.hidden && audioCtx) {
+      pendingAudioTasks.length = 0;
+      audioNeedsRecreate = true;
+    }
   });
   window.addEventListener('pageshow', (event) => {
-    if (event.persisted && audioCtx) audioNeedsRecreate = true;
+    if (event.persisted && audioCtx) {
+      pendingAudioTasks.length = 0;
+      audioNeedsRecreate = true;
+    }
   });
 
   function runWhenAudioReady(task) {
@@ -3140,16 +3182,15 @@
     }
     // 画面復帰直後などに大量の音が溜まらないよう、直近の効果音だけを保持する。
     if (pendingAudioTasks.length >= 24) pendingAudioTasks.shift();
-    pendingAudioTasks.push(task);
-    resumeAudio(ctx);
+    pendingAudioTasks.push({ task, queuedAt: audioQueueNow() });
   }
 
   function playTone({ freqStart, freqEnd, duration, type = 'sine', volume, delay = 0 }) {
-    runWhenAudioReady((ctx) => {
+    runWhenAudioReady((ctx, queuedDelay = 0) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = type;
-      const startAt = audioStartAt(ctx, delay);
+      const startAt = audioStartAt(ctx, delay + queuedDelay);
       const attackEnd = startAt + Math.min(0.004, duration * 0.2);
       osc.frequency.setValueAtTime(freqStart, startAt);
       if (freqEnd !== freqStart) osc.frequency.linearRampToValueAtTime(freqEnd, startAt + duration);
@@ -3165,8 +3206,8 @@
 
   // フィルターをかけた短いノイズ。各操作音に木質の「コッ」という輪郭を添える。
   function playClick({ freq, duration, volume, q, delay = 0 }) {
-    runWhenAudioReady((ctx) => {
-      const startAt = audioStartAt(ctx, delay);
+    runWhenAudioReady((ctx, queuedDelay = 0) => {
+      const startAt = audioStartAt(ctx, delay + queuedDelay);
       const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
@@ -3276,8 +3317,8 @@
   }
 
   function playTraceHit({ freq, duration = 0.045, volume = 0.07, delay = 0, q = 1.1 }) {
-    runWhenAudioReady((ctx) => {
-      const startAt = audioStartAt(ctx, delay);
+    runWhenAudioReady((ctx, queuedDelay = 0) => {
+      const startAt = audioStartAt(ctx, delay + queuedDelay);
       const source = ctx.createBufferSource();
       source.buffer = getTraceNoiseBuffer(ctx);
       const filter = ctx.createBiquadFilter();
