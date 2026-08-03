@@ -2992,70 +2992,156 @@
   // 効果音
   // ============================================================
   let audioCtx = null;
-  let audioUnlockInFlight = null;
   const pendingAudioTasks = [];
-  function getAudioCtx() {
-    if (!audioCtx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return null;
-      audioCtx = new AC();
+  const AUDIO_STARTUP_LEAD = 0.07;
+  const AUDIO_PRIME_DURATION = 0.14;
+  const AUDIO_RESUME_TIMEOUT = 1000;
+  let audioWarmUntil = 0;
+  let audioNeedsRecreate = false;
+  let primedAudioCtx = null;
+  let traceNoiseBuffer = null;
+  let traceNoiseSampleRate = 0;
+
+  function createAudioCtx() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    try {
+      audioCtx = new AC({ latencyHint: 'interactive' });
+    } catch (e) {
+      try { audioCtx = new AC(); } catch (fallbackError) { audioCtx = null; }
     }
+    if (!audioCtx) return null;
+
+    audioWarmUntil = audioCtx.currentTime + AUDIO_STARTUP_LEAD;
+    primedAudioCtx = null;
+    traceNoiseBuffer = null;
+    traceNoiseSampleRate = 0;
+    const ctx = audioCtx;
+    if (typeof ctx.addEventListener === 'function') {
+      ctx.addEventListener('statechange', () => {
+        if (ctx !== audioCtx) return;
+        if (ctx.state === 'running') {
+          primeAudioOutput(ctx);
+          flushPendingAudio(ctx);
+        } else if (ctx.state === 'closed') {
+          audioNeedsRecreate = true;
+        }
+      });
+    }
+    return ctx;
+  }
+
+  function getAudioCtx() {
+    if (!audioCtx || audioCtx.state === 'closed') return createAudioCtx();
     return audioCtx;
   }
 
+  function discardAudioCtx() {
+    const staleCtx = audioCtx;
+    audioCtx = null;
+    pendingAudioTasks.length = 0;
+    primedAudioCtx = null;
+    audioWarmUntil = 0;
+    traceNoiseBuffer = null;
+    traceNoiseSampleRate = 0;
+    if (!staleCtx || staleCtx.state === 'closed') return;
+    try {
+      const closing = staleCtx.close();
+      if (closing && typeof closing.catch === 'function') closing.catch(() => {});
+    } catch (e) { /* 壊れたAudioContextでも次の作り直しを続行する */ }
+  }
+
+  // iPhoneではAudioContextがrunningになっても、出力経路の起動に数十msかかり、
+  // 短い初音がその間に終わってしまうことがある。少し長い無音を先に流し、
+  // 最初の実音には小さな助走時間を設けて、音の立ち上がりを欠けさせない。
+  function primeAudioOutput(ctx) {
+    if (!ctx || primedAudioCtx === ctx) return;
+    primedAudioCtx = ctx;
+    audioWarmUntil = Math.max(audioWarmUntil, ctx.currentTime + AUDIO_STARTUP_LEAD);
+    try {
+      const frameCount = Math.max(1, Math.ceil(ctx.sampleRate * AUDIO_PRIME_DURATION));
+      const buffer = ctx.createBuffer(1, frameCount, ctx.sampleRate);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    } catch (e) { /* 無音の助走に失敗してもresumeと実音は試す */ }
+  }
+
+  function audioStartAt(ctx, delay = 0) {
+    return Math.max(ctx.currentTime, audioWarmUntil) + delay;
+  }
+
   function flushPendingAudio(ctx) {
-    if (!ctx || ctx.state !== 'running') return;
+    if (!ctx || ctx !== audioCtx || ctx.state !== 'running' || audioNeedsRecreate) return;
+    primeAudioOutput(ctx);
     const tasks = pendingAudioTasks.splice(0);
     tasks.forEach((task) => {
       try { task(ctx); } catch (e) { /* 1音の失敗で残りの効果音を止めない */ }
     });
   }
 
-  // iOSではページ読み込みやscriptからのclick()では音声を解禁できない。
-  // 実際のタップ開始時にresumeと無音再生を行い、そのタップで要求された効果音は
-  // AudioContextがrunningになった直後に再生する。これにより「最初の1回だけ無音」を防ぐ。
-  function unlockAudio() {
-    const ctx = getAudioCtx();
-    if (!ctx) return;
+  function resumeAudio(ctx) {
     if (ctx.state === 'running') {
       flushPendingAudio(ctx);
       return;
     }
-
-    // touchstartとpointerdownが両方届いても、同じ解禁処理は1回だけ実行する。
-    if (audioUnlockInFlight) return;
+    let settled = false;
     try {
-      const buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-      source.start(0);
-    } catch (e) { /* 解禁用の無音再生に失敗してもresumeは試す */ }
-
-    try {
-      audioUnlockInFlight = Promise.resolve(ctx.resume())
-        .then(() => { flushPendingAudio(ctx); })
-        .catch(() => { /* 次の実タップで再試行する */ })
-        .finally(() => { audioUnlockInFlight = null; });
+      Promise.resolve(ctx.resume())
+        .then(() => {
+          settled = true;
+          if (ctx === audioCtx && ctx.state === 'running') flushPendingAudio(ctx);
+        })
+        .catch(() => { settled = true; /* 次の実操作で再試行する */ });
     } catch (e) {
-      audioUnlockInFlight = null;
+      settled = true;
     }
+    // WebKitにはresume()が解決も拒否もされない状態がある。処理中フラグで
+    // 次の操作を塞がず、タイムアウト後は次の実操作内でContextごと作り直す。
+    setTimeout(() => {
+      if (!settled && ctx === audioCtx && ctx.state !== 'running') audioNeedsRecreate = true;
+    }, AUDIO_RESUME_TIMEOUT);
+  }
+
+  // iOSではページ読み込みやscriptからのclick()では音声を解禁できない。
+  // 実際のユーザー操作のcapture段階で出力を起こし、その操作が要求した実音は
+  // running確認後まで保持する。未解決のresumeがあっても毎回再試行できる。
+  function unlockAudio(event) {
+    if (event && event.isTrusted === false) return;
+    if (audioCtx && (audioNeedsRecreate || audioCtx.state === 'interrupted' || audioCtx.state === 'closed')) {
+      discardAudioCtx();
+    }
+    audioNeedsRecreate = false;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    primeAudioOutput(ctx);
+    resumeAudio(ctx);
   }
   window.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true });
   window.addEventListener('touchstart', unlockAudio, { capture: true, passive: true });
+  window.addEventListener('touchend', unlockAudio, { capture: true, passive: true });
   window.addEventListener('click', unlockAudio, { capture: true, passive: true });
+  window.addEventListener('keydown', unlockAudio, { capture: true, passive: true });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && audioCtx) audioNeedsRecreate = true;
+  });
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted && audioCtx) audioNeedsRecreate = true;
+  });
 
   function runWhenAudioReady(task) {
     const ctx = getAudioCtx();
     if (!ctx) return;
-    if (ctx.state === 'running') {
+    if (ctx.state === 'running' && !audioNeedsRecreate) {
+      primeAudioOutput(ctx);
       try { task(ctx); } catch (e) { /* 再生失敗で操作自体を止めない */ }
       return;
     }
     // 画面復帰直後などに大量の音が溜まらないよう、直近の効果音だけを保持する。
     if (pendingAudioTasks.length >= 24) pendingAudioTasks.shift();
     pendingAudioTasks.push(task);
-    unlockAudio();
+    resumeAudio(ctx);
   }
 
   function playTone({ freqStart, freqEnd, duration, type = 'sine', volume, delay = 0 }) {
@@ -3063,7 +3149,7 @@
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = type;
-      const startAt = ctx.currentTime + delay;
+      const startAt = audioStartAt(ctx, delay);
       const attackEnd = startAt + Math.min(0.004, duration * 0.2);
       osc.frequency.setValueAtTime(freqStart, startAt);
       if (freqEnd !== freqStart) osc.frequency.linearRampToValueAtTime(freqEnd, startAt + duration);
@@ -3080,7 +3166,7 @@
   // フィルターをかけた短いノイズ。各操作音に木質の「コッ」という輪郭を添える。
   function playClick({ freq, duration, volume, q, delay = 0 }) {
     runWhenAudioReady((ctx) => {
-      const startAt = ctx.currentTime + delay;
+      const startAt = audioStartAt(ctx, delay);
       const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
@@ -3178,8 +3264,6 @@
 
   // なぞり描き用の短いノイズは一度だけ生成して使い回す。
   // 高速で炭素鎖を伸ばしても、1マスごとのBuffer生成で処理が重くならないようにする。
-  let traceNoiseBuffer = null;
-  let traceNoiseSampleRate = 0;
   function getTraceNoiseBuffer(ctx) {
     if (traceNoiseBuffer && traceNoiseSampleRate === ctx.sampleRate) return traceNoiseBuffer;
     const duration = 0.09;
@@ -3192,10 +3276,8 @@
   }
 
   function playTraceHit({ freq, duration = 0.045, volume = 0.07, delay = 0, q = 1.1 }) {
-    const ctx = getAudioCtx();
-    if (!ctx) return;
-    try {
-      const startAt = ctx.currentTime + delay;
+    runWhenAudioReady((ctx) => {
+      const startAt = audioStartAt(ctx, delay);
       const source = ctx.createBufferSource();
       source.buffer = getTraceNoiseBuffer(ctx);
       const filter = ctx.createBiquadFilter();
@@ -3210,7 +3292,7 @@
       gain.connect(ctx.destination);
       source.start(startAt);
       source.stop(startAt + duration);
-    } catch (e) { /* 再生に失敗しても、なぞり描き自体は継続させる */ }
+    });
   }
 
   // 新しい炭素へ進むたびに音を積み上げる。長い鎖ほど明るく、5炭素目以降は
