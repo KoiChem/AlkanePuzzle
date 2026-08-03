@@ -148,7 +148,9 @@
   .operation-guide-btn:active{transform:translate(1px,2px);box-shadow:0 0 0 var(--shadow);}
   .operation-guide-icon{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
   #operation-guide-btn-naming{
-    flex:0 0 auto;align-self:stretch;width:auto;height:auto;min-height:0;aspect-ratio:1;padding:0;box-sizing:border-box;border-radius:50%;
+    flex:0 0 var(--naming-operation-guide-size,38px);align-self:center;
+    width:var(--naming-operation-guide-size,38px);height:var(--naming-operation-guide-size,38px);min-height:0;
+    padding:0;box-sizing:border-box;border-radius:50%;
   }
   #operation-guide-btn-naming span{display:none;}
   @media(max-width:340px){
@@ -500,7 +502,7 @@
   }
 
   /* ---- 難易度設定(管理者向け・?admin=1のときだけ表示) ---- */
-  .diff-tabs-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .diff-tabs-row{--naming-operation-guide-size:38px;display:flex;align-items:center;gap:8px;margin-bottom:10px;}
   .diff-tabs-row .diff-tabs{flex:1;margin-bottom:0;}
   .hydroxyl-toggle{
     flex:0 0 38px;align-self:stretch;width:38px;height:auto;padding:0;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;
@@ -4729,6 +4731,28 @@
   // ============================================================
   // モード切替
   // ============================================================
+  let namingOperationGuideSizeFrame = null;
+  function scheduleNamingOperationGuideSize() {
+    const row = document.querySelector('.diff-tabs-row');
+    if (!row) return;
+
+    // まず最小の正円へ戻してからタブの実高さを測る。
+    // 狭い画面で一度大きくなった値が残り、広い画面でも縮まないことを防ぐ。
+    row.style.setProperty('--naming-operation-guide-size', '38px');
+    if (namingOperationGuideSizeFrame) cancelAnimationFrame(namingOperationGuideSizeFrame);
+    namingOperationGuideSizeFrame = requestAnimationFrame(() => {
+      namingOperationGuideSizeFrame = null;
+      const guideButton = document.getElementById('operation-guide-btn-naming');
+      if (!guideButton || guideButton.style.display === 'none') return;
+      const visibleDifficultyTabs = [...document.querySelectorAll('#diff-tabs .diff-tab[data-diff]')]
+        .filter((button) => button.getClientRects().length > 0);
+      if (!visibleDifficultyTabs.length) return;
+      const tabHeight = Math.max(...visibleDifficultyTabs.map((button) => button.getBoundingClientRect().height));
+      row.style.setProperty('--naming-operation-guide-size', `${tabHeight}px`);
+    });
+  }
+  window.addEventListener('resize', scheduleNamingOperationGuideSize);
+
   function refreshDiffTabsUI() {
     document.querySelectorAll('.diff-tab[data-diff]').forEach((b) => b.classList.toggle('active', b.dataset.diff === difficulty));
     const practiceBtn = document.querySelector('.diff-tab[data-diff="practice"]');
@@ -4738,6 +4762,7 @@
     const operationGuideBtn = document.getElementById('operation-guide-btn-naming');
     if (operationGuideBtn) operationGuideBtn.style.display = currentMode === 'game2' ? 'inline-flex' : 'none';
     renderHydroxylToggle();
+    scheduleNamingOperationGuideSize();
   }
 
   function renderHydroxylToggle() {
