@@ -2110,6 +2110,7 @@
   const pendingPalettePlacements = new Map(); // 同じマスのダブルタップで選択解除できるよう、配置を短時間だけ保留する
   let traceState = null; // なぞって描く操作の進行状態: null | { path:[{r,c},...], closed:boolean }
   let traceSnapshot = null; // なぞり開始前のgridの退避(取り消し・キャンセル用)
+  let traceGestureStartedWithAudioLocked = false; // 初回スワイプ音を次の操作へ持ち越さないための判定
   let suppressNextTraceValidSound = false; // 環を閉じた直後だけ、締め音と通常の正常構造音を重ねない
   let interactionsEnabled = true; // ゲーム②(読み取り専用表示)ではfalseにする
   let wasStructureValid = false; // 直前が「正常」だったかどうか(不正→正常の遷移でのみ音を鳴らすため)
@@ -2656,6 +2657,7 @@
   function startTrace(e, startR, startC) {
     traceSnapshot = grid.map((row) => row.slice());
     traceState = { path: [{ r: startR, c: startC }], closed: false };
+    traceGestureStartedWithAudioLocked = !audioCtx || audioCtx.state !== 'running';
 
     const processStep = (nr, nc) => {
       if (!traceState || traceState.closed) return;
@@ -2713,6 +2715,8 @@
       if (path.length < 2) {
         grid = traceSnapshot.map((row) => row.slice()); // 実質タップのみ = 何もしない
       }
+      if (traceGestureStartedWithAudioLocked) discardPendingTraceAudio();
+      traceGestureStartedWithAudioLocked = false;
       traceState = null;
       traceSnapshot = null;
       if (closedTrace) suppressNextTraceValidSound = true;
@@ -3094,6 +3098,14 @@
     });
   }
 
+  // iOSではスワイプのtouchend/pointerupが音声解禁の操作として認められない場合がある。
+  // そのスワイプ中の描画音だけを破棄し、次のタップでまとめて鳴ることを防ぐ。
+  function discardPendingTraceAudio() {
+    for (let i = pendingAudioTasks.length - 1; i >= 0; i--) {
+      if (pendingAudioTasks[i].category === 'trace') pendingAudioTasks.splice(i, 1);
+    }
+  }
+
   function flushPendingAudio(ctx) {
     if (!ctx || ctx !== audioCtx || ctx.state !== 'running' || audioNeedsRecreate) return;
     primeAudioOutput(ctx);
@@ -3144,6 +3156,11 @@
       || event.type === 'touchend'
       || event.type === 'pointerup'
       || (event.type === 'pointerdown' && pointerType === 'mouse');
+    const traceReleaseWhileLocked = traceGestureStartedWithAudioLocked
+      && ctx.state !== 'running'
+      && traceState?.path.length >= 2
+      && (event?.type === 'pointerup' || event?.type === 'touchend');
+    if (traceReleaseWhileLocked) discardPendingTraceAudio();
     if (activationCanStartAudio && pendingAudioTasks.length > 0) {
       // iOSではスワイプ後のresume()だけが拒否されることがある。実操作の同期処理内で
       // 実音ノードのstart()まで予約し、AudioContext側にも音声開始の意図を渡す。
@@ -3151,7 +3168,9 @@
     }
     // touch/pointerの押し始めはスクロール開始にもなり得るため、そこでの未解決resumeを
     // タイムアウト扱いにしない。復旧判定は指を離す操作または明確なクリックで行う。
-    resumeAudio(ctx, activationCanStartAudio);
+    // 音声解禁に使えない初回スワイプでは、1秒後のContext再生成も予約しない。
+    // 次のタップで同じContextを素直にresumeできる状態を保つ。
+    resumeAudio(ctx, activationCanStartAudio && !traceReleaseWhileLocked);
   }
   window.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true });
   window.addEventListener('pointerup', unlockAudio, { capture: true, passive: true });
@@ -3172,7 +3191,7 @@
     }
   });
 
-  function runWhenAudioReady(task) {
+  function runWhenAudioReady(task, category = 'general') {
     const ctx = getAudioCtx();
     if (!ctx) return;
     if (ctx.state === 'running' && !audioNeedsRecreate) {
@@ -3182,10 +3201,10 @@
     }
     // 画面復帰直後などに大量の音が溜まらないよう、直近の効果音だけを保持する。
     if (pendingAudioTasks.length >= 24) pendingAudioTasks.shift();
-    pendingAudioTasks.push({ task, queuedAt: audioQueueNow() });
+    pendingAudioTasks.push({ task, queuedAt: audioQueueNow(), category });
   }
 
-  function playTone({ freqStart, freqEnd, duration, type = 'sine', volume, delay = 0 }) {
+  function playTone({ freqStart, freqEnd, duration, type = 'sine', volume, delay = 0, category = 'general' }) {
     runWhenAudioReady((ctx, queuedDelay = 0) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -3201,7 +3220,7 @@
       gain.connect(ctx.destination);
       osc.start(startAt);
       osc.stop(startAt + duration);
-    });
+    }, category);
   }
 
   // フィルターをかけた短いノイズ。各操作音に木質の「コッ」という輪郭を添える。
@@ -3333,7 +3352,7 @@
       gain.connect(ctx.destination);
       source.start(startAt);
       source.stop(startAt + duration);
-    });
+    }, 'trace');
   }
 
   // 新しい炭素へ進むたびに音を積み上げる。長い鎖ほど明るく、5炭素目以降は
@@ -3361,7 +3380,7 @@
       playTraceHit({ freq: 1750, volume: 0.065 * strength, duration: 0.045, delay: delay + 0.006, q: 1.35 });
       playTone({
         freqStart: 190, freqEnd: 132, duration: 0.105, type: 'triangle',
-        volume: 0.075 * strength, delay,
+        volume: 0.075 * strength, delay, category: 'trace',
       });
     };
     if (doubleHit) playStroke(0, 0.72);
@@ -3370,7 +3389,7 @@
 
   function playTraceBacktrackSound() {
     playTraceHit({ freq: 620, volume: 0.045, duration: 0.04, q: 0.85 });
-    playTone({ freqStart: 310, freqEnd: 230, duration: 0.06, type: 'triangle', volume: 0.025 });
+    playTone({ freqStart: 310, freqEnd: 230, duration: 0.06, type: 'triangle', volume: 0.025, category: 'trace' });
   }
 
   function playTraceCloseSound(carbonCount) {
@@ -3379,15 +3398,15 @@
     const depth = Math.min(carbonCount, 12) * 1.5;
     const playKick = (delay, strength) => {
       playTraceHit({ freq: 340, volume: 0.08 * strength, duration: 0.07, delay, q: 0.72 });
-      playTone({ freqStart: 132 + depth, freqEnd: 76, duration: 0.14, type: 'sine', volume: 0.10 * strength, delay });
-      playTone({ freqStart: 285, freqEnd: 180, duration: 0.10, type: 'triangle', volume: 0.062 * strength, delay });
+      playTone({ freqStart: 132 + depth, freqEnd: 76, duration: 0.14, type: 'sine', volume: 0.10 * strength, delay, category: 'trace' });
+      playTone({ freqStart: 285, freqEnd: 180, duration: 0.10, type: 'triangle', volume: 0.062 * strength, delay, category: 'trace' });
     };
     playKick(0, 0.72);
     playKick(0.10, 1);
     // 低音だけを上げず、閉じた瞬間に小さな光沢を足す。通常の正常構造音とは
     // 別の音型なので、環が閉じた感覚を保ったまま格だけを揃えられる。
-    playTone({ freqStart: 720, freqEnd: 760, duration: 0.12, type: 'triangle', volume: 0.12, delay: 0.115 });
-    playTone({ freqStart: 1080, freqEnd: 1080, duration: 0.075, type: 'sine', volume: 0.052, delay: 0.185 });
+    playTone({ freqStart: 720, freqEnd: 760, duration: 0.12, type: 'triangle', volume: 0.12, delay: 0.115, category: 'trace' });
+    playTone({ freqStart: 1080, freqEnd: 1080, duration: 0.075, type: 'sine', volume: 0.052, delay: 0.185, category: 'trace' });
   }
   // 構造が正常になった瞬間: 明るい2音の上昇チャイム + ふわっと軽いきらめき
   function playValidSound() {
