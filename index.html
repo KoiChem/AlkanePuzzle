@@ -4234,6 +4234,17 @@
   const ANSWER_DELETE_DISTANCE = 27;
   let answerDragState = null;
   let answerInsertIndex = null;
+  let answerPreviewResizeObserver = null;
+
+  // 解答チップが折り返されて解答欄の高さが変わったら、下の語群に割り当てる高さも更新する。
+  // 正答表示など updateAnswerPreview() を通らない表示変更にも追従させる。
+  function observeAnswerPreviewSize(preview) {
+    answerPreviewResizeObserver?.disconnect();
+    answerPreviewResizeObserver = null;
+    if (!preview || !window.ResizeObserver) return;
+    answerPreviewResizeObserver = new ResizeObserver(() => scheduleGame2ResponsiveLayout());
+    answerPreviewResizeObserver.observe(preview);
+  }
 
   function rememberAnswerState() {
     answerHistory.push({ tokens: [...answerTokens], insertIndex: answerInsertIndex });
@@ -4290,6 +4301,8 @@
     if (markerIndex === answerTokens.length) addMarker();
     const trash = document.createElement('span'); trash.className = 'answer-trash'; trash.textContent = '削除'; preview.appendChild(trash);
     updateAnswerUndoButton();
+    // ResizeObserver非対応環境でも、通常の入力・戻す・削除では必ず再計算する。
+    scheduleGame2ResponsiveLayout();
   }
 
   function beginAnswerPointer(event, token, fromIndex = null) {
@@ -4687,6 +4700,7 @@
     preview.className = 'preview';
     preview.id = 'answer-preview';
     wb.appendChild(preview);
+    observeAnswerPreviewSize(preview);
 
     const controlRow = document.createElement('div');
     controlRow.className = 'row control-row';
