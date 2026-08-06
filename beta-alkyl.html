@@ -746,7 +746,7 @@
         <h3 class="operation-title"><span class="operation-no">3</span>4つのボタン</h3>
         <div class="operation-card">
           <div class="operation-buttons"><span class="operation-fake-btn">1つ戻す</span><span class="operation-fake-btn">クリア</span><span class="operation-fake-btn primary">解答する</span><span class="operation-fake-btn">パス</span></div>
-          <div class="operation-button-notes"><p><strong>1つ戻す</strong><br>直前の追加・移動・削除を1手戻します。</p><p><strong>クリア</strong><br>解答欄をすべて空にします。</p><p><strong>解答する</strong><br>できた名前を判定します。</p><p><strong>パス</strong><br>答えを見て次へ。3〜5問後にもう一度出ます。</p></div>
+          <div class="operation-button-notes"><p><strong>1つ戻す</strong><br>直前の追加・移動・削除を1手戻します。</p><p><strong>クリア</strong><br>解答欄をすべて空にします。</p><p><strong>解答する</strong><br>できた名前を判定します。</p><p><strong>パス</strong><br>答えを確認後、「入力に戻る」か「次へ」を選べます。次へ進むと3〜5問後にもう一度出ます。</p></div>
         </div>
         <details class="operation-details"><summary>答え合わせのあと</summary><div class="operation-details-body"><ul><li>「もう一度」：同じ解答を残したまま編集へ戻ります。</li><li>「ヒント」：確認点を絞れるときだけ表示されます。</li><li>「答え」：正しい名前を確認して次へ進みます。</li><li>「次へ」：新しい問題を始めます。</li></ul></div></details>
         <p class="operation-rule-link"><strong>主鎖や位置番号の決め方は「命名ルール」へ。</strong><br>この操作ガイドは、画面の使い方だけをまとめています。</p>
@@ -4339,9 +4339,12 @@
 
   const ANSWER_DRAG_THRESHOLD = 8;
   const ANSWER_DELETE_DISTANCE = 27;
+  const ANSWER_CONTROL_SETTLE_MS = 360;
   let answerDragState = null;
   let answerInsertIndex = null;
   let answerPreviewResizeObserver = null;
+  let answerPreviewReserveFrame = null;
+  let answerControlGuardTimer = null;
 
   // 解答チップが折り返されて解答欄の高さが変わったら、下の語群に割り当てる高さも更新する。
   // 正答表示など updateAnswerPreview() を通らない表示変更にも追従させる。
@@ -4351,6 +4354,57 @@
     if (!preview || !window.ResizeObserver) return;
     answerPreviewResizeObserver = new ResizeObserver(() => scheduleGame2ResponsiveLayout());
     answerPreviewResizeObserver.observe(preview);
+  }
+
+  // 正答として必要な語数ぶんの高さを先に確保する。入力途中の折り返しで
+  // 操作列が語群へ重ならないようにし、長い名前でも連続タップの位置を安定させる。
+  function reserveAnswerPreviewHeight() {
+    const preview = document.getElementById('answer-preview');
+    if (!preview || preview.classList.contains('result')) return;
+    const tokens = expectedGame2AnswerTokens(targetName);
+    const width = preview.getBoundingClientRect().width;
+    if (!tokens || !width) return;
+    const measure = document.createElement('div');
+    measure.className = 'preview editing';
+    measure.style.cssText = `position:fixed;left:-9999px;top:0;width:${width}px;min-height:0;margin:0;visibility:hidden;pointer-events:none;`;
+    for (const token of tokens) {
+      const chip = document.createElement('span');
+      chip.className = `answer-chip ${answerChipCategory(token)}`;
+      if (token === CYCLO_TOKEN || token === ALCOHOL_TOKEN) chip.classList.add('special-affix');
+      chip.textContent = token;
+      measure.appendChild(chip);
+    }
+    const marker = document.createElement('span');
+    marker.className = 'answer-insert-marker';
+    measure.appendChild(marker);
+    preview.parentElement.appendChild(measure);
+    const requiredHeight = Math.ceil(measure.getBoundingClientRect().height);
+    measure.remove();
+    preview.style.minHeight = `${Math.max(44, requiredHeight)}px`;
+  }
+  function scheduleAnswerPreviewHeightReserve() {
+    if (answerPreviewReserveFrame) cancelAnimationFrame(answerPreviewReserveFrame);
+    answerPreviewReserveFrame = requestAnimationFrame(() => {
+      answerPreviewReserveFrame = null;
+      reserveAnswerPreviewHeight();
+    });
+  }
+  window.addEventListener('resize', scheduleAnswerPreviewHeightReserve);
+  window.visualViewport?.addEventListener('resize', scheduleAnswerPreviewHeightReserve);
+
+  // 予想外にさらに折り返した場合も、直後の連続タップで確定操作を誤発火させない。
+  function guardAnswerTerminalControls() {
+    const wordbank = document.getElementById('wordbank');
+    const controls = ['submit-answer-btn2', 'pass-answer-btn2']
+      .map((id) => document.getElementById(id)).filter(Boolean);
+    if (!controls.length || wordbank?.classList.contains('answered')) return;
+    controls.forEach((button) => { button.disabled = true; });
+    if (answerControlGuardTimer) clearTimeout(answerControlGuardTimer);
+    answerControlGuardTimer = setTimeout(() => {
+      answerControlGuardTimer = null;
+      if (wordbank?.classList.contains('answered')) return;
+      controls.forEach((button) => { if (button.isConnected) button.disabled = false; });
+    }, ANSWER_CONTROL_SETTLE_MS);
   }
 
   function rememberAnswerState() {
@@ -4390,6 +4444,7 @@
     const preview = document.getElementById('answer-preview');
     if (!preview) return;
     if (preview.classList.contains('result')) return; // 結果表示中(誤スタンプ・正解スタンプ)は上書きしない
+    const beforeHeight = preview.getBoundingClientRect().height;
     preview.classList.add('editing');
     preview.classList.remove('delete-armed');
     preview.innerHTML = '';
@@ -4408,6 +4463,7 @@
     if (markerIndex === answerTokens.length) addMarker();
     const trash = document.createElement('span'); trash.className = 'answer-trash'; trash.textContent = '削除'; preview.appendChild(trash);
     updateAnswerUndoButton();
+    if (answerTokens.length > 0 && Math.abs(preview.getBoundingClientRect().height - beforeHeight) > .5) guardAnswerTerminalControls();
     // ResizeObserver非対応環境でも、通常の入力・戻す・削除では必ず再計算する。
     scheduleGame2ResponsiveLayout();
   }
@@ -4784,18 +4840,29 @@
 
   function passGame2Question() {
     if (!currentGame2Question) return;
-    // パスは誤答として扱わない。答えを見せてから、一度だけ間隔を空けて再出題する。
-    resetCorrectStreak('game2');
-    scheduleGame2Review(currentGame2Question);
+    // パスは誤答として扱わない。次へ進んだ時だけ再出題を予約し、誤タップなら入力へ戻せる。
+    const passedQuestion = currentGame2Question;
     const wordbank = document.getElementById('wordbank');
     const preview = document.getElementById('answer-preview');
     wordbank.classList.add('answered');
     preview.classList.remove('editing');
     preview.classList.add('result', 'answer-revealed');
     preview.innerHTML = `<div class="result-copy">答え：<span class="name">${displayCompoundName(targetName)}</span></div>`
-      + `<div class="answer-actions"><button id="next-btn2" class="secondary">次へ</button></div>`;
+      + `<div class="answer-actions"><button id="resume-answer-btn2" class="secondary">入力に戻る</button><button id="next-btn2" class="secondary">次へ</button></div>`;
     fitCompoundNamesWithin(preview, 'answer');
-    document.getElementById('next-btn2').addEventListener('click', () => { playUiClickSound(); startGame2(); });
+    document.getElementById('resume-answer-btn2').addEventListener('click', () => {
+      playUiClickSound();
+      wordbank.classList.remove('answered');
+      preview.classList.remove('result', 'answer-revealed');
+      answerInsertIndex = null;
+      updateAnswerPreview();
+    });
+    document.getElementById('next-btn2').addEventListener('click', () => {
+      playUiClickSound();
+      resetCorrectStreak('game2');
+      scheduleGame2Review(passedQuestion);
+      startGame2();
+    });
   }
 
   function buildWordBank() {
@@ -4808,6 +4875,7 @@
     preview.id = 'answer-preview';
     wb.appendChild(preview);
     observeAnswerPreviewSize(preview);
+    reserveAnswerPreviewHeight();
 
     const controlRow = document.createElement('div');
     controlRow.className = 'row control-row';
@@ -4827,10 +4895,12 @@
       updateAnswerPreview();
     });
     const submitBtn = document.createElement('button');
+    submitBtn.id = 'submit-answer-btn2';
     submitBtn.textContent = '解答する';
     submitBtn.className = 'primary';
     submitBtn.addEventListener('click', submitGame2Answer);
     const passBtn = document.createElement('button');
+    passBtn.id = 'pass-answer-btn2';
     passBtn.type = 'button';
     passBtn.className = 'secondary pass-btn';
     passBtn.textContent = 'パス';
