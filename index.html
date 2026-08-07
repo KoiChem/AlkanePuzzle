@@ -4248,7 +4248,6 @@
   let answerDragState = null;
   let answerInsertIndex = null;
   let answerPreviewResizeObserver = null;
-  let answerPreviewReserveFrame = null;
   let answerControlGuardTimer = null;
 
   // 解答チップが折り返されて解答欄の高さが変わったら、下の語群に割り当てる高さも更新する。
@@ -4260,42 +4259,6 @@
     answerPreviewResizeObserver = new ResizeObserver(() => scheduleGame2ResponsiveLayout());
     answerPreviewResizeObserver.observe(preview);
   }
-
-  // 正答として必要な語数ぶんの高さを先に確保する。入力途中の折り返しで
-  // 操作列が語群へ重ならないようにし、長い名前でも連続タップの位置を安定させる。
-  function reserveAnswerPreviewHeight() {
-    const preview = document.getElementById('answer-preview');
-    if (!preview || preview.classList.contains('result')) return;
-    const tokens = expectedGame2AnswerTokens(targetName);
-    const width = preview.getBoundingClientRect().width;
-    if (!tokens || !width) return;
-    const measure = document.createElement('div');
-    measure.className = 'preview editing';
-    measure.style.cssText = `position:fixed;left:-9999px;top:0;width:${width}px;min-height:0;margin:0;visibility:hidden;pointer-events:none;`;
-    for (const token of tokens) {
-      const chip = document.createElement('span');
-      chip.className = `answer-chip ${answerChipCategory(token)}`;
-      if (token === CYCLO_TOKEN || token === ALCOHOL_TOKEN) chip.classList.add('special-affix');
-      chip.textContent = token;
-      measure.appendChild(chip);
-    }
-    const marker = document.createElement('span');
-    marker.className = 'answer-insert-marker';
-    measure.appendChild(marker);
-    preview.parentElement.appendChild(measure);
-    const requiredHeight = Math.ceil(measure.getBoundingClientRect().height);
-    measure.remove();
-    preview.style.minHeight = `${Math.max(44, requiredHeight)}px`;
-  }
-  function scheduleAnswerPreviewHeightReserve() {
-    if (answerPreviewReserveFrame) cancelAnimationFrame(answerPreviewReserveFrame);
-    answerPreviewReserveFrame = requestAnimationFrame(() => {
-      answerPreviewReserveFrame = null;
-      reserveAnswerPreviewHeight();
-    });
-  }
-  window.addEventListener('resize', scheduleAnswerPreviewHeightReserve);
-  window.visualViewport?.addEventListener('resize', scheduleAnswerPreviewHeightReserve);
 
   // 予想外にさらに折り返した場合も、直後の連続タップで確定操作を誤発火させない。
   function guardAnswerTerminalControls() {
@@ -4786,7 +4749,6 @@
     preview.id = 'answer-preview';
     wb.appendChild(preview);
     observeAnswerPreviewSize(preview);
-    reserveAnswerPreviewHeight();
 
     const controlRow = document.createElement('div');
     controlRow.className = 'row control-row';
