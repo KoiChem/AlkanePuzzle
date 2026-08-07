@@ -2095,13 +2095,21 @@
     const {
       typeMin = 1, typeMax = 1, lenMin = 2, lenMax = 7, subMin = 0, subMax = 4, useBent = false, forceTurn = false, forceRingSubstituent = false,
       ringSizes = [4, 6], bendRange = null, allowMethane = false, categoryWeights = null, alcoholEnabled = false, alcoholRate = 40, hydroxylLimitOne = false,
+      hydroxylCountsAsSubstituent = true,
       maxWidth = COLS, maxHeight = ROWS,
     } = opts || {};
-    const typeRange = [typeMin, typeMax];
     // OHを候補の重みで増やすのではなく、問題単位で含めるかを決める。
     // 有効時は設定した割合で、少なくとも1個のOHを含む問題になる。
     const normalizedAlcoholRate = Math.max(0, Math.min(100, Number(alcoholRate) || 0));
     const forceHydroxyl = alcoholEnabled && Math.random() * 100 < normalizedAlcoholRate;
+    // OHを数えない場合でも、生成する問題にはOHを少なくとも1個追加する。
+    // 設定された種類数・個数はOHを除いた置換基について満たすよう、生成用の範囲だけ
+    // OH 1個分を広げ、最終的には名称から数え直して厳密に判定する。
+    const hydroxylCounts = !!hydroxylCountsAsSubstituent;
+    const extraHydroxylForGeneration = forceHydroxyl && !hydroxylCounts ? 1 : 0;
+    const generationTypeRange = [typeMin + extraHydroxylForGeneration, typeMax + extraHydroxylForGeneration];
+    const generationSubMin = subMin + extraHydroxylForGeneration;
+    const generationSubMax = subMax + extraHydroxylForGeneration;
     function hydroxylCountInGrid(g) {
       return g.flat().filter((panel) => panel && panel.element === HYDROXYL_ELEMENT).length;
     }
@@ -2118,33 +2126,35 @@
       // 意図せず種類数が設定範囲から外れることがあるため、実際の結果を見てから判定する。
       // ただし置換基が1つも無い構造(種類数0)は、下限が何であっても許容する。
       const groupSummary = namedGroupSummary(result.name);
-      if (!groupSummary || groupSummary.total < subMin || groupSummary.total > subMax) return null;
-      const typeCount = groupSummary.types.length;
+      if (!groupSummary) return null;
+      const countedTotal = groupSummary.total - (hydroxylCounts ? 0 : groupSummary.hydroxylCount);
+      if (countedTotal < subMin || countedTotal > subMax) return null;
+      const typeCount = hydroxylCounts ? groupSummary.types.length : groupSummary.types.filter((type) => type !== 'OH').length;
       if (typeCount > typeMax) return null;
       if (typeCount > 0 && typeCount < typeMin) return null;
       return { grid: g, name: result.name, parentCarbonCount: groupSummary.parentCarbonCount, fellBack: false };
     }
     function tryMethane() {
       try {
-        const g = generateMethaneGrid(forceHydroxyl, typeMax, subMin, subMax);
+        const g = generateMethaneGrid(forceHydroxyl, generationTypeRange[1], generationSubMin, generationSubMax);
         return g ? finalize(g) : null;
       } catch (e) { return null; }
     }
-    function tryCyclo() { try { return finalize(generateCycloalkaneGrid(forceRingSubstituent, ringSizes, subMin, subMax, typeRange, forceHydroxyl, hydroxylLimitOne)); } catch (e) { return null; } }
+    function tryCyclo() { try { return finalize(generateCycloalkaneGrid(forceRingSubstituent, ringSizes, generationSubMin, generationSubMax, generationTypeRange, forceHydroxyl, hydroxylLimitOne)); } catch (e) { return null; } }
     function tryChainLen(len) {
       try {
-        const lenOpts = { ...opts, lenMin: len, lenMax: len, forceHydroxyl, hydroxylLimitOne };
-        const g = useBent ? generateBentAlkaneGrid(typeRange, lenOpts, forceTurn, bendRange) : generateAlkaneGrid(typeRange, lenOpts);
+        const lenOpts = { ...opts, lenMin: len, lenMax: len, subMin: generationSubMin, subMax: generationSubMax, forceHydroxyl, hydroxylLimitOne };
+        const g = useBent ? generateBentAlkaneGrid(generationTypeRange, lenOpts, forceTurn, bendRange) : generateAlkaneGrid(generationTypeRange, lenOpts);
         return g ? finalize(g) : null;
       } catch (e) { return null; }
     }
 
     // 問題形式(メタン／鎖状／環状)を先に重み付きで選び、鎖状なら主鎖長を均等に選ぶ。
     // これで主鎖範囲を変えてもメタン・環状の出題率が意図せず変わらない。
-    const methaneMinCount = Math.max(1, Number(subMin) || 0);
-    const methaneMaxCount = Math.min(4, Number(subMax) || 0);
+    const methaneMinCount = Math.max(1, Number(generationSubMin) || 0);
+    const methaneMaxCount = Math.min(4, Number(generationSubMax) || 0);
     const methaneEligible = allowMethane && methaneMinCount <= methaneMaxCount
-      && !(forceHydroxyl && typeMax <= 1 && methaneMinCount > 1);
+      && !(forceHydroxyl && generationTypeRange[1] <= 1 && methaneMinCount > 1);
     const categories = [];
     if (methaneEligible) categories.push({ kind: 'methane' });
     for (let l = Math.max(2, lenMin); l <= Math.max(2, lenMax); l++) categories.push({ kind: 'chain', len: l });
@@ -2411,14 +2421,14 @@
   // ============================================================
   // モーダルで編集できる項目の既定値。ここが「今の設定」の基準になる。
   const DEFAULT_GAME1_OPTS = {
-    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
-    medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
-    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  gridCols: 5, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true,  hydroxylCountsAsSubstituent: true },
+    medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false, hydroxylCountsAsSubstituent: true },
+    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  gridCols: 5, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false, hydroxylCountsAsSubstituent: false },
   };
   const DEFAULT_GAME2_OPTS = {
-    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, bendMin: 0, bendMax: 1, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true,  shuffleWordBankGroups: false },
-    medium: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  bendMin: 2, bendMax: 3, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false, shuffleWordBankGroups: false },
-    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  bendMin: 4, bendMax: 99, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false, shuffleWordBankGroups: true },
+    easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, ringSizes: [4, 6],     forceRingSubstituent: false, bendMin: 0, bendMax: 1, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true,  hydroxylCountsAsSubstituent: true,  shuffleWordBankGroups: false },
+    medium: { typeMin: 1, typeMax: 1, lenMin: 4, lenMax: 8,  subMin: 3, subMax: 6, ringSizes: [6, 8],     forceRingSubstituent: true,  bendMin: 2, bendMax: 3, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false, hydroxylCountsAsSubstituent: true,  shuffleWordBankGroups: false },
+    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, ringSizes: [6, 8, 10], forceRingSubstituent: true,  bendMin: 4, bendMax: 99, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false, hydroxylCountsAsSubstituent: false, shuffleWordBankGroups: true },
   };
   // 0〜4への既定値変更前の設定。完全に旧既定値のままの難度だけを移行し、
   // 他項目を調整している利用者の置換基数設定は保持する。
@@ -2587,6 +2597,7 @@
       alcoholEnabled: s.alcoholEnabled,
       alcoholRate: s.alcoholRate,
       hydroxylLimitOne: s.hydroxylLimitOne,
+      hydroxylCountsAsSubstituent: s.hydroxylCountsAsSubstituent,
       useBent: true, forceTurn: FORCE_TURN.game1[tier], allowMethane: ALLOW_METHANE[tier], categoryWeights: QUESTION_CATEGORY_WEIGHTS[tier],
       maxWidth: s.gridCols, maxHeight: s.gridRows,
     };
@@ -2600,6 +2611,7 @@
       alcoholEnabled: s.alcoholEnabled,
       alcoholRate: s.alcoholRate,
       hydroxylLimitOne: s.hydroxylLimitOne,
+      hydroxylCountsAsSubstituent: s.hydroxylCountsAsSubstituent,
       useBent: true, forceTurn: FORCE_TURN.game2[tier], allowMethane: ALLOW_METHANE[tier], categoryWeights: QUESTION_CATEGORY_WEIGHTS[tier],
       bendRange: [s.bendMin, s.bendMax],
     };
@@ -4603,14 +4615,20 @@
     const baseName = tokens.find((token) => BASE_NAME_SET.has(token));
     const parentCarbonCount = baseName ? BASE_NAME_TOKENS.indexOf(baseName) + 1 : 0;
     let total = 0;
+    let hydroxylCount = 0;
     const countForIndex = (index) => {
       const multiplierIndex = MULTIPLIER_PREFIX.indexOf(tokens[index - 1]);
       return multiplierIndex >= 2 ? multiplierIndex : 1;
     };
     tokens.forEach((token, index) => {
-      if (SUB_NAME_SET.has(token) || token === ALCOHOL_TOKEN) total += countForIndex(index);
+      const count = countForIndex(index);
+      if (SUB_NAME_SET.has(token)) total += count;
+      if (token === ALCOHOL_TOKEN) {
+        total += count;
+        hydroxylCount += count;
+      }
     });
-    return { total, types: groupTypesInName(name), signature: groupTypeSignature(name), parentCarbonCount };
+    return { total, hydroxylCount, types: groupTypesInName(name), signature: groupTypeSignature(name), parentCarbonCount };
   }
 
   function game2TokenCountsMatch(actual, expected) {
@@ -4877,7 +4895,7 @@
     button.classList.toggle('active', enabled);
     button.disabled = lockedForPractice;
     button.setAttribute('aria-pressed', String(enabled));
-    button.title = lockedForPractice ? '練習ではヒドロキシ基は常にON' : `ヒドロキシ基を出題数に含める: ${enabled ? 'ON' : 'OFF'}`;
+    button.title = lockedForPractice ? '練習ではアルコール問題は常にON' : `アルコール問題を出題する: ${enabled ? 'ON' : 'OFF'}`;
     button.setAttribute('aria-label', button.title);
   }
 
@@ -5045,28 +5063,15 @@
     return row;
   }
 
-  function makeAlcoholToggleRow(game) {
-    const row = document.createElement('div');
-    row.className = 'settings-row';
-    const lab = document.createElement('span'); lab.className = 'settings-label'; lab.textContent = 'ヒドロキシ基を出題数に含める（このゲーム共通）';
-    const enabled = !!gameSettings[game].easy.alcoholEnabled;
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'settings-toggle' + (enabled ? ' on' : '');
-    toggle.textContent = enabled ? 'ON' : 'OFF';
-    toggle.addEventListener('click', () => { setAlcoholEnabledForGame(game, !enabled); onSettingsChanged(); });
-    row.append(lab, toggle);
-    return row;
-  }
-
   function renderSettingsForm() {
     const { game, tier } = modalState;
     const s = gameSettings[game][tier];
     const form = document.getElementById('settings-form');
     form.innerHTML = '';
     form.appendChild(makeRangeStepperRow('主鎖炭素数', s, 'lenMin', 'lenMax', 1, 10));
-    form.appendChild(makeRangeStepperRow('置換基・OH基の種類数', s, 'typeMin', 'typeMax', 1, 6));
-    form.appendChild(makeRangeStepperRow('置換基・OH基の数', s, 'subMin', 'subMax', 0, 10));
+    const hydroxylCountLabel = s.hydroxylCountsAsSubstituent ? '置換基・OH基' : '置換基（OHを除く）';
+    form.appendChild(makeRangeStepperRow(`${hydroxylCountLabel}の種類数`, s, 'typeMin', 'typeMax', 1, 6));
+    form.appendChild(makeRangeStepperRow(`${hydroxylCountLabel}の数`, s, 'subMin', 'subMax', 0, 10));
     form.appendChild(makeRingSizeRow('シクロ主鎖の炭素数', s));
     if (game === 'game1') {
       form.appendChild(makeStepperRow('枠数(横)', s, 'gridCols', 3, COLS));
@@ -5075,7 +5080,7 @@
       form.appendChild(makeRangeStepperRow('折れ曲がり炭素数', s, 'bendMin', 'bendMax', 0, 10));
       form.appendChild(makeToggleRow('語群グループの表示順を出題ごとに入れ替える', s, 'shuffleWordBankGroups'));
     }
-    form.appendChild(makeAlcoholToggleRow(game));
+    form.appendChild(makeToggleRow('ヒドロキシ基を出題数に含める', s, 'hydroxylCountsAsSubstituent'));
     form.appendChild(makePercentStepperRow('アルコール問題の出題率', s, 'alcoholRate'));
     form.appendChild(makeToggleRow('分子中のヒドロキシ基を1個までにする', s, 'hydroxylLimitOne'));
     form.appendChild(makeToggleRow('環に置換基を必ず付ける', s, 'forceRingSubstituent'));
@@ -5120,7 +5125,7 @@
 
   function exportSettingsAsCode() {
     const fmtTier = (s, isGame1) => {
-      const common = `typeMin: ${s.typeMin}, typeMax: ${s.typeMax}, lenMin: ${s.lenMin}, lenMax: ${s.lenMax}, subMin: ${s.subMin}, subMax: ${s.subMax}, ringSizes: [${s.ringSizes.join(', ')}], alcoholEnabled: ${s.alcoholEnabled}, alcoholRate: ${s.alcoholRate}, hydroxylLimitOne: ${s.hydroxylLimitOne}`;
+      const common = `typeMin: ${s.typeMin}, typeMax: ${s.typeMax}, lenMin: ${s.lenMin}, lenMax: ${s.lenMax}, subMin: ${s.subMin}, subMax: ${s.subMax}, ringSizes: [${s.ringSizes.join(', ')}], alcoholEnabled: ${s.alcoholEnabled}, alcoholRate: ${s.alcoholRate}, hydroxylLimitOne: ${s.hydroxylLimitOne}, hydroxylCountsAsSubstituent: ${s.hydroxylCountsAsSubstituent}`;
       const rest = isGame1
         ? `forceRingSubstituent: ${s.forceRingSubstituent}, gridCols: ${s.gridCols}, gridRows: ${s.gridRows}`
         : `forceRingSubstituent: ${s.forceRingSubstituent}, bendMin: ${s.bendMin}, bendMax: ${s.bendMax}, shuffleWordBankGroups: ${s.shuffleWordBankGroups}`;
