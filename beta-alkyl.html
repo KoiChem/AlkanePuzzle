@@ -1401,6 +1401,7 @@
     }
 
     let best = null;
+    const candidateErrors = new Set();
     for (const [a, b] of candidatePairs) {
       const path = reconstructPath(distMaps.get(a).parent, a, b);
       if (path.length > 35) throw new Error('UNSUPPORTED: 主鎖がペンタトリアコンタンを超えています');
@@ -1421,10 +1422,17 @@
             || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) < 0)
             || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) === 0 && candidate.branchCount > best.branchCount)
             || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) === 0 && candidate.branchCount === best.branchCount && compareNumberingCandidates(candidate, best) < 0)) best = candidate;
-        } catch (e) { /* OHが主鎖外へ出る候補は除外 */ }
+        } catch (e) {
+          // すべての主鎖候補が失敗したときに、練習画面へ正しい理由を返せるよう残す。
+          candidateErrors.add(e.message);
+        }
       }
     }
-    if (!best) throw new Error('UNSUPPORTED_HYDROXYL_LAYOUT');
+    if (!best) {
+      if (candidateErrors.has('UNSUPPORTED_SUBSTITUENT')) throw new Error('UNSUPPORTED_SUBSTITUENT');
+      if (candidateErrors.has('UNSUPPORTED_HYDROXYL_LAYOUT')) throw new Error('UNSUPPORTED_HYDROXYL_LAYOUT');
+      throw new Error('UNSUPPORTED_SUBSTITUENT');
+    }
     const locantedSubstituents = best.rawSubstituents.map((s) => ({ locant: best.orderedPath.indexOf(s.backboneNode) + 1, name: s.name }));
     if (best.hydroxyls.length) return buildAlcoholName(CHAIN_NAMES[best.orderedPath.length], best.hydroxyls, locantedSubstituents, false);
     return buildName(CHAIN_NAMES[best.orderedPath.length], locantedSubstituents);
@@ -1535,7 +1543,7 @@
   }
   function namingTargetMessage(error) {
     if (error === 'UNSUPPORTED_MULTI_RING') return '正常な構造です（命名対象外）\n複数の環を持つ構造の命名には、まだ対応していません';
-    if (error === 'UNSUPPORTED_SUBSTITUENT') return '正常な構造です（命名対象外）\n枝分かれした側鎖や、デシル基を超える長い側鎖の命名には、まだ対応していません';
+    if (error === 'UNSUPPORTED_SUBSTITUENT') return '正常な構造です（命名対象外）\n※枝分かれした置換基を含む複雑な構造や、デシル基を超える長い側鎖の命名には、まだ対応していません';
     if (error === 'UNSUPPORTED_HYDROXYL_LAYOUT') return '正常な構造です（命名対象外）\nOHを主鎖・主環にまとめられない構造には、まだ対応していません';
     if (error === 'GEMINAL_DIOL') return '正常な構造です（命名対象外）\n同じ炭素にOHが2つ付く構造は、このアプリでは出題しません';
     if (typeof error === 'string' && error.includes('奇数員環')) return '正常な構造です（命名対象外）\nこの環サイズの命名には、まだ対応していません';
@@ -1933,20 +1941,31 @@
   }
 
   // プロピル基を確実に側鎖として残せる9炭素主鎖のレイアウト。
-  // 中央から右へ3マスの枝を伸ばし、主鎖はその両側に4炭素ずつ確保する。
-  // 折れ曲がり数は3で、「まあまあ」の設定範囲にも収まる。
+  // 側鎖は盤面内で折れ曲がるが、炭素が一本道なので化学的には直鎖プロピル基のまま。
+  // 主鎖はその両側に4炭素ずつ確保し、5×5マスにも収める。
   const PROPYL_FEATURE_PATH = [
     [0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [3, 2], [4, 2], [4, 1], [4, 0],
   ];
+  const PROPYL_FEATURE_BRANCH = [[2, 3], [1, 3], [0, 3]];
   function generateFeaturedPropylGrid(typeRange, opts) {
     const { subMin = 3, subMax = 6, forceHydroxyl = false, hydroxylLimitOne = false } = opts || {};
     for (let attempt = 0; attempt < 40; attempt++) {
       const path = PROPYL_FEATURE_PATH.map(([r, c]) => [r, c]);
-      const occupied = new Set(path.map(([r, c]) => `${r},${c}`));
+      const occupied = new Set([...path, ...PROPYL_FEATURE_BRANCH].map(([r, c]) => `${r},${c}`));
+      // プロピル基自身を1個置くため、残りの置換基数だけを生成器へ委ねる。
       const posInfo = planBentSubstituents(
-        path, occupied, typeRange, subMin, subMax, forceHydroxyl, hydroxylLimitOne, 3, 'プロピル'
+        path, occupied, typeRange, Math.max(0, subMin - 1), Math.max(0, subMax - 1),
+        forceHydroxyl, hydroxylLimitOne, 2, null
       );
-      if (posInfo) return buildBentGrid(path, posInfo);
+      if (!posInfo) continue;
+      const grid = buildBentGrid(path, posInfo);
+      // 主鎖中央から折れた直鎖プロピル基を接続する。
+      const centerDirs = [...getActiveDirections(grid[2][2])];
+      grid[2][2] = panelForDirections([...centerDirs, 'E']);
+      grid[2][3] = panelForDirections(['W', 'N']);
+      grid[1][3] = panelForDirections(['S', 'N']);
+      grid[0][3] = panelForDirections(['S']);
+      return grid;
     }
     return null;
   }
@@ -2512,7 +2531,7 @@
   const DEFAULT_GAME1_OPTS = {
     easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, maxAlkylLength: 2, ringSizes: [4, 6],     forceRingSubstituent: false, gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true },
     medium: { typeMin: 1, typeMax: 2, lenMin: 4, lenMax: 9,  subMin: 3, subMax: 6, maxAlkylLength: 3, ringSizes: [6, 8],     forceRingSubstituent: true,  gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
-    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, maxAlkylLength: 4, ringSizes: [6, 8, 10], forceRingSubstituent: true,  gridCols: 7, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
+    hard:   { typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, maxAlkylLength: 3, ringSizes: [6, 8, 10], forceRingSubstituent: true,  gridCols: 5, gridRows: 5, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false },
   };
   const DEFAULT_GAME2_OPTS = {
     easy:   { typeMin: 1, typeMax: 1, lenMin: 1, lenMax: 6,  subMin: 0, subMax: 4, maxAlkylLength: 2, ringSizes: [4, 6],     forceRingSubstituent: false, bendMin: 0, bendMax: 1, alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: true,  shuffleWordBankGroups: false },
@@ -2584,6 +2603,13 @@
     typeMin: 1, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8,
     ringSizes: [6, 8, 10], forceRingSubstituent: true, bendMin: 4, bendMax: 99,
   };
+  // 長鎖アルキル基ベータ初版の「並べる・そこそこ」既定値だけを、
+  // プロピルまで・5×5の既定値へ移す。利用者が変えた設定は保持する。
+  const PREVIOUS_BETA_GAME1_HARD_DEFAULT = {
+    typeMin: 2, typeMax: 4, lenMin: 6, lenMax: 10, subMin: 4, subMax: 8, maxAlkylLength: 4,
+    ringSizes: [6, 8, 10], forceRingSubstituent: true, gridCols: 7, gridRows: 5,
+    alcoholEnabled: false, alcoholRate: 40, hydroxylLimitOne: false,
+  };
   function matchesLegacyDefault(savedTier, legacyDefault) {
     return !!savedTier && Object.entries(legacyDefault).every(([key, value]) => JSON.stringify(savedTier[key]) === JSON.stringify(value));
   }
@@ -2599,6 +2625,14 @@
     const hard = saved && saved.game2 && saved.game2.hard;
     if (matchesLegacyDefault(hard, LEGACY_GAME2_HARD_DEFAULT)
       || matchesLegacyDefault(hard, LEGACY_INDEX_GAME2_HARD_DEFAULT)) hard.typeMin = 2;
+    return saved;
+  }
+  function migratePreviousBetaGame1HardDefault(saved) {
+    const hard = saved && saved.game1 && saved.game1.hard;
+    if (matchesLegacyDefault(hard, PREVIOUS_BETA_GAME1_HARD_DEFAULT)) {
+      hard.maxAlkylLength = 3;
+      hard.gridCols = 5;
+    }
     return saved;
   }
   function migrateLegacySubCountDefaults(saved) {
@@ -2651,6 +2685,7 @@
     try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)); } catch (e) { saved = null; }
     saved = migrateLegacyHydroxylDefaults(saved);
     saved = migrateLegacyGame2HardDefault(saved);
+    saved = migratePreviousBetaGame1HardDefault(saved);
     saved = migrateLegacySubCountDefaults(saved);
     saved = migrateUniformSubCountDefaults(saved);
     saved = migrateTwoToSixSubCountDefaults(saved);
@@ -3900,7 +3935,7 @@
         const compIdx = practiceCellComponentIndex.get(`${r},${c}`);
         const comp = compIdx !== undefined ? practiceComponents[compIdx] : null;
         if (comp) {
-          if (comp.status === 'valid') {
+          if (comp.status === 'valid' || comp.status === 'unsupported') {
             e.preventDefault();
             selectionOnlyThisGesture = true;
             focusPracticeComponent(comp, true);
@@ -4063,15 +4098,17 @@
       const gridIsFresh = !recentSignatures.has(signature);
       const typeIsFresh = !previous || typeSignature !== previous.typeSignature;
       candidates.push({ result, signature, typeSignature, nameIsFresh, gridIsFresh, typeIsFresh });
-      if (nameIsFresh && gridIsFresh && typeIsFresh) return result;
+      // 最終保険問題（通常はエタン）は、設定内の通常問題を探し切ってからだけ採用する。
+      if (!result.fellBack && nameIsFresh && gridIsFresh && typeIsFresh) return result;
     }
     // 全条件を満たせない狭い設定では、まず直前と種類の組み合わせが変わる候補を優先する。
     // それも不可能なときだけ従来どおり、名称・盤面が新しい候補、最後に先頭候補へ緩和する。
-    const changedCombination = candidates.find((item) => item.typeIsFresh
+    const normalCandidates = candidates.filter((item) => !item.result.fellBack);
+    const changedCombination = normalCandidates.find((item) => item.typeIsFresh
       && (!previous || item.result.name !== previous.name) && (!previous || item.signature !== previous.signature));
     if (changedCombination) return changedCombination.result;
-    const otherwiseFresh = candidates.find((item) => item.nameIsFresh && item.gridIsFresh);
-    return (otherwiseFresh || candidates[0]).result;
+    const otherwiseFresh = normalCandidates.find((item) => item.nameIsFresh && item.gridIsFresh);
+    return (otherwiseFresh || normalCandidates[0] || candidates[0]).result;
   }
 
   function questionKey(question) {
