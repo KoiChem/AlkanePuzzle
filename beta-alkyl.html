@@ -579,6 +579,13 @@
     margin-top:10px;padding:10px 12px;font-size:12.5px;font-weight:700;line-height:1.6;
     color:#a6480f;background:#fdf0dd;border:2px dashed var(--warning);border-radius:10px 8px 11px 9px;
   }
+  .settings-goal{
+    margin-top:10px;padding:10px 12px;font-size:12.5px;font-weight:700;line-height:1.6;
+    border:2px dashed var(--border);border-radius:10px 8px 11px 9px;background:var(--bg);color:var(--text-muted);
+    white-space:pre-line;
+  }
+  .settings-goal.pass{color:#2c6d36;background:#eaf8e9;border-color:#73b77b;}
+  .settings-goal.fail{color:#a6480f;background:#fdf0dd;border-color:var(--warning);}
   .modal-actions{display:flex;gap:8px;margin-top:14px;}
   .modal-actions button{
     flex:1;font-size:13px;font-weight:700;padding:9px 6px;
@@ -653,7 +660,9 @@
     </div>
     <div id="settings-form"></div>
     <div id="settings-warning" class="settings-warning" style="display:none;"></div>
+    <div id="settings-goal" class="settings-goal" style="display:none;"></div>
     <div class="modal-actions">
+      <button id="settings-distribution-btn" type="button">出題分布を検査（/goal）</button>
       <button id="settings-export-btn" type="button">コードとして書き出す</button>
       <button id="settings-reset-btn" type="button">既定値に戻す</button>
     </div>
@@ -922,21 +931,25 @@
     'ヘンイコサン', 'ドコサン', 'トリコサン', 'テトラコサン', 'ペンタコサン', 'ヘキサコサン', 'ヘプタコサン', 'オクタコサン', 'ノナコサン', 'トリアコンタン',
     'ヘントリアコンタン', 'ドトリアコンタン', 'トリトリアコンタン', 'テトラトリアコンタン', 'ペンタトリアコンタン',
   ];
-  // 練習では、直鎖のアルキル基をデシル基まで命名できる。
-  // 分岐した置換基（イソプロピル基など）は、このベータの対象外とする。
+  // 練習では、直鎖のアルキル基をペンタデシル基まで命名できる。
+  // 分岐C3・C4側鎖は、学習でなじみのある慣用名で扱う。
   const STRAIGHT_ALKYL_NAMES = [
     '', 'メチル', 'エチル', 'プロピル', 'ブチル', 'ペンチル', 'ヘキシル', 'ヘプチル', 'オクチル', 'ノニル', 'デシル',
+    'ウンデシル', 'ドデシル', 'トリデシル', 'テトラデシル', 'ペンタデシル',
   ];
   const SUBSTITUENT_NAME_BY_LENGTH = Object.fromEntries(
     STRAIGHT_ALKYL_NAMES.slice(1).map((name, index) => [index + 1, name])
   );
-  // アルファベット順(bromo, butyl, chloro, decyl, ethyl, fluoro, heptyl, hexyl,
-  // iodo, methyl, nonyl, octyl, pentyl, propyl)。日本語の五十音順ではない点に注意。
+  // アルファベット順。慣用名では iso は数え、sec / tert は母体の butyl として扱う。
+  // これは学習アプリで採る一般命名の約束であり、日本語の五十音順ではない。
   const SUBSTITUENT_ORDER = {
-    'ブロモ': 0, 'ブチル': 1, 'クロロ': 2, 'デシル': 3, 'エチル': 4, 'フルオロ': 5,
-    'ヘプチル': 6, 'ヘキシル': 7, 'ヨード': 8, 'メチル': 9, 'ノニル': 10, 'オクチル': 11,
-    'ペンチル': 12, 'プロピル': 13,
+    'ブロモ': 0, 'ブチル': 1, 'sec-ブチル': 1.1, 'tert-ブチル': 1.2,
+    'クロロ': 2, 'デシル': 3, 'ドデシル': 4, 'エチル': 5, 'フルオロ': 6,
+    'ヘプチル': 7, 'ヘキシル': 8, 'ヨード': 9, 'イソブチル': 10, 'イソプロピル': 11,
+    'メチル': 12, 'ノニル': 13, 'オクチル': 14, 'ペンタデシル': 15, 'ペンチル': 16,
+    'プロピル': 17, 'テトラデシル': 18, 'トリデシル': 19, 'ウンデシル': 20,
   };
+  function substituentOrder(name) { return SUBSTITUENT_ORDER[name] ?? Number.MAX_SAFE_INTEGER; }
   // index = 同じ置換基の個数。同一置換基を20個まで置いても倍数接頭語が付けられるようにする。
   const MULTIPLIER_PREFIX = [
     '', '', 'ジ', 'トリ', 'テトラ', 'ペンタ', 'ヘキサ', 'ヘプタ', 'オクタ', 'ノナ', 'デカ',
@@ -1120,6 +1133,51 @@
     return path.reverse();
   }
 
+  // 親鎖との結合を外した炭素側鎖を集める。分岐C3・C4は rooted tree の形から
+  // 慣用名へ対応付け、直鎖はC15まで扱う。それより複雑な側鎖は従来どおり対象外にする。
+  function nameCarbonSubstituent(graph, backboneSet, backboneNode, root) {
+    const nodes = new Set();
+    const queue = [{ id: root, parent: backboneNode }];
+    while (queue.length) {
+      const { id: cur, parent } = queue.shift();
+      if (nodes.has(cur)) throw new Error('UNSUPPORTED_SUBSTITUENT');
+      if (graph.elements.get(cur) !== 'C') throw new Error('UNSUPPORTED_SUBSTITUENT');
+      nodes.add(cur);
+      for (const next of graph.adjacency.get(cur)) {
+        if (next === parent) continue;
+        if (backboneSet.has(next)) throw new Error('UNSUPPORTED_SUBSTITUENT');
+        if (nodes.has(next)) throw new Error('UNSUPPORTED_SUBSTITUENT');
+        queue.push({ id: next, parent: cur });
+      }
+    }
+    const carbonNeighbors = (id) => [...graph.adjacency.get(id)].filter((next) => nodes.has(next));
+    const length = nodes.size;
+    const rootDegree = carbonNeighbors(root).length;
+    const isStraight = [...nodes].every((id) => carbonNeighbors(id).length <= 2);
+
+    if (isStraight && rootDegree <= 1) {
+      const name = SUBSTITUENT_NAME_BY_LENGTH[length];
+      if (!name) throw new Error('UNSUPPORTED_SUBSTITUENT');
+      return { backboneNode, length, name };
+    }
+    if (isStraight && length === 3 && rootDegree === 2) {
+      return { backboneNode, length, name: 'イソプロピル' };
+    }
+    if (isStraight && length === 4 && rootDegree === 2) {
+      return { backboneNode, length, name: 'sec-ブチル' };
+    }
+    if (length === 4 && rootDegree === 1) {
+      const junction = carbonNeighbors(root)[0];
+      if (junction && carbonNeighbors(junction).length === 3) {
+        return { backboneNode, length, name: 'イソブチル' };
+      }
+    }
+    if (length === 4 && rootDegree === 3 && [...nodes].every((id) => id === root || carbonNeighbors(id).length === 1)) {
+      return { backboneNode, length, name: 'tert-ブチル' };
+    }
+    throw new Error('UNSUPPORTED_SUBSTITUENT');
+  }
+
   function extractSubstituents(graph, backboneSet) {
     const substituents = [];
     for (const node of backboneSet) {
@@ -1136,24 +1194,7 @@
           continue;
         }
 
-        const subtreeNodes = new Set([neighbor]);
-        const queue = [{ id: neighbor, parent: node }];
-        let branchOk = true;
-        while (queue.length) {
-          const { id: cur, parent } = queue.shift();
-          const nexts = [...graph.adjacency.get(cur)].filter((n) => n !== parent && !backboneSet.has(n));
-          // 親へ戻る結合を除いた先が2本以上なら、分岐置換基または環であり対象外。
-          if (nexts.length > 1) branchOk = false;
-          for (const n of nexts) {
-            if (graph.elements.get(n) !== 'C') throw new Error('UNSUPPORTED_SUBSTITUENT'); // 炭素鎖の途中にハロゲンが混ざる形は未対応
-            if (subtreeNodes.has(n)) { branchOk = false; continue; }
-            subtreeNodes.add(n);
-            queue.push({ id: n, parent: cur });
-          }
-        }
-        const length = subtreeNodes.size;
-        if (!branchOk || !SUBSTITUENT_NAME_BY_LENGTH[length]) throw new Error('UNSUPPORTED_SUBSTITUENT');
-        substituents.push({ backboneNode: node, length, name: SUBSTITUENT_NAME_BY_LENGTH[length] });
+        substituents.push(nameCarbonSubstituent(graph, backboneSet, node, neighbor));
       }
     }
     return substituents;
@@ -1199,7 +1240,7 @@
       if (!groups.has(s.name)) groups.set(s.name, []);
       groups.get(s.name).push(s.locant);
     }
-    const sortedNames = [...groups.keys()].sort((a, b) => SUBSTITUENT_ORDER[a] - SUBSTITUENT_ORDER[b]);
+    const sortedNames = [...groups.keys()].sort((a, b) => substituentOrder(a) - substituentOrder(b));
     return sortedNames.map((name) => {
       const locants = groups.get(name).sort((a, b) => a - b);
       return `${locants.join(',')}-${MULTIPLIER_PREFIX[locants.length] || ''}${name}`;
@@ -1212,7 +1253,7 @@
     const counts = new Map();
     for (const s of substituents) counts.set(s.name, (counts.get(s.name) || 0) + 1);
     return [...counts.keys()]
-      .sort((a, b) => SUBSTITUENT_ORDER[a] - SUBSTITUENT_ORDER[b])
+      .sort((a, b) => substituentOrder(a) - substituentOrder(b))
       .map((name) => `${MULTIPLIER_PREFIX[counts.get(name)] || ''}${name}`)
       .join('');
   }
@@ -1338,7 +1379,7 @@
   // (IUPACの規則: 同点なら、アルファベット順で先に来る置換基により小さい番号を与える)。
   function alphabeticalLocants(rawSubstituents, locantOf) {
     return rawSubstituents
-      .map((s) => ({ order: SUBSTITUENT_ORDER[s.name], locant: locantOf(s) }))
+      .map((s) => ({ order: substituentOrder(s.name), locant: locantOf(s) }))
       .sort((a, b) => (a.order - b.order) || (a.locant - b.locant))
       .map((x) => x.locant);
   }
@@ -1543,7 +1584,7 @@
   }
   function namingTargetMessage(error) {
     if (error === 'UNSUPPORTED_MULTI_RING') return '正常な構造です（命名対象外）\n複数の環を持つ構造の命名には、まだ対応していません';
-    if (error === 'UNSUPPORTED_SUBSTITUENT') return '正常な構造です（命名対象外）\n※枝分かれした置換基を含む複雑な構造や、デシル基を超える長い側鎖の命名には、まだ対応していません';
+    if (error === 'UNSUPPORTED_SUBSTITUENT') return '正常な構造です（命名対象外）\n※炭素5個以上の枝分かれ側鎖や、ペンタデシル基を超える長い側鎖の命名には、まだ対応していません';
     if (error === 'UNSUPPORTED_HYDROXYL_LAYOUT') return '正常な構造です（命名対象外）\nOHを主鎖・主環にまとめられない構造には、まだ対応していません';
     if (error === 'GEMINAL_DIOL') return '正常な構造です（命名対象外）\n同じ炭素にOHが2つ付く構造は、このアプリでは出題しません';
     if (typeof error === 'string' && error.includes('奇数員環')) return '正常な構造です（命名対象外）\nこの環サイズの命名には、まだ対応していません';
@@ -1965,9 +2006,42 @@
       grid[2][3] = panelForDirections(['W', 'N']);
       grid[1][3] = panelForDirections(['S', 'N']);
       grid[0][3] = panelForDirections(['S']);
-      return grid;
+      return varyCompactPropylGrid(grid);
     }
     return null;
+  }
+
+  // 5×5に収める専用プロピル配置は、化学的な接続を変えずに反転だけを混ぜる。
+  // これにより盤面の見た目が毎回同じ向きになることを避ける。
+  function varyCompactPropylGrid(grid) {
+    const cells = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (grid[r][c]) cells.push([r, c]);
+    const minR = Math.min(...cells.map(([r]) => r));
+    const maxR = Math.max(...cells.map(([r]) => r));
+    const minC = Math.min(...cells.map(([, c]) => c));
+    const maxC = Math.max(...cells.map(([, c]) => c));
+    const mode = choice(['normal', 'horizontal', 'vertical', 'halfTurn']);
+    if (mode === 'normal') return grid;
+    const mapDirection = (dir) => {
+      if (mode === 'horizontal' || mode === 'halfTurn') {
+        if (dir === 'E') return 'W';
+        if (dir === 'W') return 'E';
+      }
+      if (mode === 'vertical' || mode === 'halfTurn') {
+        if (dir === 'N') return 'S';
+        if (dir === 'S') return 'N';
+      }
+      return dir;
+    };
+    const out = emptyGrid();
+    for (const [r, c] of cells) {
+      const nr = (mode === 'vertical' || mode === 'halfTurn') ? maxR - (r - minR) : r;
+      const nc = (mode === 'horizontal' || mode === 'halfTurn') ? maxC - (c - minC) : c;
+      const panel = panelForDirections([...getActiveDirections(grid[r][c])].map(mapDirection));
+      if (grid[r][c].element) panel.element = grid[r][c].element;
+      out[nr][nc] = panel;
+    }
+    return out;
   }
 
   // 環状(シクロアルカン)のテンプレート: 2行×N列の「細長い長方形」の形。
@@ -2185,7 +2259,7 @@
     return { w: maxC - minC + 1, h: maxR - minR + 1 };
   }
 
-  // opts: { typeMin, typeMax, lenMin, lenMax, subMin, subMax, maxAlkylLength, useBent, forceTurn, forceRingSubstituent, ringSizes, bendRange, allowMethane, categoryWeights, maxWidth, maxHeight }
+  // opts: { typeMin, typeMax, lenMin, lenMax, subMin, subMax, maxAlkylLength, featuredAlkylRate, useBent, forceTurn, forceRingSubstituent, ringSizes, bendRange, allowMethane, categoryWeights, maxWidth, maxHeight }
   //   typeMin / typeMax: この問題で使う置換基・OH基の「種類数」の範囲
   //   useBent: 屈曲した主鎖を使うか / forceTurn: できるだけ曲げるように誘導するか
   //   ringSizes: 環のサイズ候補(例: [4,6]) / bendRange: [min,max]で折れ曲がり炭素数を指定(省略時は無制限)
@@ -2195,15 +2269,16 @@
     const {
       typeMin = 1, typeMax = 1, lenMin = 2, lenMax = 7, subMin = 0, subMax = 4, useBent = false, forceTurn = false, forceRingSubstituent = false,
       ringSizes = [4, 6], bendRange = null, allowMethane = false, categoryWeights = null, alcoholEnabled = false, alcoholRate = 40, hydroxylLimitOne = false,
-      maxAlkylLength = 2,
+      maxAlkylLength = 2, featuredAlkylRate = 0.35,
       maxWidth = COLS, maxHeight = ROWS,
     } = opts || {};
     const typeRange = [typeMin, typeMax];
     const normalizedMaxAlkylLength = Math.max(2, Math.min(4, Number(maxAlkylLength) || 2));
-    // プロピル基は専用の9炭素主鎖レイアウト、ブチル基は主鎖10炭素までの
-    // 範囲でも正答に残る位置を選ぶことで、一定の割合で実際に含む問題を狙う。
+    // 5×5のプロピル基だけは専用レイアウト、ほかは選ばれた主鎖長を保つ位置を選び、
+    // 一定の割合で実際に長鎖が名称へ残る問題を狙う。
     // いずれも正式名に残らなければ finalize が棄却するため、見た目だけの長鎖は出題しない。
-    const featuredAlkylName = useBent && normalizedMaxAlkylLength >= 3 && Math.random() < 0.55
+    const normalizedFeaturedAlkylRate = Math.max(0, Math.min(1, Number(featuredAlkylRate) || 0));
+    const featuredAlkylName = useBent && normalizedMaxAlkylLength >= 3 && Math.random() < normalizedFeaturedAlkylRate
       ? choice(alkylNamesUpTo(normalizedMaxAlkylLength).slice(2))
       : null;
     // OHを候補の重みで増やすのではなく、問題単位で含めるかを決める。
@@ -2246,7 +2321,9 @@
           ...opts, lenMin: len, lenMax: len, forceHydroxyl, hydroxylLimitOne,
           maxAlkylLength: normalizedMaxAlkylLength, requiredAlkylName: featuredAlkylName,
         };
-        const g = featuredAlkylName === 'プロピル'
+        // 名付けるは7×5を使えるため、選ばれた主鎖長を守る通常生成器でプロピルを置く。
+        // 5×5だけは、収まりとエタンへの保険フォールバックを防ぐ専用配置を残す。
+        const g = featuredAlkylName === 'プロピル' && maxWidth <= 5
           ? generateFeaturedPropylGrid(typeRange, lenOpts)
           : (useBent ? generateBentAlkaneGrid(typeRange, lenOpts, forceTurn, bendRange) : generateAlkaneGrid(typeRange, lenOpts));
         return g ? finalize(g) : null;
@@ -2583,6 +2660,12 @@
     medium: { chain: 80, cyclo: 20 },
     hard: { chain: 75, cyclo: 25 },
   };
+  // 長鎖側鎖を意識して練習する割合。固定テンプレートへの集中を避けるため、
+  // 「そこそこ」の並べるは抑えめ、名付けるはプロピル・ブチルをほどよく出す値にする。
+  const FEATURED_ALKYL_RATE = {
+    game1: { easy: 0, medium: 0.35, hard: 0.30 },
+    game2: { easy: 0, medium: 0.35, hard: 0.45 },
+  };
 
   // index.html の通常版と設定を混ぜないため、ベータ版専用の保存領域を使う。
   const SETTINGS_KEY = 'alkane-puzzle-settings-beta-alkyl-v1';
@@ -2718,6 +2801,7 @@
     return {
       typeMin: s.typeMin, typeMax: s.typeMax, lenMin: s.lenMin, lenMax: s.lenMax, subMin: s.subMin, subMax: s.subMax,
       maxAlkylLength: s.maxAlkylLength,
+      featuredAlkylRate: FEATURED_ALKYL_RATE.game1[tier],
       ringSizes: s.ringSizes.length ? s.ringSizes : [6],
       forceRingSubstituent: s.forceRingSubstituent,
       alcoholEnabled: s.alcoholEnabled,
@@ -2732,6 +2816,7 @@
     return {
       typeMin: s.typeMin, typeMax: s.typeMax, lenMin: s.lenMin, lenMax: s.lenMax, subMin: s.subMin, subMax: s.subMax,
       maxAlkylLength: s.maxAlkylLength,
+      featuredAlkylRate: FEATURED_ALKYL_RATE.game2[tier],
       ringSizes: s.ringSizes.length ? s.ringSizes : [6],
       forceRingSubstituent: s.forceRingSubstituent,
       alcoholEnabled: s.alcoholEnabled,
@@ -4077,37 +4162,52 @@
   function questionTypeSignature(result) {
     return namedGroupSummary(result.name)?.signature || groupTypeSignature(result.name);
   }
+  // ハロゲンの位置だけが違う同じ主鎖・長側鎖の連続を避けるための簡略骨格署名。
+  // 完全な盤面ではなく「鎖/環・親構造の炭素数・最長アルキル基」を比較する。
+  function questionBackboneSignature(result) {
+    const parentCount = result.parentCarbonCount || namedGroupSummary(result.name)?.parentCarbonCount || 0;
+    const parentKind = result.name.includes('シクロ') ? '環' : '鎖';
+    let longestAlkyl = 0;
+    for (let length = 1; length < STRAIGHT_ALKYL_NAMES.length; length++) {
+      if (result.name.includes(STRAIGHT_ALKYL_NAMES[length])) longestAlkyl = Math.max(longestAlkyl, length);
+    }
+    return `${parentKind}${parentCount}|側鎖${longestAlkyl}`;
+  }
   function rememberQuestion(history, result) {
     history.push({
       name: result.name,
       signature: questionGridSignature(result.grid),
       typeSignature: questionTypeSignature(result),
+      backboneSignature: questionBackboneSignature(result),
     });
     if (history.length > 8) history.shift();
   }
   function generateAvoidingRecentRepeat(opts, history) {
     const recentNames = new Set(history.slice(-8).map((item) => item.name));
     const recentSignatures = new Set(history.slice(-4).map((item) => item.signature));
+    const recentBackbones = new Set(history.slice(-4).map((item) => item.backboneSignature));
     const previous = history[history.length - 1] || null;
     const candidates = [];
     for (let i = 0; i < 12; i++) {
       const result = generateStructureWithOptions(opts);
       const signature = questionGridSignature(result.grid);
       const typeSignature = questionTypeSignature(result);
+      const backboneSignature = questionBackboneSignature(result);
       const nameIsFresh = !recentNames.has(result.name);
       const gridIsFresh = !recentSignatures.has(signature);
+      const backboneIsFresh = !recentBackbones.has(backboneSignature);
       const typeIsFresh = !previous || typeSignature !== previous.typeSignature;
-      candidates.push({ result, signature, typeSignature, nameIsFresh, gridIsFresh, typeIsFresh });
+      candidates.push({ result, signature, typeSignature, backboneSignature, nameIsFresh, gridIsFresh, backboneIsFresh, typeIsFresh });
       // 最終保険問題（通常はエタン）は、設定内の通常問題を探し切ってからだけ採用する。
-      if (!result.fellBack && nameIsFresh && gridIsFresh && typeIsFresh) return result;
+      if (!result.fellBack && nameIsFresh && gridIsFresh && backboneIsFresh && typeIsFresh) return result;
     }
     // 全条件を満たせない狭い設定では、まず直前と種類の組み合わせが変わる候補を優先する。
     // それも不可能なときだけ従来どおり、名称・盤面が新しい候補、最後に先頭候補へ緩和する。
     const normalCandidates = candidates.filter((item) => !item.result.fellBack);
-    const changedCombination = normalCandidates.find((item) => item.typeIsFresh
+    const changedCombination = normalCandidates.find((item) => item.typeIsFresh && item.backboneIsFresh
       && (!previous || item.result.name !== previous.name) && (!previous || item.signature !== previous.signature));
     if (changedCombination) return changedCombination.result;
-    const otherwiseFresh = normalCandidates.find((item) => item.nameIsFresh && item.gridIsFresh);
+    const otherwiseFresh = normalCandidates.find((item) => item.nameIsFresh && item.gridIsFresh && item.backboneIsFresh);
     return (otherwiseFresh || normalCandidates[0] || candidates[0]).result;
   }
 
@@ -5220,6 +5320,7 @@
     const { game, tier } = modalState;
     const s = gameSettings[game][tier];
     const form = document.getElementById('settings-form');
+    document.getElementById('settings-goal').style.display = 'none';
     form.innerHTML = '';
     form.appendChild(makeRangeStepperRow('主鎖炭素数', s, 'lenMin', 'lenMax', 1, 10));
     form.appendChild(makeAlkylLengthStepperRow(s));
@@ -5276,6 +5377,57 @@
     }
   }
 
+  // /goal: 実際の出題経路（直近問題の重複回避を含む）で両モードを試行し、
+  // 保険問題と、親構造・簡略骨格の集中度を管理画面から確認できるようにする。
+  const QUESTION_DISTRIBUTION_GOAL = {
+    sampleSize: 240,
+    hard: { maxParentShare: 0.36, maxBackboneShare: 0.22 },
+    other: { maxParentShare: 0.52, maxBackboneShare: 0.36 },
+  };
+  function summarizeQuestionDistribution(opts, sampleSize) {
+    const history = [];
+    const parentCounts = new Map();
+    const backboneCounts = new Map();
+    let fallbackCount = 0;
+    for (let i = 0; i < sampleSize; i++) {
+      const result = generateAvoidingRecentRepeat(opts, history);
+      rememberQuestion(history, result);
+      if (result.fellBack) fallbackCount++;
+      const backbone = questionBackboneSignature(result);
+      const parent = backbone.split('|')[0];
+      parentCounts.set(parent, (parentCounts.get(parent) || 0) + 1);
+      backboneCounts.set(backbone, (backboneCounts.get(backbone) || 0) + 1);
+    }
+    const dominant = (counts) => [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ja'))[0] || ['なし', 0];
+    const [parent, parentCount] = dominant(parentCounts);
+    const [backbone, backboneCount] = dominant(backboneCounts);
+    return {
+      fallbackCount, parent, parentShare: parentCount / sampleSize,
+      backbone, backboneShare: backboneCount / sampleSize,
+    };
+  }
+  function formatDistributionPercent(value) { return `${(value * 100).toFixed(1)}%`; }
+  function runQuestionDistributionGoal() {
+    const { tier } = modalState;
+    const goal = tier === 'hard' ? QUESTION_DISTRIBUTION_GOAL.hard : QUESTION_DISTRIBUTION_GOAL.other;
+    const sampleSize = QUESTION_DISTRIBUTION_GOAL.sampleSize;
+    const reports = [
+      ['並べる', summarizeQuestionDistribution(buildGame1Opts(tier), sampleSize)],
+      ['名付ける', summarizeQuestionDistribution(buildGame2Opts(tier), sampleSize)],
+    ];
+    const passed = reports.every(([, report]) => report.fallbackCount === 0
+      && report.parentShare <= goal.maxParentShare && report.backboneShare <= goal.maxBackboneShare);
+    const lines = [
+      `/goal（${tier === 'hard' ? 'そこそこ' : tier === 'medium' ? 'まあまあ' : 'すいすい'}・各${sampleSize}問）: ${passed ? '合格' : '要調整'}`,
+      `基準: 保険問題 0、最多親構造 ${Math.round(goal.maxParentShare * 100)}%以下、最多骨格 ${Math.round(goal.maxBackboneShare * 100)}%以下`,
+      ...reports.map(([label, report]) => `${label}: 保険 ${report.fallbackCount}、親 ${report.parent} ${formatDistributionPercent(report.parentShare)}、骨格 ${report.backbone} ${formatDistributionPercent(report.backboneShare)}`),
+    ];
+    const goalEl = document.getElementById('settings-goal');
+    goalEl.className = `settings-goal ${passed ? 'pass' : 'fail'}`;
+    goalEl.textContent = lines.join('\n');
+    goalEl.style.display = 'block';
+  }
+
   function exportSettingsAsCode() {
     const fmtTier = (s, isGame1) => {
       const common = `typeMin: ${s.typeMin}, typeMax: ${s.typeMax}, lenMin: ${s.lenMin}, lenMax: ${s.lenMax}, subMin: ${s.subMin}, subMax: ${s.subMax}, maxAlkylLength: ${s.maxAlkylLength}, ringSizes: [${s.ringSizes.join(', ')}], alcoholEnabled: ${s.alcoholEnabled}, alcoholRate: ${s.alcoholRate}, hydroxylLimitOne: ${s.hydroxylLimitOne}`;
@@ -5300,6 +5452,7 @@
   function openSettingsModal() {
     document.getElementById('settings-modal').style.display = 'flex';
     document.getElementById('settings-export-area').style.display = 'none';
+    document.getElementById('settings-goal').style.display = 'none';
     renderSettingsForm();
   }
   function closeSettingsModal() {
@@ -5523,6 +5676,7 @@
     });
   });
   document.getElementById('settings-export-btn').addEventListener('click', exportSettingsAsCode);
+  document.getElementById('settings-distribution-btn').addEventListener('click', runQuestionDistributionGoal);
   document.getElementById('settings-reset-btn').addEventListener('click', () => {
     const { game, tier } = modalState;
     const defaults = game === 'game1' ? DEFAULT_GAME1_OPTS : DEFAULT_GAME2_OPTS;
