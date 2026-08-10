@@ -1047,6 +1047,28 @@
     return mismatches;
   }
 
+  // 出題モデルでは、上下左右に接している原子は必ず互いに結合して見えるようにする。
+  // 通常の結合検査は「出している手」が片側だけでないかを見るだけなので、原子どうしが
+  // 隣り合っているのに両方が水素の手を出している配置は通ってしまう。鎖状問題では
+  // それが分子の向きが壊れて見える原因になるため、生成後の安全網として検出する。
+  function unbondedAdjacentPairs(grid) {
+    const pairs = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (!grid[r][c]) continue;
+        for (const dir of ['E', 'S']) {
+          const [dr, dc] = DELTA[dir];
+          const nr = r + dr, nc = c + dc;
+          if (nr >= ROWS || nc >= COLS || !grid[nr][nc]) continue;
+          const bonded = getBondDirections(grid, r, c).has(dir)
+            && getBondDirections(grid, nr, nc).has(OPPOSITE[dir]);
+          if (!bonded) pairs.push({ r, c, nr, nc, dir });
+        }
+      }
+    }
+    return pairs;
+  }
+
   function buildGraph(grid) {
     const adjacency = new Map();
     const nodeIds = [];
@@ -1682,6 +1704,30 @@
     return arr;
   }
   function emptyGrid() { return Array.from({ length: ROWS }, () => Array(COLS).fill(null)); }
+  function gridKey(r, c) { return `${r},${c}`; }
+
+  // 原子を置く先が、結合相手以外の既存原子に触れていないかを調べる。
+  // これを主鎖と側鎖の探索中に使うことで、完成後に見た目だけを修正するのではなく、
+  // 最初から「隣接した炭素なのに結合していない」配置を作らない。
+  function pathFitsWithoutUnbondedContact(points, occupied, firstNeighborKey) {
+    const planned = new Set();
+    let previousKey = firstNeighborKey;
+    for (const [r, c] of points) {
+      if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return false;
+      const currentKey = gridKey(r, c);
+      if (occupied.has(currentKey) || planned.has(currentKey)) return false;
+      for (const dir of DIR_ORDER) {
+        const [dr, dc] = DELTA[dir];
+        const nr = r + dr, nc = c + dc;
+        if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+        const neighborKey = gridKey(nr, nc);
+        if ((occupied.has(neighborKey) || planned.has(neighborKey)) && neighborKey !== previousKey) return false;
+      }
+      planned.add(currentKey);
+      previousKey = currentKey;
+    }
+    return true;
+  }
   function pickUpToNDistinct(pool, n) {
     const count = randInt(1, Math.max(1, Math.min(n, pool.length)));
     const shuffled = shuffle([...pool]);
@@ -1836,15 +1882,14 @@
 
   function tryGenerateBentChain(len, forceTurn) {
     const occupied = new Set();
-    const key = (r, c) => `${r},${c}`;
     let r = randInt(1, ROWS - 2);
     let c = randInt(2, COLS - 3);
     const path = [[r, c]];
-    occupied.add(key(r, c));
+    occupied.add(gridKey(r, c));
     let lastDir = null;
 
     for (let step = 1; step < len; step++) {
-      let candidates = shuffle(['N', 'E', 'S', 'W']).filter((d) => !lastDir || d !== OPPOSITE[lastDir]);
+      let candidates = shuffle([...DIR_ORDER]).filter((d) => !lastDir || d !== OPPOSITE[lastDir]);
       if (forceTurn && lastDir) {
         // 直進(lastDirと同じ向き)を優先度最後に回し、できるだけ曲がらせる
         candidates = candidates.filter((d) => d !== lastDir).concat(candidates.filter((d) => d === lastDir));
@@ -1853,17 +1898,62 @@
       for (const d of candidates) {
         const [dr, dc] = DELTA[d];
         const nr = r + dr, nc = c + dc;
-        if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || occupied.has(key(nr, nc))) continue;
+        if (!pathFitsWithoutUnbondedContact([[nr, nc]], occupied, gridKey(r, c))) continue;
         r = nr; c = nc;
         path.push([r, c]);
-        occupied.add(key(r, c));
+        occupied.add(gridKey(r, c));
         lastDir = d;
         moved = true;
         break;
       }
-      if (!moved) return null; // 行き詰まったら失敗(呼び出し元でリトライ)
+      if (!moved) return null;
     }
     return { path, occupied };
+  }
+
+  // 長鎖側鎖を注目させる問題では、主鎖を完成させてから空き場所を探すと、
+  // 無接触条件のため側鎖が置けないことがある。主鎖の候補を戻りながら、
+  // 接続位置に側鎖が実際に収まる形だけを採用する。
+  function tryGenerateBentChainWithSidechain(len, attachmentIndex, sidechainLength, forceTurn, bendRange, bounds = null) {
+    const [bendMin, bendMax] = bendRange || [1, Infinity];
+    const allowed = bounds || { minR: 0, maxR: ROWS - 1, minC: 0, maxC: COLS - 1 };
+    for (let startAttempt = 0; startAttempt < 6; startAttempt++) {
+      const start = [randInt(allowed.minR, allowed.maxR), randInt(allowed.minC, allowed.maxC)];
+      const path = [start];
+      const occupied = new Set([gridKey(...start)]);
+      let visited = 0;
+      const extend = (r, c, lastDir) => {
+        if (++visited > 6000) return null;
+        if (path.length === len) {
+          const bends = countBends(path);
+          if (bends < bendMin || bends > bendMax) return null;
+          const root = path[attachmentIndex];
+          const branchPath = findBentSidechainPath(root, occupied, sidechainLength, computeChainDirs(path, attachmentIndex), allowed);
+          return branchPath ? { path: [...path], occupied: new Set(occupied), branchPath } : null;
+        }
+        let candidates = shuffle([...DIR_ORDER]).filter((dir) => !lastDir || dir !== OPPOSITE[lastDir]);
+        if (forceTurn && lastDir) {
+          candidates = candidates.filter((dir) => dir !== lastDir).concat(candidates.filter((dir) => dir === lastDir));
+        }
+        for (const dir of candidates) {
+          const [dr, dc] = DELTA[dir];
+          const nr = r + dr, nc = c + dc;
+          if (nr < allowed.minR || nr > allowed.maxR || nc < allowed.minC || nc > allowed.maxC) continue;
+          if (!pathFitsWithoutUnbondedContact([[nr, nc]], occupied, gridKey(r, c))) continue;
+          const nextKey = gridKey(nr, nc);
+          path.push([nr, nc]);
+          occupied.add(nextKey);
+          const found = extend(nr, nc, dir);
+          if (found) return found;
+          occupied.delete(nextKey);
+          path.pop();
+        }
+        return null;
+      };
+      const found = extend(start[0], start[1], null);
+      if (found) return found;
+    }
+    return null;
   }
 
   function planBentSubstituents(path, occupied, typeRange, subMin, subMax, forceHydroxyl, hydroxylLimitOne, maxAlkylLength, requiredAlkylName) {
@@ -1887,12 +1977,13 @@
       const length = SUBSTITUENT_LENGTH[name];
       const [dr, dc] = DELTA[dir];
       const [r0, c0] = path[i];
+      const points = [];
       let rr = r0, cc = c0;
       for (let k = 0; k < length; k++) {
         rr += dr; cc += dc;
-        if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS || occupied.has(`${rr},${cc}`)) return null;
+        points.push([rr, cc]);
       }
-      return true;
+      return pathFitsWithoutUnbondedContact(points, occupied, gridKey(r0, c0));
     };
     const place = (i, dir, name) => {
       const length = SUBSTITUENT_LENGTH[name];
@@ -1901,7 +1992,7 @@
       let rr = r0, cc = c0;
       for (let k = 0; k < length; k++) {
         rr += dr; cc += dc;
-        occupied.add(`${rr},${cc}`);
+        occupied.add(gridKey(rr, cc));
       }
       if (!posInfo[i]) posInfo[i] = {};
       posInfo[i][dir] = name;
@@ -1949,7 +2040,7 @@
         const choices = choicesAt(i, eligibleNamesAt(i));
         if (choices.length) positions.push({ i, choices });
       }
-      if (!positions.length) break;
+      if (!positions.length) return null;
       const { i, choices } = choice(positions);
       const { dir, name } = choice(choices);
       place(i, dir, name);
@@ -2002,8 +2093,7 @@
       const posInfo = planBentSubstituents(
         walk.path, occupied, typeRange, subMin, subMax, forceHydroxyl, hydroxylLimitOne, maxAlkylLength, requiredAlkylName
       );
-      if (!posInfo) continue;
-      return buildBentGrid(walk.path, posInfo);
+      if (posInfo) return buildBentGrid(walk.path, posInfo);
     }
     return null; // 呼び出し元でリトライ
   }
@@ -2011,20 +2101,23 @@
   // 5×5では、主鎖と長鎖側鎖を別々の一本道として探索する。
   // 固定ノナン・固定5位のテンプレートを使わず、選ばれた主鎖長・接続炭素のまま
   // 盤面への埋め込みだけをバックトラックで探す。
-  function findBentSidechainPath(root, forbidden, length, excludedDirs) {
+  function findBentSidechainPath(root, forbidden, length, excludedDirs, bounds = null) {
     const keyOf = ([r, c]) => `${r},${c}`;
+    const allowed = bounds || { minR: 0, maxR: ROWS - 1, minC: 0, maxC: COLS - 1 };
     const used = new Set(forbidden);
     const startDirs = shuffle(DIR_ORDER.filter((dir) => !excludedDirs.includes(dir)));
     const visit = (path) => {
       if (path.length === length) return path;
       const current = path[path.length - 1];
       const previous = path.length > 1 ? path[path.length - 2] : root;
-      const candidates = shuffle(DIR_ORDER).filter((dir) => {
+      // DIR_ORDER は回転計算の基準表でもあるため、配列本体をシャッフルしない。
+      // ここを直接シャッフルすると、その後のパネル回転が方角と対応しなくなる。
+      const candidates = shuffle([...DIR_ORDER]).filter((dir) => {
         const [dr, dc] = DELTA[dir];
         const next = [current[0] + dr, current[1] + dc];
-        if (next[0] < 0 || next[0] >= ROWS || next[1] < 0 || next[1] >= COLS) return false;
+        if (next[0] < allowed.minR || next[0] > allowed.maxR || next[1] < allowed.minC || next[1] > allowed.maxC) return false;
         if (next[0] === previous[0] && next[1] === previous[1]) return false;
-        return !used.has(keyOf(next));
+        return pathFitsWithoutUnbondedContact([next], used, keyOf(current));
       });
       for (const dir of candidates) {
         const [dr, dc] = DELTA[dir];
@@ -2039,7 +2132,7 @@
     for (const dir of startDirs) {
       const [dr, dc] = DELTA[dir];
       const first = [root[0] + dr, root[1] + dc];
-      if (first[0] < 0 || first[0] >= ROWS || first[1] < 0 || first[1] >= COLS || used.has(keyOf(first))) continue;
+      if (!pathFitsWithoutUnbondedContact([first], used, keyOf(root))) continue;
       used.add(keyOf(first));
       const found = visit([first]);
       if (found) return found;
@@ -2063,7 +2156,8 @@
   function generateCompactFeaturedAlkylGrid(typeRange, opts, requiredAlkylName) {
     const {
       lenMin = 7, lenMax = 10, subMin = 3, subMax = 6,
-      forceHydroxyl = false, hydroxylLimitOne = false, forceTurn = true,
+      forceHydroxyl = false, hydroxylLimitOne = false, forceTurn = true, bendRange = null,
+      maxWidth = COLS, maxHeight = ROWS,
     } = opts || {};
     const requiredLength = SUBSTITUENT_LENGTH[requiredAlkylName];
     const len = randInt(Math.max(2, lenMin), Math.max(2, lenMax));
@@ -2085,12 +2179,14 @@
     // 接続位置を先に選び、そこへ収められる主鎖の形だけを探す。
     // 収まらないときに他の位置へ逃げないため、中央だけが有利になる偏りを作らない。
       const attachmentIndex = choice(choice([...attachmentClasses.values()]));
-    for (let attempt = 0; attempt < 180; attempt++) {
-      const walk = tryGenerateBentChain(len, forceTurn);
-      if (!walk || countBends(walk.path) < 1) continue;
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const hiddenCols = Math.floor((COLS - Math.min(maxWidth, COLS)) / 2);
+      const hiddenRows = Math.floor((ROWS - Math.min(maxHeight, ROWS)) / 2);
+      const bounds = { minR: hiddenRows, maxR: ROWS - hiddenRows - 1, minC: hiddenCols, maxC: COLS - hiddenCols - 1 };
+      const walk = tryGenerateBentChainWithSidechain(len, attachmentIndex, requiredLength, forceTurn, bendRange, bounds);
+      if (!walk) continue;
       const root = walk.path[attachmentIndex];
-      const branchPath = findBentSidechainPath(root, walk.occupied, requiredLength, computeChainDirs(walk.path, attachmentIndex));
-      if (!branchPath) continue;
+      const { branchPath } = walk;
       const occupied = new Set([...walk.occupied, ...branchPath].map(([r, c]) => `${r},${c}`));
       const posInfo = planBentSubstituents(
         walk.path, occupied, typeRange, Math.max(0, subMin - 1), Math.max(0, subMax - 1),
@@ -2099,6 +2195,7 @@
       if (!posInfo) continue;
       const grid = buildBentGrid(walk.path, posInfo);
       addBentCarbonSidechain(grid, root, branchPath);
+      if (unbondedAdjacentPairs(grid).length > 0) continue;
       return grid;
     }
     return null;
@@ -2338,8 +2435,22 @@
     // 一定の割合で実際に長鎖が名称へ残る問題を狙う。
     // いずれも正式名に残らなければ finalize が棄却するため、見た目だけの長鎖は出題しない。
     const normalizedFeaturedAlkylRate = Math.max(0, Math.min(1, Number(featuredAlkylRate) || 0));
-    const featuredAlkylName = useBent && normalizedMaxAlkylLength >= 3 && Math.random() < normalizedFeaturedAlkylRate
-      ? choice(alkylNamesUpTo(normalizedMaxAlkylLength).slice(2))
+    // 注目側鎖は、現在の主鎖範囲で名称上も複数の位置を選べるものだけにする。
+    // 例: 主鎖が最大10炭素ならブチル基は中央1位置にしか残せないため、
+    // それを強制すると一点集中か保険問題への置換になる。
+    const featuredAlkylCandidates = alkylNamesUpTo(normalizedMaxAlkylLength).slice(2).filter((name) => {
+      const length = SUBSTITUENT_LENGTH[name];
+      for (let l = Math.max(2, lenMin, length * 2 + 1); l <= Math.max(2, lenMax); l++) {
+        const locants = new Set();
+        for (let i = 0; i < l; i++) {
+          if (Math.min(i, l - 1 - i) >= length) locants.add(Math.min(i + 1, l - i));
+        }
+        if (locants.size >= 2) return true;
+      }
+      return false;
+    });
+    const featuredAlkylName = useBent && featuredAlkylCandidates.length && Math.random() < normalizedFeaturedAlkylRate
+      ? choice(featuredAlkylCandidates)
       : null;
     // OHを候補の重みで増やすのではなく、問題単位で含めるかを決める。
     // 有効時は設定した割合で、少なくとも1個のOHを含む問題になる。
@@ -2354,6 +2465,9 @@
       if (extent.w > maxWidth || extent.h > maxHeight) return null;
       const result = generateName(g);
       if (!result.ok) return null;
+      // 鎖状問題は、結合のない原子どうしが隣接する配置を出題しない。
+      // 環状問題は現在の長方形テンプレートで意図的に近接を使うため、別の表示改善として扱う。
+      if (!result.name.includes('シクロ') && unbondedAdjacentPairs(g).length > 0) return null;
       if (featuredAlkylName && !result.name.includes(featuredAlkylName)) return null;
       const hydroxylCount = hydroxylCountInGrid(g);
       if (forceHydroxyl && hydroxylCount === 0) return null;
@@ -2385,9 +2499,9 @@
           ...opts, lenMin: len, lenMax: len, forceHydroxyl, hydroxylLimitOne,
           maxAlkylLength: normalizedMaxAlkylLength, requiredAlkylName: featuredAlkylName,
         };
-        // 5×5では長鎖側鎖を曲げられる制約付き探索を使う。
+        // 長鎖側鎖は、盤面幅にかかわらず屈曲できる制約付き探索を使う。
         // 固定ノナン・固定5位の専用テンプレートには戻らない。
-        const g = featuredAlkylName === 'プロピル' && maxWidth <= 5
+        const g = featuredAlkylName
           ? generateCompactFeaturedAlkylGrid(typeRange, lenOpts, featuredAlkylName)
           : (useBent ? generateBentAlkaneGrid(typeRange, lenOpts, forceTurn, bendRange) : generateAlkaneGrid(typeRange, lenOpts));
         return g ? finalize(g, len) : null;
@@ -2438,9 +2552,15 @@
         if (r) return r;
       }
     }
-    // それでも決まらない場合の保険(かなり厳しい設定のとき): カテゴリを問わずもう少し粘る
-    for (let i = 0; i < 80; i++) {
-      const r = tryCategory(choice(categories));
+    // それでも決まらない場合の保険(かなり厳しい設定のとき):
+    // 無接触の鎖状配置が偶然見つからなかっただけでエタンへ落ちないよう、
+    // 鎖状候補を均等にもう一巡多く試す。通常経路ではここに入らない。
+    const recoveryCategories = shuffle([
+      ...chainCategories,
+      ...categories.filter((cat) => cat.kind !== 'chain'),
+    ]);
+    for (let i = 0; i < 240; i++) {
+      const r = tryCategory(recoveryCategories[i % recoveryCategories.length]);
       if (r) return r;
     }
     // 長鎖側鎖を狙った5×5配置だけが詰まった場合は、保険問題へ落とす前に
