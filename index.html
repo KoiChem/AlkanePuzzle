@@ -1263,8 +1263,13 @@
     }
   }
 
-  function buildSubstituentPrefix(locantedSubstituents) {
+  // IUPACでは、同種の原子だけからなる2炭素鎖の単置換体は位置番号「1」を省略する。
+  // 例: フルオロエタン、クロロエタン（ただし 1,1-ジクロロエタン等では省略しない）。
+  function buildSubstituentPrefix(locantedSubstituents, omitSoleEthaneLocant = false) {
     if (locantedSubstituents.length === 0) return '';
+    if (omitSoleEthaneLocant && locantedSubstituents.length === 1 && locantedSubstituents[0].locant === 1) {
+      return locantedSubstituents[0].name;
+    }
     const groups = new Map();
     for (const s of locantedSubstituents) {
       if (!groups.has(s.name)) groups.set(s.name, []);
@@ -1305,7 +1310,7 @@
   }
 
   function buildName(baseName, locantedSubstituents) {
-    return buildSubstituentPrefix(locantedSubstituents) + baseName;
+    return buildSubstituentPrefix(locantedSubstituents, baseName === 'エタン') + baseName;
   }
 
   // 判定用の名称は変えず、表示だけに代表的な慣用名を添える。
@@ -4417,7 +4422,7 @@
       groups.push(`${locants.join(',')}-${multiplier}${tokens[i]}`);
       i++;
     }
-    // 位置番号を省略した置換基グループ(メタン置換体、または環の単置換のケース)。
+    // 位置番号を省略した置換基グループ(メタン置換体、単置換シクロアルカン、単置換エタン)。
     // メタン置換体は同じ置換基が2個以上あるとき倍数詞(ジ・トリ・テトラ)だけが付き、位置番号は付かない。
     while (i < tokens.length && (SUB_NAME_SET.has(tokens[i]) || MULTIPLIER_SET.has(tokens[i]))) {
       let multiplier = '';
