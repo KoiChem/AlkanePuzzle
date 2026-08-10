@@ -579,13 +579,6 @@
     margin-top:10px;padding:10px 12px;font-size:12.5px;font-weight:700;line-height:1.6;
     color:#a6480f;background:#fdf0dd;border:2px dashed var(--warning);border-radius:10px 8px 11px 9px;
   }
-  .settings-goal{
-    margin-top:10px;padding:10px 12px;font-size:12.5px;font-weight:700;line-height:1.6;
-    border:2px dashed var(--border);border-radius:10px 8px 11px 9px;background:var(--bg);color:var(--text-muted);
-    white-space:pre-line;
-  }
-  .settings-goal.pass{color:#2c6d36;background:#eaf8e9;border-color:#73b77b;}
-  .settings-goal.fail{color:#a6480f;background:#fdf0dd;border-color:var(--warning);}
   .modal-actions{display:flex;gap:8px;margin-top:14px;}
   .modal-actions button{
     flex:1;font-size:13px;font-weight:700;padding:9px 6px;
@@ -660,9 +653,7 @@
     </div>
     <div id="settings-form"></div>
     <div id="settings-warning" class="settings-warning" style="display:none;"></div>
-    <div id="settings-goal" class="settings-goal" style="display:none;"></div>
     <div class="modal-actions">
-      <button id="settings-distribution-btn" type="button">出題分布を検査（/goal）</button>
       <button id="settings-export-btn" type="button">コードとして書き出す</button>
       <button id="settings-reset-btn" type="button">既定値に戻す</button>
     </div>
@@ -1441,32 +1432,42 @@
       }
     }
 
+    // 主鎖は「OHを最も多く含む」→「最も長い」の順で、構造そのものから先に決める。
+    // 命名できない側鎖を持つ最長鎖候補を捨てて、短い鎖へ後退すると、
+    // 3-プロピルヘキサンのような最長鎖規則に反する名前を作ってしまう。
+    // そこで命名可能性は主鎖候補の優先順位を変えないものとし、最上位候補だけを命名する。
+    const structuralCandidates = candidatePairs.flatMap(([a, b]) => {
+      const path = reconstructPath(distMaps.get(a).parent, a, b);
+      const hydroxylCount = path.reduce((count, node) => count + [...adjacency.get(node)]
+        .filter((neighbor) => elements.get(neighbor) === HYDROXYL_ELEMENT).length, 0);
+      return [path, [...path].reverse()].map((orderedPath) => ({ orderedPath, hydroxylCount }));
+    });
+    const maxHydroxylCount = Math.max(...structuralCandidates.map((candidate) => candidate.hydroxylCount));
+    const maxParentLength = Math.max(...structuralCandidates
+      .filter((candidate) => candidate.hydroxylCount === maxHydroxylCount)
+      .map((candidate) => candidate.orderedPath.length));
+
     let best = null;
     const candidateErrors = new Set();
-    for (const [a, b] of candidatePairs) {
-      const path = reconstructPath(distMaps.get(a).parent, a, b);
-      if (path.length > 35) throw new Error('UNSUPPORTED: 主鎖がペンタトリアコンタンを超えています');
-      for (const reversed of [false, true]) {
-        const orderedPath = reversed ? [...path].reverse() : path;
-        const pathSet = new Set(orderedPath);
-        try {
-          const rawSubstituents = extractSubstituents(graph, pathSet);
-          const hydroxyls = hydroxylLocants(graph, orderedPath);
-          const locantOf = (s) => orderedPath.indexOf(s.backboneNode) + 1;
-          const locants = rawSubstituents.map(locantOf).sort((a, b) => a - b);
-          const alphaLocants = alphabeticalLocants(rawSubstituents, locantOf);
-          const branchCount = rawSubstituents.length;
-          const candidate = { orderedPath, rawSubstituents, hydroxyls, locants, alphaLocants, branchCount };
-          if (best === null
-            || candidate.hydroxyls.length > best.hydroxyls.length
-            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length > best.orderedPath.length)
-            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) < 0)
-            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) === 0 && candidate.branchCount > best.branchCount)
-            || (candidate.hydroxyls.length === best.hydroxyls.length && candidate.orderedPath.length === best.orderedPath.length && compareLocantArrays(candidate.hydroxyls, best.hydroxyls) === 0 && candidate.branchCount === best.branchCount && compareNumberingCandidates(candidate, best) < 0)) best = candidate;
-        } catch (e) {
-          // すべての主鎖候補が失敗したときに、練習画面へ正しい理由を返せるよう残す。
-          candidateErrors.add(e.message);
-        }
+    for (const { orderedPath, hydroxylCount } of structuralCandidates) {
+      if (hydroxylCount !== maxHydroxylCount || orderedPath.length !== maxParentLength) continue;
+      if (orderedPath.length > 35) throw new Error('UNSUPPORTED: 主鎖がペンタトリアコンタンを超えています');
+      const pathSet = new Set(orderedPath);
+      try {
+        const rawSubstituents = extractSubstituents(graph, pathSet);
+        const hydroxyls = hydroxylLocants(graph, orderedPath);
+        const locantOf = (s) => orderedPath.indexOf(s.backboneNode) + 1;
+        const locants = rawSubstituents.map(locantOf).sort((a, b) => a - b);
+        const alphaLocants = alphabeticalLocants(rawSubstituents, locantOf);
+        const branchCount = rawSubstituents.length;
+        const candidate = { orderedPath, rawSubstituents, hydroxyls, locants, alphaLocants, branchCount };
+        if (best === null
+          || compareLocantArrays(candidate.hydroxyls, best.hydroxyls) < 0
+          || (compareLocantArrays(candidate.hydroxyls, best.hydroxyls) === 0 && candidate.branchCount > best.branchCount)
+          || (compareLocantArrays(candidate.hydroxyls, best.hydroxyls) === 0 && candidate.branchCount === best.branchCount && compareNumberingCandidates(candidate, best) < 0)) best = candidate;
+      } catch (e) {
+        // 最優先の主鎖だけを試したうえで理由を返す。短い主鎖への後退はしない。
+        candidateErrors.add(e.message);
       }
     }
     if (!best) {
@@ -1753,7 +1754,9 @@
     const grid = emptyGrid();
 
     const slots = [];
-    for (let i = 1; i < len - 1; i++) { slots.push([i, 'up']); slots.push([i, 'down']); }
+    // 直線レイアウトでも末端を候補から外さない。上下2方向ずつを用意するので、
+    // 位置ごとの候補数は主鎖の内外で等しく、末端専用の出題率にはならない。
+    for (let i = 0; i < len; i++) { slots.push([i, 'up']); slots.push([i, 'down']); }
     shuffle(slots);
 
     const distinctNames = pickSpeciesForRange(typeRange, slots.length, forceHydroxyl, SUBSTITUENT_SPECIES);
@@ -1865,19 +1868,18 @@
 
   function planBentSubstituents(path, occupied, typeRange, subMin, subMax, forceHydroxyl, hydroxylLimitOne, maxAlkylLength, requiredAlkylName) {
     const len = path.length;
-    const slots = [];
-    for (let i = 1; i < len - 1; i++) {
-      const chainDirs = computeChainDirs(path, i);
-      for (const d of ['N', 'E', 'S', 'W']) if (!chainDirs.includes(d)) slots.push([i, d]);
-    }
-    shuffle(slots);
+    // まず「方向」ではなく主鎖上の「炭素位置」を均等に選ぶ。
+    // 末端は3方向、内部は2方向空くため、方向をそのまま抽選すると末端だけが
+    // 1.5倍選ばれてしまう。位置を先に抽選し、空き方向はその後で決める。
+    // 同じ炭素も空き原子価がある間は候補に残すので、1,1,1-トリクロロ体のような
+    // 多置換も、末端専用の特例なしに生成できる。
 
     // 注目する長鎖を1本置いた後は、追加の長鎖で主鎖が伸びてしまわないよう、
-    // 従来のメチル・エチル・ハロゲンだけから残りの種類を選ぶ。
+    // メチル・エチル・ハロゲンだけから残りの種類を選ぶ。
     const speciesPool = requiredAlkylName ? SUBSTITUENT_SPECIES : substituentSpeciesForMaxAlkyl(maxAlkylLength);
-    const distinctNames = pickSpeciesForRange(typeRange, slots.length, forceHydroxyl, speciesPool);
+    const distinctNames = pickSpeciesForRange(typeRange, len * 3, forceHydroxyl, speciesPool);
 
-    const targetCount = randInt(subMin, subMax);
+    const targetCount = Math.max(requiredAlkylName ? 1 : 0, randInt(subMin, subMax));
     const posInfo = {};
     let placed = 0;
     let hydroxylCount = 0;
@@ -1906,25 +1908,50 @@
       if (name === HYDROXYL_ELEMENT) hydroxylCount++;
       placed++;
     };
-    // プロピル／ブチルを使う問題では、ほかの枝より先に物理的に収まる位置を確保する。
+
+    const eligibleNamesAt = (i) => {
+      const currentNames = posInfo[i] ? Object.values(posInfo[i]) : [];
+      return distinctNames.filter((name) => name !== HYDROXYL_ELEMENT
+        || (!currentNames.includes(HYDROXYL_ELEMENT) && (!hydroxylLimitOne || hydroxylCount === 0)));
+    };
+    const choicesAt = (i, names) => {
+      const chainDirs = computeChainDirs(path, i);
+      const usedDirs = new Set(Object.keys(posInfo[i] || {}));
+      const directions = DIR_ORDER.filter((dir) => !chainDirs.includes(dir) && !usedDirs.has(dir));
+      const choices = [];
+      for (const dir of directions) {
+        for (const name of names) if (canPlace(i, dir, name)) choices.push({ dir, name });
+      }
+      return choices;
+    };
+
+    // プロピル／ブチルを使う問題では、主鎖として吸収されない位置を均等に選ぶ。
+    // ここでも方向の数ではなく炭素番号で抽選する。
     if (requiredAlkylName) {
       const requiredLength = SUBSTITUENT_LENGTH[requiredAlkylName];
-      // 側鎖の両側に十分な主鎖を残せる中央寄りの位置だけを使う。
-      // これにより長鎖が最長鎖へ吸収される候補を生成段階から大きく減らす。
-      const requiredSlot = shuffle(slots.filter(([i, dir]) =>
-        Math.min(i, path.length - 1 - i) >= requiredLength && canPlace(i, dir, requiredAlkylName)
-      ))[0];
-      if (!requiredSlot) return null;
-      place(requiredSlot[0], requiredSlot[1], requiredAlkylName);
+      const positions = shuffle(Array.from({ length: len }, (_, i) => i)
+        .filter((i) => Math.min(i, len - 1 - i) >= requiredLength));
+      let requiredPlaced = false;
+      for (const i of positions) {
+        const choices = choicesAt(i, [requiredAlkylName]);
+        if (!choices.length) continue;
+        const { dir, name } = choice(choices);
+        place(i, dir, name);
+        requiredPlaced = true;
+        break;
+      }
+      if (!requiredPlaced) return null;
     }
-    for (const [i, dir] of slots) {
-      if (placed >= targetCount) break;
-      const currentNames = posInfo[i] ? Object.values(posInfo[i]) : [];
-      const candidates = distinctNames.filter((name) => name !== HYDROXYL_ELEMENT
-        || (!currentNames.includes(HYDROXYL_ELEMENT) && (!hydroxylLimitOne || hydroxylCount === 0)));
-      if (candidates.length === 0) continue;
-      const name = candidates.length === 1 ? candidates[0] : choice(candidates);
-      if (!canPlace(i, dir, name)) continue;
+
+    while (placed < targetCount) {
+      const positions = [];
+      for (let i = 0; i < len; i++) {
+        const choices = choicesAt(i, eligibleNamesAt(i));
+        if (choices.length) positions.push({ i, choices });
+      }
+      if (!positions.length) break;
+      const { i, choices } = choice(positions);
+      const { dir, name } = choice(choices);
       place(i, dir, name);
     }
     return posInfo;
@@ -1981,67 +2008,100 @@
     return null; // 呼び出し元でリトライ
   }
 
-  // プロピル基を確実に側鎖として残せる9炭素主鎖のレイアウト。
-  // 側鎖は盤面内で折れ曲がるが、炭素が一本道なので化学的には直鎖プロピル基のまま。
-  // 主鎖はその両側に4炭素ずつ確保し、5×5マスにも収める。
-  const PROPYL_FEATURE_PATH = [
-    [0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [3, 2], [4, 2], [4, 1], [4, 0],
-  ];
-  const PROPYL_FEATURE_BRANCH = [[2, 3], [1, 3], [0, 3]];
-  function generateFeaturedPropylGrid(typeRange, opts) {
-    const { subMin = 3, subMax = 6, forceHydroxyl = false, hydroxylLimitOne = false } = opts || {};
-    for (let attempt = 0; attempt < 40; attempt++) {
-      const path = PROPYL_FEATURE_PATH.map(([r, c]) => [r, c]);
-      const occupied = new Set([...path, ...PROPYL_FEATURE_BRANCH].map(([r, c]) => `${r},${c}`));
-      // プロピル基自身を1個置くため、残りの置換基数だけを生成器へ委ねる。
-      const posInfo = planBentSubstituents(
-        path, occupied, typeRange, Math.max(0, subMin - 1), Math.max(0, subMax - 1),
-        forceHydroxyl, hydroxylLimitOne, 2, null
-      );
-      if (!posInfo) continue;
-      const grid = buildBentGrid(path, posInfo);
-      // 主鎖中央から折れた直鎖プロピル基を接続する。
-      const centerDirs = [...getActiveDirections(grid[2][2])];
-      grid[2][2] = panelForDirections([...centerDirs, 'E']);
-      grid[2][3] = panelForDirections(['W', 'N']);
-      grid[1][3] = panelForDirections(['S', 'N']);
-      grid[0][3] = panelForDirections(['S']);
-      return varyCompactPropylGrid(grid);
+  // 5×5では、主鎖と長鎖側鎖を別々の一本道として探索する。
+  // 固定ノナン・固定5位のテンプレートを使わず、選ばれた主鎖長・接続炭素のまま
+  // 盤面への埋め込みだけをバックトラックで探す。
+  function findBentSidechainPath(root, forbidden, length, excludedDirs) {
+    const keyOf = ([r, c]) => `${r},${c}`;
+    const used = new Set(forbidden);
+    const startDirs = shuffle(DIR_ORDER.filter((dir) => !excludedDirs.includes(dir)));
+    const visit = (path) => {
+      if (path.length === length) return path;
+      const current = path[path.length - 1];
+      const previous = path.length > 1 ? path[path.length - 2] : root;
+      const candidates = shuffle(DIR_ORDER).filter((dir) => {
+        const [dr, dc] = DELTA[dir];
+        const next = [current[0] + dr, current[1] + dc];
+        if (next[0] < 0 || next[0] >= ROWS || next[1] < 0 || next[1] >= COLS) return false;
+        if (next[0] === previous[0] && next[1] === previous[1]) return false;
+        return !used.has(keyOf(next));
+      });
+      for (const dir of candidates) {
+        const [dr, dc] = DELTA[dir];
+        const next = [current[0] + dr, current[1] + dc];
+        used.add(keyOf(next));
+        const found = visit([...path, next]);
+        if (found) return found;
+        used.delete(keyOf(next));
+      }
+      return null;
+    };
+    for (const dir of startDirs) {
+      const [dr, dc] = DELTA[dir];
+      const first = [root[0] + dr, root[1] + dc];
+      if (first[0] < 0 || first[0] >= ROWS || first[1] < 0 || first[1] >= COLS || used.has(keyOf(first))) continue;
+      used.add(keyOf(first));
+      const found = visit([first]);
+      if (found) return found;
+      used.delete(keyOf(first));
     }
     return null;
   }
 
-  // 5×5に収める専用プロピル配置は、化学的な接続を変えずに反転だけを混ぜる。
-  // これにより盤面の見た目が毎回同じ向きになることを避ける。
-  function varyCompactPropylGrid(grid) {
-    const cells = [];
-    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (grid[r][c]) cells.push([r, c]);
-    const minR = Math.min(...cells.map(([r]) => r));
-    const maxR = Math.max(...cells.map(([r]) => r));
-    const minC = Math.min(...cells.map(([, c]) => c));
-    const maxC = Math.max(...cells.map(([, c]) => c));
-    const mode = choice(['normal', 'horizontal', 'vertical', 'halfTurn']);
-    if (mode === 'normal') return grid;
-    const mapDirection = (dir) => {
-      if (mode === 'horizontal' || mode === 'halfTurn') {
-        if (dir === 'E') return 'W';
-        if (dir === 'W') return 'E';
-      }
-      if (mode === 'vertical' || mode === 'halfTurn') {
-        if (dir === 'N') return 'S';
-        if (dir === 'S') return 'N';
-      }
-      return dir;
-    };
-    const out = emptyGrid();
-    for (const [r, c] of cells) {
-      const nr = (mode === 'vertical' || mode === 'halfTurn') ? maxR - (r - minR) : r;
-      const nc = (mode === 'horizontal' || mode === 'halfTurn') ? maxC - (c - minC) : c;
-      const panel = panelForDirections([...getActiveDirections(grid[r][c])].map(mapDirection));
-      if (grid[r][c].element) panel.element = grid[r][c].element;
-      out[nr][nc] = panel;
+  function addBentCarbonSidechain(grid, root, branchPath) {
+    const firstDir = directionBetween(root, branchPath[0]);
+    grid[root[0]][root[1]] = panelForDirections([...getActiveDirections(grid[root[0]][root[1]]), firstDir]);
+    for (let i = 0; i < branchPath.length; i++) {
+      const current = branchPath[i];
+      const previous = i === 0 ? root : branchPath[i - 1];
+      const dirs = [directionBetween(current, previous)];
+      if (i < branchPath.length - 1) dirs.push(directionBetween(current, branchPath[i + 1]));
+      grid[current[0]][current[1]] = panelForDirections(dirs);
     }
-    return out;
+  }
+
+  function generateCompactFeaturedAlkylGrid(typeRange, opts, requiredAlkylName) {
+    const {
+      lenMin = 7, lenMax = 10, subMin = 3, subMax = 6,
+      forceHydroxyl = false, hydroxylLimitOne = false, forceTurn = true,
+    } = opts || {};
+    const requiredLength = SUBSTITUENT_LENGTH[requiredAlkylName];
+    const len = randInt(Math.max(2, lenMin), Math.max(2, lenMax));
+    const attachmentPositions = Array.from({ length: len }, (_, i) => i)
+      .filter((i) => Math.min(i, len - 1 - i) >= requiredLength);
+    // 鏡像関係にある炭素は同じ命名位置になる。炭素をそのまま均等抽選すると、
+    // 例えばノナンの4位（4位と6位）が5位の2倍になってしまうため、名称上の
+    // 位置ごとに一度まとめてから選ぶ。選択肢が一つしかない主鎖長は、注目側鎖を
+    // 強制する対象にしない（4-プロピルヘプタンの一点集中を防ぐ）。
+    const attachmentClasses = new Map();
+    for (const i of attachmentPositions) {
+      const canonicalLocant = Math.min(i + 1, len - i);
+      const positions = attachmentClasses.get(canonicalLocant) || [];
+      positions.push(i);
+      attachmentClasses.set(canonicalLocant, positions);
+    }
+    if (attachmentClasses.size < 2) return null;
+
+    // 接続位置を先に選び、そこへ収められる主鎖の形だけを探す。
+    // 収まらないときに他の位置へ逃げないため、中央だけが有利になる偏りを作らない。
+      const attachmentIndex = choice(choice([...attachmentClasses.values()]));
+    for (let attempt = 0; attempt < 180; attempt++) {
+      const walk = tryGenerateBentChain(len, forceTurn);
+      if (!walk || countBends(walk.path) < 1) continue;
+      const root = walk.path[attachmentIndex];
+      const branchPath = findBentSidechainPath(root, walk.occupied, requiredLength, computeChainDirs(walk.path, attachmentIndex));
+      if (!branchPath) continue;
+      const occupied = new Set([...walk.occupied, ...branchPath].map(([r, c]) => `${r},${c}`));
+      const posInfo = planBentSubstituents(
+        walk.path, occupied, typeRange, Math.max(0, subMin - 1), Math.max(0, subMax - 1),
+        forceHydroxyl, hydroxylLimitOne, 2, null
+      );
+      if (!posInfo) continue;
+      const grid = buildBentGrid(walk.path, posInfo);
+      addBentCarbonSidechain(grid, root, branchPath);
+      return grid;
+    }
+    return null;
   }
 
   // 環状(シクロアルカン)のテンプレート: 2行×N列の「細長い長方形」の形。
@@ -2288,7 +2348,7 @@
     function hydroxylCountInGrid(g) {
       return g.flat().filter((panel) => panel && panel.element === HYDROXYL_ELEMENT).length;
     }
-    function finalize(g) {
+    function finalize(g, expectedParentLength = null) {
       // 盤面の使用可能な範囲に収まらない構造は出題しない(組み立て不可能になるため)
       const extent = gridExtent(g);
       if (extent.w > maxWidth || extent.h > maxHeight) return null;
@@ -2303,6 +2363,10 @@
       // ただし置換基が1つも無い構造(種類数0)は、下限が何であっても許容する。
       const groupSummary = namedGroupSummary(result.name);
       if (!groupSummary || groupSummary.total < subMin || groupSummary.total > subMax) return null;
+      // 鎖状問題は、生成時に選んだ主鎖長と最長鎖が一致するものだけを採用する。
+      // 側鎖が実質的に主鎖を延長した構造や、命名対象外の最長鎖から短い鎖へ
+      // 誤って後退する構造を、出題として通さない。
+      if (expectedParentLength !== null && groupSummary.parentCarbonCount !== expectedParentLength) return null;
       const typeCount = groupSummary.types.length;
       if (typeCount > typeMax) return null;
       if (typeCount > 0 && typeCount < typeMin) return null;
@@ -2321,12 +2385,12 @@
           ...opts, lenMin: len, lenMax: len, forceHydroxyl, hydroxylLimitOne,
           maxAlkylLength: normalizedMaxAlkylLength, requiredAlkylName: featuredAlkylName,
         };
-        // 名付けるは7×5を使えるため、選ばれた主鎖長を守る通常生成器でプロピルを置く。
-        // 5×5だけは、収まりとエタンへの保険フォールバックを防ぐ専用配置を残す。
+        // 5×5では長鎖側鎖を曲げられる制約付き探索を使う。
+        // 固定ノナン・固定5位の専用テンプレートには戻らない。
         const g = featuredAlkylName === 'プロピル' && maxWidth <= 5
-          ? generateFeaturedPropylGrid(typeRange, lenOpts)
+          ? generateCompactFeaturedAlkylGrid(typeRange, lenOpts, featuredAlkylName)
           : (useBent ? generateBentAlkaneGrid(typeRange, lenOpts, forceTurn, bendRange) : generateAlkaneGrid(typeRange, lenOpts));
-        return g ? finalize(g) : null;
+        return g ? finalize(g, len) : null;
       } catch (e) { return null; }
     }
 
@@ -2367,7 +2431,7 @@
     const preferred = family === 'chain' ? choice(chainCategories) : categories.find((cat) => cat.kind === family);
     const orderedCategories = [preferred, ...shuffle(categories.filter((cat) => cat !== preferred))];
 
-    const attemptsPerCategory = 15;
+    const attemptsPerCategory = 25;
     for (const cat of orderedCategories) {
       for (let i = 0; i < attemptsPerCategory; i++) {
         const r = tryCategory(cat);
@@ -2375,9 +2439,15 @@
       }
     }
     // それでも決まらない場合の保険(かなり厳しい設定のとき): カテゴリを問わずもう少し粘る
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 80; i++) {
       const r = tryCategory(choice(categories));
       if (r) return r;
+    }
+    // 長鎖側鎖を狙った5×5配置だけが詰まった場合は、保険問題へ落とす前に
+    // 同じ難度条件で通常の鎖状・環状問題を生成する。出題不能をエタンへ置換しない。
+    if (featuredAlkylName) {
+      const ordinary = generateStructureWithOptions({ ...opts, featuredAlkylRate: 0 });
+      if (!ordinary.fellBack) return ordinary;
     }
     // 最終手段: 万一失敗してもエタンで確実に成功させる(fellBack:trueで「設定が厳しすぎる」ことを呼び出し元に伝える)
     const g = emptyGrid();
@@ -4168,10 +4238,18 @@
     const parentCount = result.parentCarbonCount || namedGroupSummary(result.name)?.parentCarbonCount || 0;
     const parentKind = result.name.includes('シクロ') ? '環' : '鎖';
     let longestAlkyl = 0;
+    let longestAlkylLocants = '';
     for (let length = 1; length < STRAIGHT_ALKYL_NAMES.length; length++) {
-      if (result.name.includes(STRAIGHT_ALKYL_NAMES[length])) longestAlkyl = Math.max(longestAlkyl, length);
+      const alkylName = STRAIGHT_ALKYL_NAMES[length];
+      const matches = [...result.name.matchAll(new RegExp(`(?:^|-)(\\d+(?:,\\d+)*)-(?:ジ|トリ|テトラ|ペンタ|ヘキサ|ヘプタ|オクタ|ノナ|デカ)?${alkylName}`, 'g'))];
+      if (!matches.length) continue;
+      if (length > longestAlkyl) {
+        longestAlkyl = length;
+        longestAlkylLocants = matches.flatMap((match) => match[1].split(',')).sort((a, b) => Number(a) - Number(b)).join(',');
+      }
     }
-    return `${parentKind}${parentCount}|側鎖${longestAlkyl}`;
+    // 主鎖長・最長側鎖が同じでも、側鎖位置まで同じ問題の連続は避ける。
+    return `${parentKind}${parentCount}|側鎖${longestAlkyl}@${longestAlkylLocants || '-'}`;
   }
   function rememberQuestion(history, result) {
     history.push({
@@ -5320,7 +5398,6 @@
     const { game, tier } = modalState;
     const s = gameSettings[game][tier];
     const form = document.getElementById('settings-form');
-    document.getElementById('settings-goal').style.display = 'none';
     form.innerHTML = '';
     form.appendChild(makeRangeStepperRow('主鎖炭素数', s, 'lenMin', 'lenMax', 1, 10));
     form.appendChild(makeAlkylLengthStepperRow(s));
@@ -5377,57 +5454,6 @@
     }
   }
 
-  // /goal: 実際の出題経路（直近問題の重複回避を含む）で両モードを試行し、
-  // 保険問題と、親構造・簡略骨格の集中度を管理画面から確認できるようにする。
-  const QUESTION_DISTRIBUTION_GOAL = {
-    sampleSize: 240,
-    hard: { maxParentShare: 0.36, maxBackboneShare: 0.22 },
-    other: { maxParentShare: 0.52, maxBackboneShare: 0.36 },
-  };
-  function summarizeQuestionDistribution(opts, sampleSize) {
-    const history = [];
-    const parentCounts = new Map();
-    const backboneCounts = new Map();
-    let fallbackCount = 0;
-    for (let i = 0; i < sampleSize; i++) {
-      const result = generateAvoidingRecentRepeat(opts, history);
-      rememberQuestion(history, result);
-      if (result.fellBack) fallbackCount++;
-      const backbone = questionBackboneSignature(result);
-      const parent = backbone.split('|')[0];
-      parentCounts.set(parent, (parentCounts.get(parent) || 0) + 1);
-      backboneCounts.set(backbone, (backboneCounts.get(backbone) || 0) + 1);
-    }
-    const dominant = (counts) => [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ja'))[0] || ['なし', 0];
-    const [parent, parentCount] = dominant(parentCounts);
-    const [backbone, backboneCount] = dominant(backboneCounts);
-    return {
-      fallbackCount, parent, parentShare: parentCount / sampleSize,
-      backbone, backboneShare: backboneCount / sampleSize,
-    };
-  }
-  function formatDistributionPercent(value) { return `${(value * 100).toFixed(1)}%`; }
-  function runQuestionDistributionGoal() {
-    const { tier } = modalState;
-    const goal = tier === 'hard' ? QUESTION_DISTRIBUTION_GOAL.hard : QUESTION_DISTRIBUTION_GOAL.other;
-    const sampleSize = QUESTION_DISTRIBUTION_GOAL.sampleSize;
-    const reports = [
-      ['並べる', summarizeQuestionDistribution(buildGame1Opts(tier), sampleSize)],
-      ['名付ける', summarizeQuestionDistribution(buildGame2Opts(tier), sampleSize)],
-    ];
-    const passed = reports.every(([, report]) => report.fallbackCount === 0
-      && report.parentShare <= goal.maxParentShare && report.backboneShare <= goal.maxBackboneShare);
-    const lines = [
-      `/goal（${tier === 'hard' ? 'そこそこ' : tier === 'medium' ? 'まあまあ' : 'すいすい'}・各${sampleSize}問）: ${passed ? '合格' : '要調整'}`,
-      `基準: 保険問題 0、最多親構造 ${Math.round(goal.maxParentShare * 100)}%以下、最多骨格 ${Math.round(goal.maxBackboneShare * 100)}%以下`,
-      ...reports.map(([label, report]) => `${label}: 保険 ${report.fallbackCount}、親 ${report.parent} ${formatDistributionPercent(report.parentShare)}、骨格 ${report.backbone} ${formatDistributionPercent(report.backboneShare)}`),
-    ];
-    const goalEl = document.getElementById('settings-goal');
-    goalEl.className = `settings-goal ${passed ? 'pass' : 'fail'}`;
-    goalEl.textContent = lines.join('\n');
-    goalEl.style.display = 'block';
-  }
-
   function exportSettingsAsCode() {
     const fmtTier = (s, isGame1) => {
       const common = `typeMin: ${s.typeMin}, typeMax: ${s.typeMax}, lenMin: ${s.lenMin}, lenMax: ${s.lenMax}, subMin: ${s.subMin}, subMax: ${s.subMax}, maxAlkylLength: ${s.maxAlkylLength}, ringSizes: [${s.ringSizes.join(', ')}], alcoholEnabled: ${s.alcoholEnabled}, alcoholRate: ${s.alcoholRate}, hydroxylLimitOne: ${s.hydroxylLimitOne}`;
@@ -5452,7 +5478,6 @@
   function openSettingsModal() {
     document.getElementById('settings-modal').style.display = 'flex';
     document.getElementById('settings-export-area').style.display = 'none';
-    document.getElementById('settings-goal').style.display = 'none';
     renderSettingsForm();
   }
   function closeSettingsModal() {
@@ -5676,7 +5701,6 @@
     });
   });
   document.getElementById('settings-export-btn').addEventListener('click', exportSettingsAsCode);
-  document.getElementById('settings-distribution-btn').addEventListener('click', runQuestionDistributionGoal);
   document.getElementById('settings-reset-btn').addEventListener('click', () => {
     const { game, tier } = modalState;
     const defaults = game === 'game1' ? DEFAULT_GAME1_OPTS : DEFAULT_GAME2_OPTS;
