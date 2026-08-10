@@ -2928,6 +2928,7 @@
       alcoholEnabled: s.alcoholEnabled,
       alcoholRate: s.alcoholRate,
       hydroxylLimitOne: s.hydroxylLimitOne,
+      balanceLocants: true,
       useBent: true, forceTurn: FORCE_TURN.game1[tier], allowMethane: ALLOW_METHANE[tier], categoryWeights: QUESTION_CATEGORY_WEIGHTS[tier],
       maxWidth: s.gridCols, maxHeight: s.gridRows,
     };
@@ -4302,6 +4303,60 @@
     // 主鎖長・最長側鎖が同じでも、側鎖位置まで同じ問題の連続は避ける。
     return `${parentKind}${parentCount}|側鎖${longestAlkyl}@${longestAlkylLocants || '-'}`;
   }
+  // 並べるでは、命名後に現れる鎖状主鎖の位置番号を短い履歴で均す。
+  // 配置前の位置を均等にしても、最小番号則で向きが反転するため、ここでは正式名から
+  // ロカントを取り出して評価する。環状化合物とメタンは番号の意味が別なので対象外にする。
+  const LOCANT_BALANCE_WINDOW = 36;
+  const LOCANT_BALANCE_EXTRA_CANDIDATES = 4;
+  const recentGame1LocantProfiles = [];
+  function questionChainLocantProfile(result) {
+    const summary = namedGroupSummary(result.name);
+    if (!summary || summary.parentCarbonCount < 2 || result.name.includes('シクロ')) return null;
+    const tokens = expectedGame2AnswerTokens(result.name);
+    if (!tokens) return null;
+    const parentCount = summary.parentCarbonCount;
+    const locants = tokens.filter((token) => /^\d+$/.test(token))
+      .map(Number)
+      .filter((locant) => locant >= 1 && locant <= parentCount);
+    // エタノールでは OH の 1 を表記しないため、出題上の位置番号として補う。
+    const alcoholIndex = tokens.lastIndexOf(ALCOHOL_TOKEN);
+    if (parentCount === 2 && alcoholIndex >= 0 && !MULTIPLIER_SET.has(tokens[alcoholIndex - 1])) locants.push(1);
+    return locants.length ? { parentCount, locants } : null;
+  }
+  function questionLongestAlkylLength(result) {
+    for (let length = STRAIGHT_ALKYL_NAMES.length - 1; length >= 1; length--) {
+      if (result.name.includes(STRAIGHT_ALKYL_NAMES[length])) return length;
+    }
+    return 0;
+  }
+  function rememberGame1LocantProfile(result) {
+    const profile = questionChainLocantProfile(result);
+    if (!profile) return;
+    recentGame1LocantProfiles.push(profile);
+    if (recentGame1LocantProfiles.length > LOCANT_BALANCE_WINDOW) recentGame1LocantProfiles.shift();
+  }
+  function resetGame1LocantProfiles() {
+    recentGame1LocantProfiles.length = 0;
+  }
+  function locantBalancePenalty(result) {
+    const profile = questionChainLocantProfile(result);
+    if (!profile) return null;
+    const relevant = recentGame1LocantProfiles.filter((item) => item.parentCount === profile.parentCount);
+    // 最初の数問は履歴不足で恣意的に寄せない。
+    if (relevant.length < 2) return null;
+    const counts = Array(profile.parentCount + 1).fill(0);
+    for (const item of relevant) for (const locant of item.locants) counts[locant]++;
+    for (const locant of profile.locants) counts[locant]++;
+    const mean = counts.slice(1).reduce((sum, count) => sum + count, 0) / profile.parentCount;
+    return counts.slice(1).reduce((sum, count) => sum + (count - mean) ** 2, 0);
+  }
+  function pickLocantBalancedQuestion(candidates) {
+    const scored = candidates.map((result) => ({ result, penalty: locantBalancePenalty(result) }));
+    const usable = scored.filter((item) => item.penalty !== null);
+    if (!usable.length) return choice(candidates);
+    const bestPenalty = Math.min(...usable.map((item) => item.penalty));
+    return choice(usable.filter((item) => item.penalty === bestPenalty)).result;
+  }
   function rememberQuestion(history, result) {
     history.push({
       name: result.name,
@@ -4328,7 +4383,42 @@
       const typeIsFresh = !previous || typeSignature !== previous.typeSignature;
       candidates.push({ result, signature, typeSignature, backboneSignature, nameIsFresh, gridIsFresh, backboneIsFresh, typeIsFresh });
       // 最終保険問題（通常はエタン）は、設定内の通常問題を探し切ってからだけ採用する。
-      if (!result.fellBack && nameIsFresh && gridIsFresh && backboneIsFresh && typeIsFresh) return result;
+      if (!result.fellBack && nameIsFresh && gridIsFresh && backboneIsFresh && typeIsFresh) {
+        if (!opts.balanceLocants || !questionChainLocantProfile(result)) return result;
+        // 最初に決まった問題形式・主鎖長は維持し、同じ鎖長の候補だけを少数比較する。
+        // そのため、環状問題の割合や通常の難易度設定は変わらない。
+        const parentCount = questionChainLocantProfile(result).parentCount;
+        const longestAlkylLength = questionLongestAlkylLength(result);
+        const alternatives = [result];
+        const alternativeNames = new Set([result.name]);
+        const alternativeSignatures = new Set([signature]);
+        const alternativeOpts = {
+          ...opts,
+          lenMin: parentCount,
+          lenMax: parentCount,
+          allowMethane: false,
+          categoryWeights: { chain: 100, cyclo: 0, methane: 0 },
+          // 長鎖側鎖を改めて強制すると、固定した主鎖長によって鎖状候補が無くなる。
+          // 通常生成から同じ最長側鎖長の候補だけを選び、最初の問題の出題割合を保つ。
+          featuredAlkylRate: 0,
+        };
+        for (let extra = 0; extra < LOCANT_BALANCE_EXTRA_CANDIDATES; extra++) {
+          const alternative = generateStructureWithOptions(alternativeOpts);
+          const alternativeProfile = questionChainLocantProfile(alternative);
+          if (!alternativeProfile || alternativeProfile.parentCount !== parentCount || alternative.fellBack
+            || questionLongestAlkylLength(alternative) !== longestAlkylLength) continue;
+          const alternativeSignature = questionGridSignature(alternative.grid);
+          const alternativeType = questionTypeSignature(alternative);
+          const alternativeBackbone = questionBackboneSignature(alternative);
+          if (recentNames.has(alternative.name) || recentSignatures.has(alternativeSignature)
+            || recentBackbones.has(alternativeBackbone) || (previous && alternativeType === previous.typeSignature)
+            || alternativeNames.has(alternative.name) || alternativeSignatures.has(alternativeSignature)) continue;
+          alternatives.push(alternative);
+          alternativeNames.add(alternative.name);
+          alternativeSignatures.add(alternativeSignature);
+        }
+        return pickLocantBalancedQuestion(alternatives);
+      }
     }
     // 全条件を満たせない狭い設定では、まず直前と種類の組み合わせが変わる候補を優先する。
     // それも不可能なときだけ従来どおり、名称・盤面が新しい候補、最後に先頭候補へ緩和する。
@@ -4371,6 +4461,7 @@
     interactionsEnabled = true;
     const question = generateAvoidingRecentRepeat(buildGame1Opts(difficulty), recentGame1Questions);
     rememberQuestion(recentGame1Questions, question);
+    rememberGame1LocantProfile(question);
     currentGame1Question = question;
     targetName = question.name;
     grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
@@ -5279,6 +5370,7 @@
   function enterGame1Tier() {
     clearPaletteSelection();
     setupPalette();
+    resetGame1LocantProfiles();
     const practice = difficulty === 'practice';
     document.getElementById('objective').style.display = practice ? 'none' : 'block';
     document.getElementById('status').style.display = practice ? 'block' : 'none';
