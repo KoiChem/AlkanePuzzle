@@ -522,15 +522,15 @@
   .diff-tabs-row.markup-open .diff-tabs{display:none;}
   .diff-tabs-row.markup-open .markup-tools{display:flex;}
   .diff-tabs-row.markup-open #operation-guide-btn-naming,.diff-tabs-row.markup-open #settings-gear{display:none !important;}
-  .markup-tool[data-tool="yellow"] .tool-swatch{fill:#ffe95c;stroke:#b7a02c;}
-  .markup-tool[data-tool="red"] .tool-swatch{fill:#e85b55;stroke:#a53c37;}
-  .markup-tool[data-tool="blue"] .tool-swatch{fill:#5d9ed1;stroke:#39739f;}
-  .markup-tool[data-tool="green"] .tool-swatch{fill:#55a878;stroke:#347451;}
+  .markup-tool[data-tool="yellow"] .tool-swatch{fill:#ffea00;stroke:#b59800;}
+  .markup-tool[data-tool="red"] .tool-swatch{fill:#f0443a;stroke:#a92b25;}
+  .markup-tool[data-tool="blue"] .tool-swatch{fill:#168de1;stroke:#09639e;}
+  .markup-tool[data-tool="green"] .tool-swatch{fill:#15a35d;stroke:#08723d;}
   .markup-tool:disabled{opacity:.34;box-shadow:none;}
   .markup-tool:focus-visible,.markup-toggle:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
   .grid-markup-shell{position:relative;width:min(94vw,490px);margin:0 auto 10px;}
   .grid-markup-shell .grid{width:100%;margin:0;}
-  .markup-canvas{position:absolute;z-index:20;touch-action:none;cursor:crosshair;pointer-events:none;}
+  .markup-canvas{position:absolute;z-index:20;touch-action:none;cursor:crosshair;pointer-events:none;mix-blend-mode:multiply;}
   .markup-canvas.active{pointer-events:auto;}
   #grid-markup-canvas{inset:0;width:100%;height:100%;}
   #objective-markup-canvas{pointer-events:none;}
@@ -2439,10 +2439,10 @@
 
   // ---- 問題ごとのマーキング ----
   const MARKUP_STYLES = {
-    yellow: { color: 'rgba(255, 224, 45, .38)', width: 15 },
-    red: { color: 'rgba(214, 66, 61, .88)', width: 3.2 },
-    blue: { color: 'rgba(50, 126, 184, .88)', width: 3.2 },
-    green: { color: 'rgba(49, 143, 88, .88)', width: 3.2 },
+    yellow: { color: 'rgba(255, 220, 0, .40)', width: 22.5 },
+    red: { color: 'rgba(240, 68, 58, .94)', width: 3.2 },
+    blue: { color: 'rgba(22, 141, 225, .94)', width: 3.2 },
+    green: { color: 'rgba(21, 163, 93, .94)', width: 3.2 },
   };
   let markupOpen = false;
   let markupTool = 'yellow';
