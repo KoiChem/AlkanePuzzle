@@ -522,7 +522,8 @@
   .diff-tabs-row.markup-open .diff-tabs{display:none;}
   .diff-tabs-row.markup-open .markup-tools{display:flex;}
   .diff-tabs-row.markup-open #operation-guide-btn-naming,.diff-tabs-row.markup-open #settings-gear{display:none !important;}
-  .markup-tool[data-tool="yellow"] .tool-swatch{fill:#ffea00;stroke:#b59800;}
+  .markup-tool[data-tool="yellow"] .tool-swatch{fill:#fff000;stroke:#b8a600;}
+  .markup-tool[data-tool="pink"] .tool-swatch{fill:#ff8fc7;stroke:#b94f84;}
   .markup-tool[data-tool="red"] .tool-swatch{fill:#f0443a;stroke:#a92b25;}
   .markup-tool[data-tool="blue"] .tool-swatch{fill:#168de1;stroke:#09639e;}
   .markup-tool[data-tool="green"] .tool-swatch{fill:#15a35d;stroke:#08723d;}
@@ -535,6 +536,10 @@
   #grid-markup-canvas{inset:0;width:100%;height:100%;}
   #objective-markup-canvas{pointer-events:none;}
   #objective-markup-canvas.active{pointer-events:auto;}
+  @media (max-width:380px){
+    .markup-tools{gap:2px;}
+    .markup-tool{flex-basis:34px;width:34px;}
+  }
   .hydroxyl-toggle{
     flex:0 0 38px;align-self:stretch;width:38px;height:auto;padding:0;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;
     border-radius:14px 12px 15px 11px;border:2.5px solid var(--border);background:var(--surface);box-shadow:1px 2px 0 var(--shadow);
@@ -660,6 +665,7 @@
     </div>
     <div id="markup-tools" class="markup-tools" role="toolbar" aria-label="マーキングツール">
       <button class="markup-tool active" data-tool="yellow" type="button" title="黄色の蛍光ペン" aria-label="黄色の蛍光ペン" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tool-swatch" d="m6 15 7.8-9.2 4.4 3.7-7.8 9.2L6 15Z"/><path d="m6 15-1 4 5.4-.3M4 21h16"/></svg></button>
+      <button class="markup-tool" data-tool="pink" type="button" title="ピンクの蛍光ペン" aria-label="ピンクの蛍光ペン" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tool-swatch" d="m6 15 7.8-9.2 4.4 3.7-7.8 9.2L6 15Z"/><path d="m6 15-1 4 5.4-.3M4 21h16"/></svg></button>
       <button class="markup-tool" data-tool="red" type="button" title="赤ペン" aria-label="赤ペン" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tool-swatch" d="m6 15 7.8-9.2 4.4 3.7-7.8 9.2L6 15Z"/><path d="m6 15-1 4 5.4-.3"/></svg></button>
       <button class="markup-tool" data-tool="blue" type="button" title="青ペン" aria-label="青ペン" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tool-swatch" d="m6 15 7.8-9.2 4.4 3.7-7.8 9.2L6 15Z"/><path d="m6 15-1 4 5.4-.3"/></svg></button>
       <button class="markup-tool" data-tool="green" type="button" title="緑ペン" aria-label="緑ペン" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tool-swatch" d="m6 15 7.8-9.2 4.4 3.7-7.8 9.2L6 15Z"/><path d="m6 15-1 4 5.4-.3"/></svg></button>
@@ -2439,7 +2445,8 @@
 
   // ---- 問題ごとのマーキング ----
   const MARKUP_STYLES = {
-    yellow: { color: 'rgba(255, 220, 0, .40)', width: 22.5 },
+    yellow: { color: 'rgba(255, 235, 0, .46)', width: 22.5 },
+    pink: { color: 'rgba(255, 105, 180, .46)', width: 22.5 },
     red: { color: 'rgba(240, 68, 58, .94)', width: 3.2 },
     blue: { color: 'rgba(22, 141, 225, .94)', width: 3.2 },
     green: { color: 'rgba(21, 163, 93, .94)', width: 3.2 },
