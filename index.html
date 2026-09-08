@@ -510,6 +510,31 @@
   /* ---- 難易度設定(管理者向け・?admin=1のときだけ表示) ---- */
   .diff-tabs-row{--naming-operation-guide-size:38px;display:flex;align-items:center;gap:8px;margin-bottom:10px;}
   .diff-tabs-row .diff-tabs{flex:1;margin-bottom:0;}
+  .markup-toggle,.markup-tool{
+    flex:0 0 38px;width:38px;height:38px;padding:0;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:13px 11px 14px 10px;border:2px solid var(--border);background:var(--surface);color:var(--text-muted);
+    box-shadow:1px 2px 0 var(--shadow);transition:transform .08s ease,box-shadow .08s ease,background .12s ease;
+  }
+  .markup-toggle:active,.markup-tool:active{transform:translate(1px,2px);box-shadow:0 0 0 var(--shadow);}
+  .markup-toggle.active,.markup-tool.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);}
+  .markup-toggle svg,.markup-tool svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+  .markup-tools{display:none;flex:1;align-items:center;justify-content:space-evenly;gap:5px;min-width:0;}
+  .diff-tabs-row.markup-open .diff-tabs{display:none;}
+  .diff-tabs-row.markup-open .markup-tools{display:flex;}
+  .diff-tabs-row.markup-open #operation-guide-btn-naming,.diff-tabs-row.markup-open #settings-gear{display:none !important;}
+  .markup-tool[data-tool="yellow"] .tool-swatch{fill:#ffe95c;stroke:#b7a02c;}
+  .markup-tool[data-tool="red"] .tool-swatch{fill:#e85b55;stroke:#a53c37;}
+  .markup-tool[data-tool="blue"] .tool-swatch{fill:#5d9ed1;stroke:#39739f;}
+  .markup-tool[data-tool="green"] .tool-swatch{fill:#55a878;stroke:#347451;}
+  .markup-tool:disabled{opacity:.34;box-shadow:none;}
+  .markup-tool:focus-visible,.markup-toggle:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
+  .grid-markup-shell{position:relative;width:min(94vw,490px);margin:0 auto 10px;}
+  .grid-markup-shell .grid{width:100%;margin:0;}
+  .markup-canvas{position:absolute;z-index:20;touch-action:none;cursor:crosshair;pointer-events:none;}
+  .markup-canvas.active{pointer-events:auto;}
+  #grid-markup-canvas{inset:0;width:100%;height:100%;}
+  #objective-markup-canvas{pointer-events:none;}
+  #objective-markup-canvas.active{pointer-events:auto;}
   .hydroxyl-toggle{
     flex:0 0 38px;align-self:stretch;width:38px;height:auto;padding:0;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;
     border-radius:14px 12px 15px 11px;border:2.5px solid var(--border);background:var(--surface);box-shadow:1px 2px 0 var(--shadow);
@@ -623,12 +648,23 @@
     </div>
   </header>
   <div class="diff-tabs-row">
+    <button id="markup-toggle" class="markup-toggle" type="button" aria-pressed="false" title="マーキングペンを表示" aria-label="マーキングペンを表示">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19.5l4.1-1 10-10a2.1 2.1 0 0 0-3-3l-10 10-1.1 4Z"/><path d="m13.8 7.3 3 3M8.6 18.5l-3-3"/></svg>
+    </button>
     <div class="diff-tabs" id="diff-tabs">
       <button class="diff-tab active" data-diff="practice">練習</button>
       <button class="diff-tab" data-diff="easy">すいすい</button>
       <button class="diff-tab" data-diff="medium">まあまあ</button>
       <button class="diff-tab" data-diff="hard">そこそこ</button>
       <button id="naming-rules-btn" class="diff-tab" style="display:none;" type="button" title="命名ルール" aria-label="命名ルール">命名ルール</button>
+    </div>
+    <div id="markup-tools" class="markup-tools" role="toolbar" aria-label="マーキングツール">
+      <button class="markup-tool active" data-tool="yellow" type="button" title="黄色の蛍光ペン" aria-label="黄色の蛍光ペン" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tool-swatch" d="m6 15 7.8-9.2 4.4 3.7-7.8 9.2L6 15Z"/><path d="m6 15-1 4 5.4-.3M4 21h16"/></svg></button>
+      <button class="markup-tool" data-tool="red" type="button" title="赤ペン" aria-label="赤ペン" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tool-swatch" d="m6 15 7.8-9.2 4.4 3.7-7.8 9.2L6 15Z"/><path d="m6 15-1 4 5.4-.3"/></svg></button>
+      <button class="markup-tool" data-tool="blue" type="button" title="青ペン" aria-label="青ペン" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tool-swatch" d="m6 15 7.8-9.2 4.4 3.7-7.8 9.2L6 15Z"/><path d="m6 15-1 4 5.4-.3"/></svg></button>
+      <button class="markup-tool" data-tool="green" type="button" title="緑ペン" aria-label="緑ペン" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tool-swatch" d="m6 15 7.8-9.2 4.4 3.7-7.8 9.2L6 15Z"/><path d="m6 15-1 4 5.4-.3"/></svg></button>
+      <button id="markup-undo" class="markup-tool" type="button" title="1つ戻す" aria-label="マーキングを1つ戻す" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7-5 4 5 4"/><path d="M5 11h8a6 6 0 0 1 6 6"/></svg></button>
+      <button id="markup-clear" class="markup-tool" type="button" title="すべて消す" aria-label="マーキングをすべて消す" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 17-3-3 8-9a2 2 0 0 1 3 0l3 3a2 2 0 0 1 0 3l-6 6H8Z"/><path d="m11 8 5 5M8 17h11"/></svg></button>
     </div>
     <button id="operation-guide-btn-naming" class="operation-guide-btn" style="display:none;" type="button" title="操作ガイド" aria-label="操作ガイドを開く">
       <svg class="operation-guide-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l12 8-5.2 1.8 3.2 6-2.8 1.4-3.1-6L5 18V3Z"/></svg><span>操作</span>
@@ -641,7 +677,10 @@
     </button>
   </div>
   <div class="objective" id="objective" style="display:none;"></div>
-  <div class="grid" id="grid"></div>
+  <div class="grid-markup-shell" id="grid-markup-shell">
+    <div class="grid" id="grid"></div>
+    <canvas id="grid-markup-canvas" class="markup-canvas" aria-label="アルカン構造へのマーキング領域"></canvas>
+  </div>
   <div class="palette" id="palette"></div>
   <div class="practice-guide-row" id="practice-guide-row">
     <p class="hint" id="hint"><span class="hint-line"><span class="keycap">タップ</span>まわす　<span class="keycap">2タップ</span>逆にまわす</span><span class="hint-line"><span class="keycap">3タップ</span>けす　<span class="keycap">ドラッグ</span>おく・うごかす</span></p>
@@ -2398,6 +2437,167 @@
   let answerTokens = [];
   let answerHistory = [];
 
+  // ---- 問題ごとのマーキング ----
+  const MARKUP_STYLES = {
+    yellow: { color: 'rgba(255, 224, 45, .38)', width: 15 },
+    red: { color: 'rgba(214, 66, 61, .88)', width: 3.2 },
+    blue: { color: 'rgba(50, 126, 184, .88)', width: 3.2 },
+    green: { color: 'rgba(49, 143, 88, .88)', width: 3.2 },
+  };
+  let markupOpen = false;
+  let markupTool = 'yellow';
+  let markupStrokes = [];
+  let markupUndoStack = [];
+  let activeMarkupStroke = null;
+  let objectiveMarkupCanvas = null;
+
+  function markupAvailable() {
+    return currentMode === 'game2' || (currentMode === 'game1' && difficulty !== 'practice');
+  }
+  function activeMarkupCanvas() {
+    return currentMode === 'game2' ? document.getElementById('grid-markup-canvas') : objectiveMarkupCanvas;
+  }
+  function cloneMarkupStrokes(strokes) {
+    return strokes.map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ ...point })) }));
+  }
+  function updateMarkupHistoryButtons() {
+    const hasStrokes = markupStrokes.length > 0;
+    document.getElementById('markup-undo').disabled = markupUndoStack.length === 0;
+    document.getElementById('markup-clear').disabled = !hasStrokes;
+  }
+  function drawMarkupStroke(ctx, stroke, width, height) {
+    if (!stroke.points.length) return;
+    const style = MARKUP_STYLES[stroke.tool];
+    ctx.save();
+    ctx.strokeStyle = style.color;
+    ctx.fillStyle = style.color;
+    ctx.lineWidth = style.width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    stroke.points.forEach((point, index) => {
+      const x = point.x * width, y = point.y * height;
+      if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    if (stroke.points.length === 1) {
+      const point = stroke.points[0];
+      ctx.arc(point.x * width, point.y * height, style.width / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function renderMarkupCanvas(canvas = activeMarkupCanvas()) {
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const ratio = Math.min(window.devicePixelRatio || 1, 3);
+    const pixelWidth = Math.round(rect.width * ratio);
+    const pixelHeight = Math.round(rect.height * ratio);
+    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+    }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    markupStrokes.forEach((stroke) => drawMarkupStroke(ctx, stroke, rect.width, rect.height));
+  }
+  function positionObjectiveMarkupCanvas() {
+    const objective = document.getElementById('objective');
+    const name = objective.querySelector('.name');
+    if (!name || currentMode !== 'game1' || difficulty === 'practice') {
+      objectiveMarkupCanvas?.remove();
+      objectiveMarkupCanvas = null;
+      return;
+    }
+    if (!objectiveMarkupCanvas) {
+      objectiveMarkupCanvas = document.createElement('canvas');
+      objectiveMarkupCanvas.id = 'objective-markup-canvas';
+      objectiveMarkupCanvas.className = 'markup-canvas';
+      objectiveMarkupCanvas.setAttribute('aria-label', '化合物名へのマーキング領域');
+      attachMarkupCanvasEvents(objectiveMarkupCanvas);
+      objective.appendChild(objectiveMarkupCanvas);
+    } else if (objectiveMarkupCanvas.parentElement !== objective) {
+      objective.appendChild(objectiveMarkupCanvas);
+    }
+    const objectiveRect = objective.getBoundingClientRect();
+    const nameRect = name.getBoundingClientRect();
+    const pad = 6;
+    objectiveMarkupCanvas.style.left = `${nameRect.left - objectiveRect.left - pad}px`;
+    objectiveMarkupCanvas.style.top = `${nameRect.top - objectiveRect.top - pad}px`;
+    objectiveMarkupCanvas.style.width = `${nameRect.width + pad * 2}px`;
+    objectiveMarkupCanvas.style.height = `${nameRect.height + pad * 2}px`;
+    objectiveMarkupCanvas.classList.toggle('active', markupOpen);
+    renderMarkupCanvas(objectiveMarkupCanvas);
+  }
+  function syncMarkupCanvas() {
+    const gridCanvas = document.getElementById('grid-markup-canvas');
+    gridCanvas.classList.toggle('active', markupOpen && currentMode === 'game2');
+    positionObjectiveMarkupCanvas();
+    renderMarkupCanvas();
+  }
+  function renderMarkupUI() {
+    const available = markupAvailable();
+    const toggle = document.getElementById('markup-toggle');
+    if (!available) markupOpen = false;
+    toggle.style.display = available ? 'inline-flex' : 'none';
+    toggle.classList.toggle('active', markupOpen);
+    toggle.setAttribute('aria-pressed', String(markupOpen));
+    toggle.title = markupOpen ? 'マーキングペンを閉じる' : 'マーキングペンを表示';
+    toggle.setAttribute('aria-label', toggle.title);
+    document.querySelector('.diff-tabs-row').classList.toggle('markup-open', markupOpen);
+    document.querySelectorAll('.markup-tool[data-tool]').forEach((button) => {
+      const selected = button.dataset.tool === markupTool;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    updateMarkupHistoryButtons();
+    syncMarkupCanvas();
+  }
+  function resetMarkupForQuestion() {
+    markupOpen = false;
+    markupStrokes = [];
+    markupUndoStack = [];
+    activeMarkupStroke = null;
+    renderMarkupUI();
+  }
+  function markupPoint(event, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+      y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
+    };
+  }
+  function attachMarkupCanvasEvents(canvas) {
+    canvas.addEventListener('pointerdown', (event) => {
+      if (!markupOpen || !event.isPrimary) return;
+      event.preventDefault();
+      markupUndoStack.push(cloneMarkupStrokes(markupStrokes));
+      activeMarkupStroke = { tool: markupTool, points: [markupPoint(event, canvas)] };
+      markupStrokes.push(activeMarkupStroke);
+      canvas.setPointerCapture(event.pointerId);
+      renderMarkupCanvas(canvas);
+      updateMarkupHistoryButtons();
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (!activeMarkupStroke || !canvas.hasPointerCapture(event.pointerId)) return;
+      event.preventDefault();
+      const events = event.getCoalescedEvents ? event.getCoalescedEvents() : [event];
+      events.forEach((pointEvent) => activeMarkupStroke.points.push(markupPoint(pointEvent, canvas)));
+      renderMarkupCanvas(canvas);
+    });
+    const finishStroke = (event) => {
+      if (!activeMarkupStroke) return;
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      activeMarkupStroke = null;
+    };
+    canvas.addEventListener('pointerup', finishStroke);
+    canvas.addEventListener('pointercancel', finishStroke);
+    canvas.addEventListener('lostpointercapture', () => { activeMarkupStroke = null; });
+  }
+
   // ---- 練習(アルカン並べ「練習」)専用: 複数分子の追跡状態 ----
   let practiceComponents = [];             // 直近のrefreshPracticeで解析した連結成分の配列
   let practiceCellComponentIndex = new Map(); // "r,c" -> practiceComponents内のindex(タップ判定用)
@@ -2853,6 +3053,7 @@
   let game2LayoutFrame = null;
   function resetGame2GridLayout() {
     const gridEl = document.getElementById('grid');
+    document.getElementById('grid-markup-shell').style.width = '';
     gridEl.classList.remove('game2-compact');
     gridEl.style.width = '';
     gridEl.style.gridTemplateColumns = '';
@@ -2896,6 +3097,7 @@
     gridEl.classList.add('game2-compact');
     const maxGridHeight = viewportHeight <= 620 ? 180 : 250;
     const compactWidth = Math.min(viewportWidth * 0.74, 310, maxGridHeight * cols / rows);
+    document.getElementById('grid-markup-shell').style.width = `${compactWidth}px`;
     gridEl.style.width = `${compactWidth}px`;
     gridEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
     gridEl.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
@@ -2919,6 +3121,7 @@
       const available = Math.max(112, Math.floor(viewportHeight - rect.top - 10));
       tokenScroll.style.setProperty('--token-scroll-max', `${available}px`);
     }
+    syncMarkupCanvas();
   }
   function scheduleGame2ResponsiveLayout() {
     if (game2LayoutFrame) return;
@@ -4389,6 +4592,7 @@
   }
 
   function startGame1() {
+    resetMarkupForQuestion();
     clearPaletteSelection();
     interactionsEnabled = true;
     const question = generateAvoidingRecentRepeat(buildGame1Opts(difficulty), recentGame1Questions);
@@ -4468,6 +4672,7 @@
       document.querySelector('.objective-actions').appendChild(resetBtn);
     }
     fitCompoundNamesWithin(obj, 'objective');
+    requestAnimationFrame(positionObjectiveMarkupCanvas);
   }
 
   // ============================================================
@@ -4614,6 +4819,7 @@
   }
 
   function startGame2() {
+    resetMarkupForQuestion();
     clearPaletteSelection();
     interactionsEnabled = false;
     // パスした問題は、通常の直近重複回避を意図的に越えて3〜5問後に一度だけ戻す。
@@ -5240,6 +5446,7 @@
     const operationGuideBtn = document.getElementById('operation-guide-btn-naming');
     if (operationGuideBtn) operationGuideBtn.style.display = currentMode === 'game2' ? 'inline-flex' : 'none';
     renderHydroxylToggle();
+    renderMarkupUI();
     scheduleNamingOperationGuideSize();
   }
 
@@ -5281,6 +5488,7 @@
     document.getElementById('practice-guide-row').style.display = practice ? 'grid' : 'none';
 
     if (practice) {
+      resetMarkupForQuestion();
       interactionsEnabled = true;
       wasStructureValid = false;
       resetPracticeTracking();
@@ -5741,6 +5949,33 @@
   document.getElementById('sound-toggle').addEventListener('click', (event) => {
     setSoundEnabled(!soundEnabled, event);
   });
+  document.getElementById('markup-toggle').addEventListener('click', () => {
+    markupOpen = !markupOpen;
+    playUiClickSound();
+    renderMarkupUI();
+  });
+  document.querySelectorAll('.markup-tool[data-tool]').forEach((button) => {
+    button.addEventListener('click', () => {
+      markupTool = button.dataset.tool;
+      playUiClickSound();
+      renderMarkupUI();
+    });
+  });
+  document.getElementById('markup-undo').addEventListener('click', () => {
+    if (!markupUndoStack.length) return;
+    markupStrokes = markupUndoStack.pop();
+    playUiClickSound();
+    updateMarkupHistoryButtons();
+    renderMarkupCanvas();
+  });
+  document.getElementById('markup-clear').addEventListener('click', () => {
+    if (!markupStrokes.length) return;
+    markupUndoStack.push(cloneMarkupStrokes(markupStrokes));
+    markupStrokes = [];
+    playUiClickSound();
+    updateMarkupHistoryButtons();
+    renderMarkupCanvas();
+  });
   document.querySelectorAll('.diff-tab[data-diff]').forEach((btn) => {
     btn.addEventListener('click', () => {
       playDifficultySound(btn.dataset.diff);
@@ -5754,6 +5989,10 @@
     });
   });
 
+  attachMarkupCanvasEvents(document.getElementById('grid-markup-canvas'));
+  new ResizeObserver(syncMarkupCanvas).observe(document.getElementById('grid-markup-shell'));
+  new MutationObserver(() => requestAnimationFrame(positionObjectiveMarkupCanvas))
+    .observe(document.getElementById('objective'), { childList: true, subtree: true });
   buildGridDOM();
   renderSoundToggle();
   setupPalette();
