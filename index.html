@@ -477,6 +477,7 @@
   .wordbank.answered .row button{opacity:.4;pointer-events:none;}
   .wordbank .control-row{flex-wrap:nowrap;margin-top:0;margin-bottom:12px;gap:5px;}
   .wordbank .control-row button{flex:0 1 auto;min-width:0;min-height:44px;padding:7px 10px;white-space:nowrap;}
+  .wordbank .control-row.answer-layout-settling{pointer-events:none;}
   .wordbank .control-row button:disabled{opacity:.35;pointer-events:none;}
   @media (max-width:360px){
     .wordbank .control-row{gap:4px;}
@@ -4856,6 +4857,7 @@
   let answerDragState = null;
   let answerInsertIndex = null;
   let answerPreviewResizeObserver = null;
+  let answerPreviewObservedHeight = null;
   let answerControlGuardTimer = null;
 
   // 解答チップが折り返されて解答欄の高さが変わったら、下の語群に割り当てる高さも更新する。
@@ -4863,23 +4865,29 @@
   function observeAnswerPreviewSize(preview) {
     answerPreviewResizeObserver?.disconnect();
     answerPreviewResizeObserver = null;
+    answerPreviewObservedHeight = preview?.getBoundingClientRect().height ?? null;
     if (!preview || !window.ResizeObserver) return;
-    answerPreviewResizeObserver = new ResizeObserver(() => scheduleGame2ResponsiveLayout());
+    answerPreviewResizeObserver = new ResizeObserver(() => {
+      const height = preview.getBoundingClientRect().height;
+      const heightChanged = answerPreviewObservedHeight !== null && Math.abs(height - answerPreviewObservedHeight) > .5;
+      answerPreviewObservedHeight = height;
+      if (heightChanged && answerTokens.length > 0 && !preview.classList.contains('result')) guardAnswerControlsAfterLayoutShift();
+      scheduleGame2ResponsiveLayout();
+    });
     answerPreviewResizeObserver.observe(preview);
   }
 
-  // 予想外にさらに折り返した場合も、直後の連続タップで確定操作を誤発火させない。
-  function guardAnswerTerminalControls() {
+  // 解答欄の高さが変わると操作列も移動する。画面幅によらず、
+  // 直後の連続タップが移動先の「戻す／クリア／解答／パス」に誤発火しないようにする。
+  function guardAnswerControlsAfterLayoutShift() {
     const wordbank = document.getElementById('wordbank');
-    const controls = ['submit-answer-btn2', 'pass-answer-btn2']
-      .map((id) => document.getElementById(id)).filter(Boolean);
-    if (!controls.length || wordbank?.classList.contains('answered')) return;
-    controls.forEach((button) => { button.disabled = true; });
+    const controlRow = wordbank?.querySelector('.control-row');
+    if (!controlRow || wordbank.classList.contains('answered')) return;
+    controlRow.classList.add('answer-layout-settling');
     if (answerControlGuardTimer) clearTimeout(answerControlGuardTimer);
     answerControlGuardTimer = setTimeout(() => {
       answerControlGuardTimer = null;
-      if (wordbank?.classList.contains('answered')) return;
-      controls.forEach((button) => { if (button.isConnected) button.disabled = false; });
+      if (controlRow.isConnected) controlRow.classList.remove('answer-layout-settling');
     }, ANSWER_CONTROL_SETTLE_MS);
   }
 
@@ -4939,7 +4947,7 @@
     if (markerIndex === answerTokens.length) addMarker();
     const trash = document.createElement('span'); trash.className = 'answer-trash'; trash.textContent = '削除'; preview.appendChild(trash);
     updateAnswerUndoButton();
-    if (answerTokens.length > 0 && Math.abs(preview.getBoundingClientRect().height - beforeHeight) > .5) guardAnswerTerminalControls();
+    if (answerTokens.length > 0 && Math.abs(preview.getBoundingClientRect().height - beforeHeight) > .5) guardAnswerControlsAfterLayoutShift();
     // ResizeObserver非対応環境でも、通常の入力・戻す・削除では必ず再計算する。
     scheduleGame2ResponsiveLayout();
   }
