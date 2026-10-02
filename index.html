@@ -2430,6 +2430,7 @@
   let dragState = null;
   let paletteSelection = null; // クリック配置で選択中のパネル { type, element, rotation } | null
   let selectedCardEl = null;   // 選択中のパレットカード要素(見た目の押下表示用)
+  const cancelCellTaps = []; // なぞり開始時に全マスの保留中の回転・連続タップを解除する
   const pendingPalettePlacements = new Map(); // 同じマスのダブルタップで選択解除できるよう、配置を短時間だけ保留する
   let traceState = null; // なぞって描く操作の進行状態: null | { path:[{r,c},...], closed:boolean }
   let traceSnapshot = null; // なぞり開始前のgridの退避(取り消し・キャンセル用)
@@ -3139,7 +3140,7 @@
   window.visualViewport?.addEventListener('resize', scheduleGame2ResponsiveLayout);
 
   // ============================================================
-  // なぞって描く(アルカン並べ専用): 空きマスからドラッグを始め、
+  // なぞって描く(アルカン並べ専用): 空きマスまたは既存炭素からドラッグを始め、
   // 通ったマス順に炭素をつなげて主鎖(または環)を描く。
   // ============================================================
   // pathの位置iにおける、隣接パネルへの活性方向を求める(closed=trueなら始点と終点も繋がっているとみなす)
@@ -3154,22 +3155,38 @@
     return dirs;
   }
 
-  // なぞり開始前の状態(traceSnapshot)を土台に、現在のtraceStateの経路分だけ上書きしてgridを組み直す。
+  // 開始時の結合方向へ戻してから経路の結合を追加する。既存ノードは再利用し、
+  // 引き返したときも今回追加した結合だけを取り消す。
   function applyTraceToGrid() {
     const g = traceSnapshot.map((row) => row.slice());
-    const { path, closed } = traceState;
+    const { path, closed, originalPanels } = traceState;
+    for (const { panel, type, rotation } of originalPanels) {
+      panel.type = type;
+      panel.rotation = rotation;
+    }
     for (let i = 0; i < path.length; i++) {
       const { r, c } = path[i];
       const dirs = computeTraceDirs(path, i, closed);
       if (dirs.length === 0) continue; // 経路が1マスだけ(まだ動いていない)ときは何も置かない
-      g[r][c] = panelForDirections(dirs);
+      const panel = g[r][c];
+      if (panel) {
+        const merged = panelForDirections([...getActiveDirections(panel), ...dirs]);
+        panel.type = merged.type;
+        panel.rotation = merged.rotation;
+      } else {
+        g[r][c] = panelForDirections(dirs);
+      }
     }
     grid = g;
   }
 
   function startTrace(e, startR, startC) {
+    for (const cancel of cancelCellTaps) cancel();
     traceSnapshot = grid.map((row) => row.slice());
-    traceState = { path: [{ r: startR, c: startC }], closed: false };
+    traceState = {
+      path: [{ r: startR, c: startC }], closed: false,
+      originalPanels: grid.flat().filter(Boolean).map(panel => ({ panel, type: panel.type, rotation: panel.rotation })),
+    };
     traceGestureStartedWithAudioLocked = !audioCtx || audioCtx.state !== 'running';
 
     const processStep = (nr, nc) => {
@@ -3187,12 +3204,14 @@
         if (nr === prev.r && nc === prev.c) {
           path.pop();
           playTraceBacktrackSound();
-          if (path.length >= 2) applyTraceToGrid();
-          else grid = traceSnapshot.map((row) => row.slice());
+          applyTraceToGrid();
           refreshAll();
           return;
         }
       }
+
+      // 炭素以外の既存パネルは置き換えず、経路をここで止める。
+      if (isHalogenPanel(traceSnapshot[nr][nc])) return;
 
       // 始点に戻ってきたら環として閉じる(最低3マス移動している場合のみ)
       const start = path[0];
@@ -3226,7 +3245,7 @@
       const path = traceState ? traceState.path : [];
       const closedTrace = !!traceState?.closed;
       if (path.length < 2) {
-        grid = traceSnapshot.map((row) => row.slice()); // 実質タップのみ = 何もしない
+        applyTraceToGrid(); // 実質タップのみ = 開始時の状態に戻す
       }
       if (traceGestureStartedWithAudioLocked) discardPendingTraceAudio();
       traceGestureStartedWithAudioLocked = false;
@@ -3239,6 +3258,7 @@
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
+    onMove(e); // 既存炭素からの開始では、移動閾値を越えた現在位置も経路へ含める
   }
 
   function syncCell(r, c, mismatchMap, highlightAlpha) {
@@ -4203,6 +4223,11 @@
     let tapCount = 0;
     let pendingTimer = null;
     let selectionOnlyThisGesture = false; // 練習: 今回のタップが「分子の選択のみ」で終わったか
+    cancelCellTaps.push(() => {
+      if (pendingTimer) clearTimeout(pendingTimer);
+      pendingTimer = null;
+      tapCount = 0;
+    });
 
     cell.addEventListener('pointerdown', (e) => {
       if (!interactionsEnabled) return;
@@ -4261,9 +4286,10 @@
             e.preventDefault();
             selectionOnlyThisGesture = true;
             focusPracticeComponent(comp, true);
-            return;
+            if (!isTraceEnabledNow() || isHalogenPanel(grid[r][c])) return;
+          } else {
+            focusPracticeComponent(comp, false); // 組み立て中の断片は選択後そのまま編集する
           }
-          focusPracticeComponent(comp, false); // フォーカスのみ移し、下の通常処理へ続行(即編集)
         }
       }
 
@@ -4281,7 +4307,8 @@
           moved = true;
           window.removeEventListener('pointermove', onMove);
           window.removeEventListener('pointerup', onUp);
-          beginMoveDrag(ev, r, c);
+          if (isTraceEnabledNow() && !isHalogenPanel(grid[r][c])) startTrace(ev, r, c);
+          else beginMoveDrag(ev, r, c);
         }
       };
       const onUp = () => {
