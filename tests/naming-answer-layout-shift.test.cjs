@@ -1,11 +1,10 @@
+const {serveApp,ready} = require('./browser-fixture.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const { pathToFileURL } = require('node:url');
 const { chromium } = require('playwright');
 
-const APP_URL = pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href;
+const APP_URL = 'http://alkane.test/';
 const CHROMIUM_EXECUTABLE = [
   process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -18,7 +17,8 @@ test('keeps the naming answer when a wrap moves controls under a rapid repeat ta
   t.after(() => browser.close());
 
   const page = await browser.newPage({ viewport: { width: 320, height: 568 } });
-  await page.goto(APP_URL);
+  await serveApp(page);
+  await page.goto(APP_URL); await ready(page);
   await page.getByRole('button', { name: '名付ける', exact: true }).click();
 
   const fluoro = page.getByRole('button', { name: 'フルオロ', exact: true });
@@ -88,7 +88,8 @@ test('protects the shifted control row at wider viewport sizes too', async (t) =
   ]) {
     await t.test(`${viewport.width}x${viewport.height}`, async () => {
       const page = await browser.newPage({ viewport });
-      await page.goto(APP_URL);
+      await serveApp(page);
+      await page.goto(APP_URL); await ready(page);
       await page.getByRole('button', { name: '名付ける', exact: true }).click();
 
       const numberButtons = page.locator('.token-scroll .cat-number button');

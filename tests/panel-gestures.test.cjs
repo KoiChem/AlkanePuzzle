@@ -1,3 +1,4 @@
+const {serveApp,ready} = require('./browser-fixture.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -199,8 +200,8 @@ test('panel gestures preserve existing operations', async t => {
     for (const [name,run] of scenarios) await t.test(`${viewport.width}: ${name}`, async () => {
       const page = await browser.newPage({viewport,hasTouch:true});
       try {
-        await page.route('http://alkane.test/**',route => route.fulfill({contentType:'text/html',body:html}));
-        await page.goto('http://alkane.test/');
+        await serveApp(page,html);
+        await page.goto('http://alkane.test/'); await ready(page);
         await page.evaluate(seed => window.panelTest.seed(seed),seed);
         await run(page);
       } finally { await page.close(); }

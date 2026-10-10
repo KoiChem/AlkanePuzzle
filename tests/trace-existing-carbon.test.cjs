@@ -1,3 +1,4 @@
+const {serveApp,ready} = require('./browser-fixture.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -35,8 +36,8 @@ test('trace integration', async t => {
  const browser = await chromium.launch({headless:true,executablePath}); t.after(()=>browser.close());
  for (const viewport of [{width:1280,height:900},{width:390,height:844}]) for (const scenario of cases) await t.test(`${viewport.width}: ${scenario.name}`,async()=>{
   const page=await browser.newPage({viewport});
-  await page.route('http://alkane.test/**',route=>route.fulfill({contentType:'text/html',body:html}));
-  await page.goto('http://alkane.test/'); await page.evaluate(seed=>window.traceTest.seed(seed),scenario.seed);
+  await serveApp(page,html);
+  await page.goto('http://alkane.test/'); await ready(page); await page.evaluate(seed=>window.traceTest.seed(seed),scenario.seed);
   if (scenario.tap) { const [r,c]=scenario.tap; await page.locator(`.cell[data-row="${r}"][data-col="${c}"]`).click(); }
   await drag(page,scenario.path);
   await page.waitForTimeout(260);

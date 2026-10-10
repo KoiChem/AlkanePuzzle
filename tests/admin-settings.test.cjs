@@ -1,0 +1,70 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const {chromium} = require('playwright');
+const {serveApp,ready} = require('./browser-fixture.cjs');
+const api = require('../shared-settings.js');
+const root = path.resolve(__dirname,'..');
+const original = JSON.parse(fs.readFileSync(path.join(root,'data/shared-settings.json'),'utf8'));
+test('admin saves common settings and password across independent browsers', async t => {
+  const browser = await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
+  t.after(() => browser.close());
+  let remote = structuredClone(original), sha = 'initial-sha', puts = 0, rejected = false;
+  remote.password = await api.createPassword('fixture-admin-password');
+  async function open(viewport = {width:390,height:844}) {
+    const context = await browser.newContext({viewport});
+    await context.route('https://api.github.com/repos/KoiChem/AlkanePuzzle/contents/data/shared-settings.json*', async route => {
+      if (route.request().method() === 'PUT') {
+        if (rejected) return route.fulfill({status:409,body:'conflict'});
+        assert.equal(route.request().headers().authorization,'Bearer fixture-token');
+        const body = route.request().postDataJSON(); assert.equal(body.sha,sha);
+        remote = JSON.parse(Buffer.from(body.content,'base64').toString()); sha = `saved-${++puts}`;
+        return route.fulfill({json:{content:{sha},commit:{sha:'abcdef1234567890'}}});
+      }
+      return route.fulfill({json:{sha,content:Buffer.from(JSON.stringify(remote)).toString('base64'),encoding:'base64',type:'file',name:'shared-settings.json'}});
+    });
+    const page = await context.newPage();
+    await serveApp(page);
+    await page.route('http://localhost:4179/data/shared-settings.json*',route => route.fulfill({json:remote}));
+    await page.goto('http://localhost:4179/admin.html');
+    return {page,context};
+  }
+  const first = await open();
+  await first.page.locator('#login-password').fill('wrong'); await first.page.locator('#login-button').click();
+  await first.page.getByText('パスワードが違います。',{exact:true}).waitFor();
+  assert.equal(await first.page.locator('#admin-section').isVisible(),false);
+  await first.page.locator('#login-password').fill('fixture-admin-password'); await first.page.locator('#login-button').click();
+  const editor = first.page.frameLocator('#editor');
+  await editor.locator('.modal-game-tab[data-game="game2"]').click();
+  const limit = editor.getByRole('button',{name:'シクロの置換基を1個までにする',exact:true});
+  assert.equal(await limit.getAttribute('aria-pressed'),'true'); await limit.click();
+  await limit.focus(); await first.page.keyboard.press('Space');
+  assert.equal(await limit.evaluate(button => button === document.activeElement),true,'keyboard focus must survive a toggle rerender');
+  await first.page.keyboard.press('Space');
+  await first.page.getByText('変更は下書きです。',{exact:false}).waitFor();
+  await first.page.locator('#password-button').click();
+  await first.page.locator('#current-password').fill('fixture-admin-password');
+  await first.page.locator('#new-password').fill('new-shared-password');
+  await first.page.locator('#confirm-password').fill('new-shared-password');
+  await first.page.locator('#password-confirm').click();
+  await first.page.getByText('新しいパスワードを下書きに反映しました。',{exact:false}).waitFor();
+  await first.page.locator('#save-button').click(); await first.page.locator('#github-token').fill('fixture-token'); await first.page.locator('#save-confirm').click();
+  await first.page.getByText('公開への反映を確認しました。',{exact:false}).waitFor();
+  assert.equal(remote.settings.game2.easy.cycloLimitOne,false); assert.equal(puts,1);
+  assert.equal(await first.page.locator('#github-token').inputValue(),'');
+  assert.equal(await first.page.evaluate(() => JSON.stringify({...localStorage})).then(s => s.includes('fixture-token')),false);
+  assert.equal(await first.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true);
+  const second = await open({width:1280,height:900});
+  await second.page.locator('#login-password').fill('fixture-admin-password'); await second.page.locator('#login-button').click();
+  await second.page.getByText('パスワードが違います。',{exact:true}).waitFor();
+  await second.page.locator('#login-password').fill('new-shared-password'); await second.page.locator('#login-button').click();
+  await second.page.frameLocator('#editor').locator('.modal-game-tab[data-game="game2"]').click();
+  assert.equal(await second.page.frameLocator('#editor').getByRole('button',{name:'シクロの置換基を1個までにする',exact:true}).getAttribute('aria-pressed'),'false');
+  rejected = true;
+  await first.page.locator('#save-button').click(); await first.page.locator('#github-token').fill('fixture-token'); await first.page.locator('#save-confirm').click();
+  await first.page.getByText('共通設定が更新された可能性があります。',{exact:false}).waitFor();
+  assert.equal(puts,1); assert.equal(await first.page.locator('#github-token').inputValue(),'');
+  await first.page.locator('#logout-button').click(); assert.equal(await first.page.locator('#admin-section').isVisible(),false);
+  await first.context.close(); await second.context.close();
+});

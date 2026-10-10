@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "revision": "20261010-shared-v1",
+  "password": {
+    "algorithm": "PBKDF2-SHA-256",
+    "iterations": 150000,
+    "salt": "x+DvpbNyD6y8YQsOMOCYzA==",
+    "hash": "hj4OOkfl2uSTRDjMXnMfC3E1agbGe73/5C7DUQcWZQM="
+  },
+  "settings": {
+    "game1": {
+      "easy": {
+        "typeMin": 1,
+        "typeMax": 1,
+        "lenMin": 1,
+        "lenMax": 6,
+        "subMin": 0,
+        "subMax": 4,
+        "ringSizes": [
+          4,
+          6
+        ],
+        "forceRingSubstituent": false,
+        "gridCols": 7,
+        "gridRows": 5,
+        "alcoholEnabled": false,
+        "alcoholRate": 40,
+        "hydroxylLimitOne": true,
+        "hydroxylCountsAsSubstituent": true
+      },
+      "medium": {
+        "typeMin": 1,
+        "typeMax": 2,
+        "lenMin": 4,
+        "lenMax": 8,
+        "subMin": 3,
+        "subMax": 6,
+        "ringSizes": [
+          6,
+          8
+        ],
+        "forceRingSubstituent": true,
+        "gridCols": 7,
+        "gridRows": 5,
+        "alcoholEnabled": false,
+        "alcoholRate": 40,
+        "hydroxylLimitOne": false,
+        "hydroxylCountsAsSubstituent": true
+      },
+      "hard": {
+        "typeMin": 2,
+        "typeMax": 4,
+        "lenMin": 6,
+        "lenMax": 10,
+        "subMin": 4,
+        "subMax": 8,
+        "ringSizes": [
+          6,
+          8,
+          10
+        ],
+        "forceRingSubstituent": true,
+        "gridCols": 5,
+        "gridRows": 5,
+        "alcoholEnabled": false,
+        "alcoholRate": 40,
+        "hydroxylLimitOne": false,
+        "hydroxylCountsAsSubstituent": false
+      }
+    },
+    "game2": {
+      "easy": {
+        "typeMin": 1,
+        "typeMax": 1,
+        "lenMin": 1,
+        "lenMax": 6,
+        "subMin": 0,
+        "subMax": 4,
+        "ringSizes": [
+          4,
+          6
+        ],
+        "forceRingSubstituent": false,
+        "bendMin": 0,
+        "bendMax": 1,
+        "alcoholEnabled": false,
+        "alcoholRate": 40,
+        "hydroxylLimitOne": true,
+        "hydroxylCountsAsSubstituent": true,
+        "shuffleWordBankGroups": false,
+        "cycloLimitOne": true
+      },
+      "medium": {
+        "typeMin": 1,
+        "typeMax": 1,
+        "lenMin": 4,
+        "lenMax": 8,
+        "subMin": 3,
+        "subMax": 6,
+        "ringSizes": [
+          6,
+          8
+        ],
+        "forceRingSubstituent": true,
+        "bendMin": 2,
+        "bendMax": 3,
+        "alcoholEnabled": false,
+        "alcoholRate": 40,
+        "hydroxylLimitOne": false,
+        "hydroxylCountsAsSubstituent": true,
+        "shuffleWordBankGroups": false,
+        "cycloLimitOne": false
+      },
+      "hard": {
+        "typeMin": 2,
+        "typeMax": 4,
+        "lenMin": 6,
+        "lenMax": 10,
+        "subMin": 4,
+        "subMax": 8,
+        "ringSizes": [
+          6,
+          8,
+          10
+        ],
+        "forceRingSubstituent": true,
+        "bendMin": 4,
+        "bendMax": 99,
+        "alcoholEnabled": false,
+        "alcoholRate": 40,
+        "hydroxylLimitOne": false,
+        "hydroxylCountsAsSubstituent": false,
+        "shuffleWordBankGroups": true,
+        "cycloLimitOne": false
+      }
+    }
+  }
+}
