@@ -3744,6 +3744,12 @@
     playClick({ freq: 1450, duration: 0.035, volume: 0.14, q: 1.0 });
     playTone({ freqStart: 330, freqEnd: 392, duration: 0.075, type: 'triangle', volume: 0.05 });
   }
+  // 長押し成立: 丸い「ペ」と跳ね上がる「コリっ」で、移動可能になったことを知らせる。
+  function playPanelPickupSound() {
+    playTone({ freqStart: 480, freqEnd: 300, duration: 0.075, type: 'sine', volume: 0.09 });
+    playTone({ freqStart: 660, freqEnd: 940, duration: 0.095, type: 'sine', volume: 0.072, delay: 0.065 });
+    playClick({ freq: 2100, duration: 0.025, volume: 0.12, q: 1.8, delay: 0.065 });
+  }
   // 回転: 時計回りは上昇、反時計回りは下降。目を離していても方向が分かる。
   function playRotateCWSound() {
     playClick({ freq: 2400, duration: 0.025, volume: 0.18, q: 1.3 });
@@ -4260,6 +4266,7 @@
           moved = true;
           selectionOnlyThisGesture = false;
           beginMoveDrag(lastEvent, r, c);
+          playPanelPickupSound();
         }, PANEL_LONG_PRESS_MS);
       }
     });
