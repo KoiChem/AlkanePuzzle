@@ -4163,14 +4163,33 @@
           return;
         }
         // 配置モード: このマスをタップ(移動なしでpointerup)したら選択中のパネルを置く。
-        // 回転・移動・なぞって描くなど他の操作は配置モード中は行わない。
+        // 短いタップで配置。既存パネルの長押しは選択を保ったまま移動する。
         // ただし3マス以上をなぞる(スワイプする)と、選択を解除する。
         e.preventDefault();
         const px = e.clientX, py = e.clientY;
+        const panelAtDown = grid[r][c];
+        if (panelAtDown) for (const cancel of cancelCellTaps) cancel();
+        let lastEvent = e, holdTimer = null;
+        const cleanupPlacement = () => {
+          if (holdTimer) clearTimeout(holdTimer);
+          holdTimer = null;
+          window.removeEventListener('pointermove', onPlaceMove);
+          window.removeEventListener('pointerup', onPlaceUp);
+          window.removeEventListener('pointercancel', onPlaceCancel);
+          window.removeEventListener('blur', onPlaceCancel);
+          gridGestureCancels.delete(onPlaceCancel);
+        };
+        const onPlaceCancel = (ev) => {
+          if (ev?.pointerId !== undefined && ev.pointerId !== e.pointerId) return;
+          cleanupPlacement(); pressedPointerId = null;
+        };
         let placeMoved = false;
         let deselected = false;
         const visitedCells = new Set([`${r},${c}`]); // なぞって通過した異なるマス
         const onPlaceMove = (ev) => {
+          if (ev.pointerId !== e.pointerId) return;
+          lastEvent = ev;
+          if (Math.hypot(ev.clientX-px,ev.clientY-py)>MOVE_THRESHOLD && holdTimer) {clearTimeout(holdTimer);holdTimer=null;}
           if (!placeMoved && Math.hypot(ev.clientX - px, ev.clientY - py) > MOVE_THRESHOLD) placeMoved = true;
           if (deselected) return;
           const target = document.elementFromPoint(ev.clientX, ev.clientY);
@@ -4183,13 +4202,21 @@
             playPaletteSound(false);
           }
         };
-        const onPlaceUp = () => {
-          window.removeEventListener('pointermove', onPlaceMove);
-          window.removeEventListener('pointerup', onPlaceUp);
+        const onPlaceUp = (ev) => {
+          if (ev.pointerId !== e.pointerId) return;
+          cleanupPlacement();
           if (!placeMoved && !deselected) queueSelectedPlacement(r, c, paletteSelection);
         };
         window.addEventListener('pointermove', onPlaceMove);
         window.addEventListener('pointerup', onPlaceUp);
+        window.addEventListener('pointercancel', onPlaceCancel);
+        window.addEventListener('blur', onPlaceCancel);
+        gridGestureCancels.add(onPlaceCancel);
+        if (panelAtDown) holdTimer = setTimeout(() => {
+          cleanupPlacement(); pressedPointerId = null;
+          if (!interactionsEnabled || grid[r][c] !== panelAtDown) return;
+          beginMoveDrag(lastEvent,r,c); playPanelPickupSound();
+        },PANEL_LONG_PRESS_MS);
         return;
       }
 

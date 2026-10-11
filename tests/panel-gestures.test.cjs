@@ -53,6 +53,24 @@ async function read(page) { return page.evaluate(() => window.panelTest.read());
 const seed = [[2,3,3,90]];
 const original = {r:2,c:3,type:3,rotation:90,element:'C',origin:'2,3'};
 const scenarios = [
+  ['selected candidate allows long pickup of carbon, halogen and OH and remains selected',async page=>{
+    for(const element of ['C','Cl','OH']){
+      await page.evaluate(element=>window.panelTest.seed([[2,3,1,0,element]]),element);
+      if(element==='C')await page.locator(selector(2,3)).click();
+      await page.locator('.palette-card').nth(1).click();
+      await hold(page);await move(page,1,3);await page.mouse.up();
+      assert.deepEqual(await read(page),[{r:1,c:3,type:1,rotation:0,element,origin:'2,3'}]);
+      assert.equal(await page.locator('.palette-card.selected').count(),1);
+      await page.locator(selector(2,4)).click();await page.waitForTimeout(260);
+      assert.equal((await read(page)).find(p=>p.r===2&&p.c===4).type,2);
+      await hold(page,1,3);await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.mouse.up();
+      assert.equal((await read(page)).find(p=>p.r===1&&p.c===3).element,element);
+      await hold(page,1,3);await page.mouse.move(10,10);await page.mouse.up();
+      assert.equal((await read(page)).some(p=>p.r===1&&p.c===3),false);
+      await page.locator('.palette-card').nth(1).click();
+    }
+  }],
+
   ['long press moves one panel with its identity and orientation', async page => {
     await hold(page); await move(page,1,3); await page.mouse.up();
     assert.deepEqual(await read(page),[{...original,r:1}]);
