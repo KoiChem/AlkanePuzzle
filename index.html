@@ -5423,8 +5423,8 @@
       { cls: 'cat-number', tokens: numberTokens },
       { cls: 'cat-multiplier', tokens: shuffle(multiplierTokensForCurrentDifficulty()) },
       { cls: 'cat-subname', tokens: shuffle(['メチル', 'エチル', 'フルオロ', 'クロロ', 'ブロモ', 'ヨード']) },
-      // 環の名前は「シクロ」+ 鎖の名前 で組み立てさせる。「シクロ」は先頭、オールはその右に固定する。
-      { cls: 'cat-basename', tokens: ['シクロ', ...(game2SettingsForCurrentDifficulty().alcoholEnabled ? [ALCOHOL_TOKEN] : []), ...shuffle(baseNameTokens)] },
+      // 環の名前は「シクロ」+ 鎖の名前 で組み立てさせる。「シクロ」は先頭、「オール」はグループの最後尾に固定する。
+      { cls: 'cat-basename', tokens: ['シクロ', ...shuffle(baseNameTokens), ...(game2SettingsForCurrentDifficulty().alcoholEnabled ? [ALCOHOL_TOKEN] : [])] },
     ];
     for (const { cls, tokens } of orderWordBankRows(rows)) {
       const rowEl = document.createElement('div');
