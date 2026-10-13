@@ -775,12 +775,12 @@
           </article>
           <article class="operation-card">
             <h4>グリッド操作</h4>
-            <div class="operation-row"><div class="operation-mini"><svg class="operation-trace" viewBox="0 0 54 54" aria-hidden="true"><path d="M8 41 20 29h12l13-15" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><g fill="var(--ink)"><circle cx="8" cy="41" r="5"/><circle cx="20" cy="29" r="5"/><circle cx="32" cy="29" r="5"/><circle cx="45" cy="14" r="5"/></g></svg></div><div><strong>なぞって炭素をつなぐ</strong><p>空きマスや既存の炭素からなぞると、既存の結合を保ちながら炭素鎖ができます。</p></div></div>
-            <div class="operation-row"><div class="operation-mini"><span class="operation-taps"><span class="operation-tap-count">1</span><span class="operation-tap-count">2</span><span class="operation-tap-count">3</span></span></div><div><strong>1・2・3タップ</strong><p>回転／逆回転／削除。炭素は長押ししてからドラッグすると移動できます。</p></div></div>
+            <div class="operation-row"><div class="operation-mini"><svg class="operation-trace" viewBox="0 0 54 54" aria-hidden="true"><path d="M8 41 20 29h12l13-15" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><g fill="var(--ink)"><circle cx="8" cy="41" r="5"/><circle cx="20" cy="29" r="5"/><circle cx="32" cy="29" r="5"/><circle cx="45" cy="14" r="5"/></g></svg></div><div><strong>なぞって炭素をつなぐ</strong><p>空きマスや配置済みパネルからなぞると炭素鎖ができます。既存の結合を保ち、通ったハロゲン・OH基は炭素に置き換わります。</p></div></div>
+            <div class="operation-row"><div class="operation-mini"><span class="operation-taps"><span class="operation-tap-count">1</span><span class="operation-tap-count">2</span><span class="operation-tap-count">3</span></span></div><div><strong>1・2・3タップ</strong><p>回転／逆回転／削除。どのパネルも長押ししてからドラッグすると移動できます。</p></div></div>
           </article>
         </div>
-        <aside class="operation-tip"><strong>カード選択を解除するには</strong><ul><li>選択中のカードをもう一度タップ</li><li>同じグリッドマスを素早く2回タップ</li><li>異なる3マス以上をなぞる</li></ul></aside>
-        <details class="operation-details"><summary>知っておくと便利な操作</summary><div class="operation-details-body"><ul><li>炭素鎖をなぞりながら1マス引き返すと、直前の1マスを取り消せます。</li><li>3マス以上なぞって始点へ戻ると、環状構造として閉じます。</li><li>配置済みカードを別のカードで上書きできます。炭素は長押しでつかみ、グリッド外で離すと削除できます。ハロゲンとOH基はそのままドラッグして移動・枠外削除できます。</li><li>ハロゲンとOH基は1・2タップでは回転せず、3タップで削除できます。</li><li>練習で正常な分子が複数あるときは、別の分子への最初のタップが分子選択になります。</li></ul></div></details>
+        <aside class="operation-tip"><strong>カード選択を解除するには</strong><ul><li>選択中のカードをもう一度タップ</li><li>同じグリッドマスを素早く2回タップ</li><li>隣接するマスへなぞると、選択を解除して炭素鎖を描けます</li></ul></aside>
+        <details class="operation-details"><summary>知っておくと便利な操作</summary><div class="operation-details-body"><ul><li>炭素鎖をなぞりながら1マス引き返すと、直前の1マスを取り消せます。</li><li>3マス以上なぞって始点へ戻ると、環状構造として閉じます。</li><li>配置済みカードを別のカードで上書きできます。どのパネルも長押しでつかみ、グリッド外で離すと削除できます。ハロゲンとOH基をなぞると炭素へ置き換わります。</li><li>ハロゲンとOH基は1・2タップでは回転せず、3タップで削除できます。</li><li>練習で正常な分子が複数あるときは、別の分子への最初のタップが分子選択になります。</li></ul></div></details>
       </section>
     </div>
 
@@ -3030,7 +3030,7 @@
   window.visualViewport?.addEventListener('resize', scheduleGame2ResponsiveLayout);
 
   // ============================================================
-  // なぞって描く(アルカン並べ専用): 空きマスまたは既存炭素からドラッグを始め、
+  // なぞって描く(アルカン並べ専用): 空きマスまたは既存パネルからドラッグを始め、
   // 通ったマス順に炭素をつなげて主鎖(または環)を描く。
   // ============================================================
   // pathの位置iにおける、隣接パネルへの活性方向を求める(closed=trueなら始点と終点も繋がっているとみなす)
@@ -3049,7 +3049,7 @@
   // 引き返したときも今回追加した結合だけを取り消す。
   function applyTraceToGrid() {
     const g = traceSnapshot.map((row) => row.slice());
-    const { path, closed, originalPanels } = traceState;
+    const { path, closed, originalPanels, originalBonds } = traceState;
     for (const { panel, type, rotation } of originalPanels) {
       panel.type = type;
       panel.rotation = rotation;
@@ -3059,7 +3059,10 @@
       const dirs = computeTraceDirs(path, i, closed);
       if (dirs.length === 0) continue; // 経路が1マスだけ(まだ動いていない)ときは何も置かない
       const panel = g[r][c];
-      if (panel) {
+      if (isHalogenPanel(panel)) {
+        // 自動結合していた方向を保持し、元パネルには触れず炭素へ置き換える。
+        g[r][c] = panelForDirections([...originalBonds[r][c], ...dirs]);
+      } else if (panel) {
         const merged = panelForDirections([...getActiveDirections(panel), ...dirs]);
         panel.type = merged.type;
         panel.rotation = merged.rotation;
@@ -3076,6 +3079,7 @@
     traceState = {
       path: [{ r: startR, c: startC }], closed: false,
       originalPanels: grid.flat().filter(Boolean).map(panel => ({ panel, type: panel.type, rotation: panel.rotation })),
+      originalBonds: grid.map((row, r) => row.map((panel, c) => [...getBondDirections(grid, r, c)])),
     };
     traceGestureStartedWithAudioLocked = !audioCtx || audioCtx.state !== 'running';
 
@@ -3099,9 +3103,6 @@
           return;
         }
       }
-
-      // 炭素以外の既存パネルは置き換えず、経路をここで止める。
-      if (isHalogenPanel(traceSnapshot[nr][nc])) return;
 
       // 始点に戻ってきたら環として閉じる(最低3マス移動している場合のみ)
       const start = path[0];
@@ -3128,28 +3129,38 @@
       if (!cellEl) return;
       processStep(+cellEl.dataset.row, +cellEl.dataset.col);
     };
-    const finish = () => {
-      gridGestureCancels.delete(finish);
+    const finish = (cancelled = false) => {
+      gridGestureCancels.delete(onCancel);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('blur', onCancel);
       const path = traceState ? traceState.path : [];
       const closedTrace = !!traceState?.closed;
-      if (path.length < 2) {
+      if (cancelled) {
+        traceState.path = [];
+        traceState.closed = false;
+        applyTraceToGrid(); // 元の炭素の向きと、置換前のCl・OHも復元する。
+      } else if (path.length < 2) {
         applyTraceToGrid(); // 実質タップのみ = 開始時の状態に戻す
       }
-      if (traceGestureStartedWithAudioLocked) discardPendingTraceAudio();
+      if (cancelled || traceGestureStartedWithAudioLocked) discardPendingTraceAudio();
       traceGestureStartedWithAudioLocked = false;
       traceState = null;
       traceSnapshot = null;
-      if (closedTrace) suppressNextTraceValidSound = true;
+      if (closedTrace && !cancelled) suppressNextTraceValidSound = true;
       refreshAll();
     };
     const onUp = (ev) => { if (ev.pointerId === e.pointerId) finish(); };
-    gridGestureCancels.add(finish);
+    const onCancel = (ev) => {
+      if (ev?.pointerId !== undefined && ev.pointerId !== e.pointerId) return;
+      finish(true);
+    };
+    gridGestureCancels.add(onCancel);
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('pointercancel', onCancel);
+    window.addEventListener('blur', onCancel);
     onMove(e); // 既存炭素からの開始では、移動閾値を越えた現在位置も経路へ含める
   }
 
@@ -4154,25 +4165,19 @@
         const key = `${r},${c}`;
         const pending = pendingPalettePlacements.get(key);
         if (pending) {
-          // 同じマスを素早く2回タップしたときは、1回目の配置を取り消して選択だけを解除する。
           clearTimeout(pending.timer);
           pendingPalettePlacements.delete(key);
-          clearPaletteSelection();
-          playPaletteSound(false);
-          e.preventDefault();
-          return;
         }
-        // 配置モード: このマスをタップ(移動なしでpointerup)したら選択中のパネルを置く。
-        // 短いタップで配置。既存パネルの長押しは選択を保ったまま移動する。
-        // ただし3マス以上をなぞる(スワイプする)と、選択を解除する。
+        // 2回目も離すまではタップと決めない。なぞりなら選択解除して炭素鎖へ移る。
         e.preventDefault();
         const px = e.clientX, py = e.clientY;
         const panelAtDown = grid[r][c];
         if (panelAtDown) for (const cancel of cancelCellTaps) cancel();
-        let lastEvent = e, holdTimer = null;
+        let lastEvent = e, holdTimer = null, placeMoved = false;
         const cleanupPlacement = () => {
           if (holdTimer) clearTimeout(holdTimer);
           holdTimer = null;
+          pressedPointerId = null;
           window.removeEventListener('pointermove', onPlaceMove);
           window.removeEventListener('pointerup', onPlaceUp);
           window.removeEventListener('pointercancel', onPlaceCancel);
@@ -4181,31 +4186,34 @@
         };
         const onPlaceCancel = (ev) => {
           if (ev?.pointerId !== undefined && ev.pointerId !== e.pointerId) return;
-          cleanupPlacement(); pressedPointerId = null;
+          cleanupPlacement();
         };
-        let placeMoved = false;
-        let deselected = false;
-        const visitedCells = new Set([`${r},${c}`]); // なぞって通過した異なるマス
         const onPlaceMove = (ev) => {
           if (ev.pointerId !== e.pointerId) return;
           lastEvent = ev;
-          if (Math.hypot(ev.clientX-px,ev.clientY-py)>MOVE_THRESHOLD && holdTimer) {clearTimeout(holdTimer);holdTimer=null;}
-          if (!placeMoved && Math.hypot(ev.clientX - px, ev.clientY - py) > MOVE_THRESHOLD) placeMoved = true;
-          if (deselected) return;
+          if (Math.hypot(ev.clientX - px, ev.clientY - py) < MOVE_THRESHOLD) return;
+          placeMoved = true;
+          if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
           const target = document.elementFromPoint(ev.clientX, ev.clientY);
           const cellEl = target && target.closest('.cell');
-          if (!cellEl) return;
-          visitedCells.add(`${cellEl.dataset.row},${cellEl.dataset.col}`);
-          if (visitedCells.size >= 3) { // 3マス目に入ったら選択解除
-            deselected = true;
-            clearPaletteSelection();
-            playPaletteSound(false);
-          }
+          if (!cellEl || !isTraceEnabledNow()) return;
+          const nr = +cellEl.dataset.row, nc = +cellEl.dataset.col;
+          if (!isPlayableCell(nr, nc) || Math.abs(nr-r) + Math.abs(nc-c) !== 1) return;
+          cleanupPlacement();
+          moved = true;
+          clearPaletteSelection(); // 保留中の配置も消し、なぞりへの遅延上書きを防ぐ。
+          startTrace(ev, r, c);
         };
         const onPlaceUp = (ev) => {
           if (ev.pointerId !== e.pointerId) return;
           cleanupPlacement();
-          if (!placeMoved && !deselected) queueSelectedPlacement(r, c, paletteSelection);
+          if (placeMoved) return;
+          if (pending) {
+            clearPaletteSelection();
+            playPaletteSound(false);
+          } else {
+            queueSelectedPlacement(r, c, paletteSelection);
+          }
         };
         window.addEventListener('pointermove', onPlaceMove);
         window.addEventListener('pointerup', onPlaceUp);
@@ -4213,10 +4221,11 @@
         window.addEventListener('blur', onPlaceCancel);
         gridGestureCancels.add(onPlaceCancel);
         if (panelAtDown) holdTimer = setTimeout(() => {
-          cleanupPlacement(); pressedPointerId = null;
+          cleanupPlacement();
           if (!interactionsEnabled || grid[r][c] !== panelAtDown) return;
-          beginMoveDrag(lastEvent,r,c); playPanelPickupSound();
-        },PANEL_LONG_PRESS_MS);
+          beginMoveDrag(lastEvent, r, c);
+          playPanelPickupSound();
+        }, PANEL_LONG_PRESS_MS);
         return;
       }
 
@@ -4231,7 +4240,7 @@
             e.preventDefault();
             selectionOnlyThisGesture = true;
             focusPracticeComponent(comp, true);
-            if (!isTraceEnabledNow() || isHalogenPanel(grid[r][c])) return;
+            if (!isTraceEnabledNow()) return;
           } else {
             focusPracticeComponent(comp, false); // 組み立て中の断片は選択後そのまま編集する
           }
@@ -4246,7 +4255,7 @@
       e.preventDefault();
       downX = e.clientX; downY = e.clientY; moved = false;
       const panelAtDown = grid[r][c];
-      const canTrace = isTraceEnabledNow() && !isHalogenPanel(panelAtDown);
+      const canTrace = isTraceEnabledNow();
       // 連続タップの回数は維持し、押している間に前のタップで回転しないよう保留する。
       if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; }
       let holdTimer = null;
@@ -4264,8 +4273,16 @@
         if (ev.pointerId !== e.pointerId) return;
         lastEvent = ev;
         const dx = ev.clientX - downX, dy = ev.clientY - downY;
-        if (!moved && Math.hypot(dx, dy) > MOVE_THRESHOLD) {
+        if (Math.hypot(dx, dy) >= MOVE_THRESHOLD) {
           moved = true;
+          if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+          if (canTrace) {
+            const target = document.elementFromPoint(ev.clientX, ev.clientY);
+            const cellEl = target && target.closest('.cell');
+            if (!cellEl) return;
+            const nr = +cellEl.dataset.row, nc = +cellEl.dataset.col;
+            if (!isPlayableCell(nr, nc) || Math.abs(nr-r) + Math.abs(nc-c) !== 1) return;
+          }
           cleanup();
           if (canTrace) startTrace(ev, r, c);
           else beginMoveDrag(ev, r, c);

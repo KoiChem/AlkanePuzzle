@@ -27,12 +27,21 @@ const cases = [
   {name:'backtracking removes only the new branch',seed:horizontal,path:[[1,3],[2,3],[3,3],[2,3]],want:[[1,3,'S'],[2,2,'E'],[2,3,'ENW'],[2,4,'W']]},
   {name:'full backtrack restores the existing node',seed:horizontal,path:[[2,3],[1,3],[2,3]],want:[[2,2,'E'],[2,3,'EW'],[2,4,'W']]},
   {name:'pending tap must not rotate a new branch',seed:horizontal,path:[[2,3],[1,3]],tap:[2,3],want:[[1,3,'S'],[2,2,'E'],[2,3,'ENW'],[2,4,'W']]},
-  {name:'noncarbon panel stops tracing without replacement',seed:[[2,3,['E'],'Cl'],[2,4,['W']]],path:[[1,3],[2,3]],want:[[2,3,'E'],[2,4,'W']]},
+
   {name:'existing hydroxyl bond survives carbon crossing',seed:[[2,2,['E']],[2,3,['W','E']],[2,4,['W'],'OH']],path:[[1,3],[2,3],[3,3]],want:[[1,3,'S'],[2,2,'E'],[2,3,'ENSW'],[2,4,'W'],[3,3,'N']]},
   {name:'empty-only tracing still creates a bent chain',seed:[],path:[[1,2],[1,3],[2,3]],want:[[1,2,'E'],[1,3,'SW'],[2,3,'N']]},
   {name:'empty-only tracing still closes a ring',seed:[],path:[[1,2],[1,3],[2,3],[2,2],[1,2]],want:[[1,2,'ES'],[1,3,'SW'],[2,2,'EN'],[2,3,'NW']]},
 ];
-test('trace integration', async t => {
+for (const element of ['F','Cl','Br','I','OH']) {
+ cases.push(
+  {name:element+' crossing replaces panel and preserves original carbon bond',seed:[[2,2,['E']],[2,3,['W'],element]],path:[[1,3],[2,3],[3,3]],want:[[1,3,'S'],[2,2,'E'],[2,3,'NSW'],[3,3,'N']],elements:['C','C','C','C']},
+  {name:element+' starting panel is overwritten',seed:[[2,3,['N'],element]],path:[[2,3],[1,3]],want:[[1,3,'S'],[2,3,'N']],elements:['C','C']},
+  {name:element+' ending panel is overwritten',seed:[[2,3,['N'],element]],path:[[1,3],[2,3]],want:[[1,3,'S'],[2,3,'N']],elements:['C','C']},
+  {name:element+' full backtrack restores original panel',seed:[[2,3,['N'],element]],path:[[2,3],[1,3],[2,3]],want:[[2,3,'']],elements:[element],restored:true},
+  {name:element+' removed trace endpoint is restored',seed:[[2,3,['N'],element]],path:[[1,2],[1,3],[2,3],[1,3]],want:[[1,2,'E'],[1,3,'W'],[2,3,'']],elements:['C','C',element],restored:true}
+ );
+}
+test('trace integration' , async t => {
  const browser = await chromium.launch({headless:true,executablePath}); t.after(()=>browser.close());
  for (const viewport of [{width:1280,height:900},{width:390,height:844}]) for (const scenario of cases) await t.test(`${viewport.width}: ${scenario.name}`,async()=>{
   const page=await browser.newPage({viewport});
@@ -43,7 +52,9 @@ test('trace integration', async t => {
   await page.waitForTimeout(260);
   const actual=await page.evaluate(()=>window.traceTest.read());
   assert.deepEqual(actual.map(p=>[p.r,p.c,p.dirs.join('')]),scenario.want);
-  assert.ok(actual.every(p=>p.same),'existing nodes must retain object identity');
+  assert.ok(actual.filter(p=>p.element==='C' && !scenario.seed.some(([r,c,dirs,element])=>r===p.r&&c===p.c&&element&&element!=='C')).every(p=>p.same),'existing carbons must retain object identity');
+  if (scenario.elements) assert.deepEqual(actual.map(p=>p.element),scenario.elements);
+  if (scenario.restored) assert.ok(actual.every(p=>p.same),'backtrack must restore original panels');
   assert.deepEqual(await page.evaluate(()=>window.traceTest.mismatches()),[]);
   await page.close();
  });

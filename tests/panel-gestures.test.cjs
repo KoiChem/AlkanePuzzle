@@ -7,7 +7,12 @@ const { chromium } = require('playwright');
 
 // Expose state only in the test-served HTML; all gestures use the real listeners.
 const html = fs.readFileSync(path.resolve(__dirname, '../index.html'), 'utf8').replace('})();\n</script>', `
+let pickupCalls = 0;
+const realPickupSound = playPanelPickupSound;
+playPanelPickupSound = function() { pickupCalls++; realPickupSound(); };
 window.panelTest = {
+  pickups() { return pickupCalls; },
+  cancel() { cancelGridInteractions(); },
   seed(items) {
     grid = emptyGrid();
     this.originals = new Map();
@@ -53,6 +58,104 @@ async function read(page) { return page.evaluate(() => window.panelTest.read());
 const seed = [[2,3,3,90]];
 const original = {r:2,c:3,type:3,rotation:90,element:'C',origin:'2,3'};
 const scenarios = [
+  ['native touch selected noncarbon starts trace and cancels with original restored', async page => {
+    const session=await page.context().newCDPSession(page);
+    const touch=(type,p)=>session.send('Input.dispatchTouchEvent',{type,touchPoints:p?[{...p,id:1}]:[]});
+    for(const element of ['Cl','OH']) {
+      await page.evaluate(element=>window.panelTest.seed([[2,3,1,0,element]]),element);
+      await page.locator('.palette-card').nth(1).click();
+      await touch('touchStart',await point(page,2,3));
+      await touch('touchMove',await point(page,1,3));
+      await touch('touchEnd');
+      assert.deepEqual((await read(page)).map(p=>[p.r,p.c,p.element||'C']),[[1,3,'C'],[2,3,'C']]);
+      assert.equal(await page.locator('.palette-card.selected').count(),0);
+      await page.evaluate(element=>window.panelTest.seed([[2,3,1,0,element]]),element);
+      await touch('touchStart',await point(page,2,3));
+      await touch('touchMove',await point(page,1,3));
+      await touch('touchCancel');
+      assert.deepEqual((await read(page)).map(p=>[p.r,p.c,p.element]),[[2,3,element]]);
+    }
+    await session.detach();
+  }],
+  ['inactive noncarbon molecule short tap selects and long press moves', async page => {
+    for(const element of ['Cl','OH']) {
+      const items=[[2,2,1,0],[2,3,1,0,element],[2,5,1,0],[2,6,1,180]];
+      await page.evaluate(items=>{window.panelTest.seed(items);window.panelTest.activate(2,5);},items);
+      const before=await read(page);
+      await page.locator(selector(2,3)).click();await page.waitForTimeout(260);
+      assert.deepEqual(await read(page),before);
+      await page.evaluate(()=>window.panelTest.activate(2,5));
+      await hold(page);await move(page,1,3);await page.mouse.up();
+      assert.equal((await read(page)).find(p=>p.origin==='2,3').r,1);
+    }
+  }],
+  ['trace cancellation before board switch restores pending changes', async page => {
+    const items=[[2,2,1,0],[2,3,1,0,'OH']];
+    await page.evaluate(items=>window.panelTest.seed(items),items);
+    const before=await read(page);
+    await down(page,1,3);await move(page,2,3);
+    await page.evaluate(()=>window.panelTest.cancel());
+    assert.deepEqual(await read(page),before);
+    await page.getByRole('button',{name:'名付ける',exact:true}).dispatchEvent('click');
+    const board=await read(page);await move(page,3,3);await page.mouse.up();
+    assert.deepEqual(await read(page),board);
+  }],
+  ['eight pixel adjacent swipe starts tracing',async page=>{
+    for(const selected of [false,true]) {
+      await page.evaluate(()=>window.panelTest.seed([[2,3,1,0,'Cl']]));
+      if(selected)await page.locator('.palette-card').nth(1).click();
+      const b=await page.locator(selector(2,3)).boundingBox();
+      const x=b.x+b.width-2,y=b.y+b.height/2;
+      await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+8,y);await page.mouse.up();
+      assert.deepEqual((await read(page)).map(p=>[p.r,p.c,p.element||'C']),[[2,3,'C'],[2,4,'C']]);
+    }
+  }],
+  ['all panel types signal pickup once after long press', async page => {
+    for (const element of ['C','F','Cl','Br','I','OH']) {
+      await page.evaluate(element => window.panelTest.seed([[2,3,1,0,element]]),element);
+      const before = await page.evaluate(() => window.panelTest.pickups());
+      await hold(page); await page.waitForTimeout(450);
+      assert.equal(await page.evaluate(() => window.panelTest.pickups()),before+1);
+      await page.mouse.up();
+      assert.equal((await read(page))[0].element,element);
+    }
+  }],
+  ['selected candidate draws from first cell when entering adjacent cell', async page => {
+    await page.evaluate(() => window.panelTest.seed([]));
+    await page.locator('.palette-card').nth(1).click();
+    await down(page); await move(page,1,3); await page.mouse.up();
+    await page.waitForTimeout(260);
+    assert.equal(await page.locator('.palette-card.selected').count(),0);
+    assert.deepEqual((await read(page)).map(p=>[p.r,p.c,p.element||'C']),[[1,3,'C'],[2,3,'C']]);
+  }],
+  ['second rapid tap can become a trace without delayed placement', async page => {
+    await page.evaluate(() => window.panelTest.seed([]));
+    await page.locator('.palette-card').nth(1).click();
+    await page.locator(selector(2,3)).click();
+    await down(page); await move(page,1,3); await page.mouse.up();
+    await page.waitForTimeout(260);
+    assert.equal((await read(page)).length,2);
+    assert.equal(await page.locator('.palette-card.selected').count(),0);
+  }],
+  ['moving within selected cell does not deselect or overwrite', async page => {
+    await page.locator('.palette-card').nth(1).click();
+    const p=await point(page,2,3); await down(page); await page.mouse.move(p.x+12,p.y); await page.mouse.up();
+    await page.waitForTimeout(480);
+    assert.equal(await page.locator('.palette-card.selected').count(),1);
+    assert.deepEqual(await read(page),[original]);
+  }],
+  ['trace cancellation and blur restore overwritten panel and original carbon', async page => {
+    for (const event of ['pointercancel','blur']) {
+      const items=[[2,2,1,0],[2,3,1,0,'OH']];
+      await page.evaluate(items=>window.panelTest.seed(items),items);
+      const before=await read(page);
+      await down(page,1,3); await move(page,2,3); await move(page,3,3);
+      assert.equal((await read(page)).find(p=>p.r===2&&p.c===3).element||'C','C');
+      await page.evaluate(event=>window.dispatchEvent(event==='blur'?new Event('blur'):new PointerEvent('pointercancel',{pointerId:1})),event);
+      await page.mouse.up();
+      assert.deepEqual(await read(page),before);
+    }
+  }],
   ['selected candidate allows long pickup of carbon, halogen and OH and remains selected',async page=>{
     for(const element of ['C','Cl','OH']){
       await page.evaluate(element=>window.panelTest.seed([[2,3,1,0,element]]),element);
@@ -191,12 +294,12 @@ const scenarios = [
     assert.deepEqual(await read(page),[]);
     await session.detach();
   }],
-  ['halogen and OH still move immediately and delete outside', async page => {
+  ['halogen and OH long press moves and deletes outside', async page => {
     for (const element of ['Cl','OH']) {
       await page.evaluate(element => window.panelTest.seed([[2,3,1,0,element]]),element);
-      await down(page); await move(page,1,3); await page.mouse.up();
+      await hold(page); await move(page,1,3); await page.mouse.up();
       assert.deepEqual(await read(page),[{r:1,c:3,type:1,rotation:0,element,origin:'2,3'}]);
-      await down(page,1,3); await page.mouse.move(10,10); await page.mouse.up();
+      await hold(page,1,3); await page.mouse.move(10,10); await page.mouse.up();
       assert.deepEqual(await read(page),[]);
     }
   }],
