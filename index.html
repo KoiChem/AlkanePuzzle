@@ -3107,8 +3107,8 @@
     return dirs;
   }
 
-  // 開始時の結合方向へ戻してから経路の結合を追加する。既存ノードは再利用し、
-  // 引き返したときも今回追加した結合だけを取り消す。
+  // 開始時のパネルへ戻してから、相手のいる結合と経路の結合だけを残す。
+  // 相手のいない方向は水素に戻し、引き返したマスは元のパネルへ復元する。
   function applyTraceToGrid() {
     const g = traceSnapshot.map((row) => row.slice());
     const { path, closed, originalPanels, originalBonds } = traceState;
@@ -3125,7 +3125,7 @@
         // 自動結合していた方向を保持し、元パネルには触れず炭素へ置き換える。
         g[r][c] = panelForDirections([...originalBonds[r][c], ...dirs]);
       } else if (panel) {
-        const merged = panelForDirections([...getActiveDirections(panel), ...dirs]);
+        const merged = panelForDirections([...originalBonds[r][c], ...dirs]);
         panel.type = merged.type;
         panel.rotation = merged.rotation;
       } else {
@@ -3142,7 +3142,12 @@
     traceState = {
       path: [{ r: startR, c: startC }], closed: false, undoBefore,
       originalPanels: grid.flat().filter(Boolean).map(panel => ({ panel, type: panel.type, rotation: panel.rotation })),
-      originalBonds: grid.map((row, r) => row.map((panel, c) => [...getBondDirections(grid, r, c)])),
+      // 開始時に成立していた結合だけを保存する。プレビューで変化した向きは使わない。
+      originalBonds: grid.map((row, r) => row.map((panel, c) => [...getBondDirections(grid, r, c)].filter(dir => {
+        const [dr, dc] = DELTA[dir];
+        const neighbor = grid[r + dr]?.[c + dc];
+        return neighbor && (isHalogenPanel(neighbor) || getActiveDirections(neighbor).has(OPPOSITE[dir]));
+      }))),
     };
     traceGestureStartedWithAudioLocked = !audioCtx || audioCtx.state !== 'running';
 

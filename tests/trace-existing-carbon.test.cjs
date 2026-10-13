@@ -10,11 +10,12 @@ const html = fs.readFileSync(path.resolve(__dirname, '../index.html'), 'utf8').r
   mismatches() { return checkMismatches(grid); }
 };\n})();\n</script>`);
 const executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-async function drag(page, cells) {
+async function drag(page, cells, cancelled = false) {
   const points = [];
   for (const [r,c] of cells) { const box = await page.locator(`.cell[data-row="${r}"][data-col="${c}"]`).boundingBox(); points.push({x:box.x+box.width/2,y:box.y+box.height/2}); }
   await page.mouse.move(points[0].x,points[0].y); await page.mouse.down();
   for (const p of points.slice(1)) await page.mouse.move(p.x,p.y,{steps:1});
+  if (cancelled) await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointercancel',{pointerId:1})));
   await page.mouse.up();
 }
 const horizontal = [[2,2,['E']],[2,3,['W','E']],[2,4,['W']]];
@@ -31,7 +32,14 @@ const cases = [
   {name:'existing hydroxyl bond survives carbon crossing',seed:[[2,2,['E']],[2,3,['W','E']],[2,4,['W'],'OH']],path:[[1,3],[2,3],[3,3]],want:[[1,3,'S'],[2,2,'E'],[2,3,'ENSW'],[2,4,'W'],[3,3,'N']]},
   {name:'empty-only tracing still creates a bent chain',seed:[],path:[[1,2],[1,3],[2,3]],want:[[1,2,'E'],[1,3,'SW'],[2,3,'N']]},
   {name:'empty-only tracing still closes a ring',seed:[],path:[[1,2],[1,3],[2,3],[2,2],[1,2]],want:[[1,2,'ES'],[1,3,'SW'],[2,2,'EN'],[2,3,'NW']]},
+  {name:'starting on isolated carbon replaces dangling arms with hydrogen',seed:[[2,3,['E']]],path:[[2,3],[1,3]],want:[[1,3,'S'],[2,3,'N']]},
+  {name:'ending on carbon retains mutual bonds and removes dangling arms',seed:[[2,2,['E']],[2,3,['N','E','S','W']]],path:[[1,3],[2,3]],want:[[1,3,'S'],[2,2,'E'],[2,3,'NW']]},
+  {name:'crossing removes one-sided arms toward a carbon facing away',seed:[[2,2,['E']],[2,3,['N','E','S','W']],[2,4,['E']],[2,5,['W']]],path:[[1,3],[2,3],[3,3]],want:[[1,3,'S'],[2,2,'E'],[2,3,'NSW'],[2,4,'E'],[2,5,'W'],[3,3,'N']]},
+  {name:'tracing at board edge removes outward dangling arms',seed:[[0,3,['N','E']]],path:[[0,3],[0,4]],want:[[0,3,'E'],[0,4,'W']]},
+  {name:'ring overwrites isolated carbon with only the ring bonds',seed:[[2,3,['N','E','S','W']]],path:[[2,3],[2,4],[3,4],[3,3],[2,3]],want:[[2,3,'ES'],[2,4,'SW'],[3,3,'EN'],[3,4,'NW']]},
+  ...['backtrack','cancel','undo'].map(restore => ({name:restore+' restores original dangling arms',seed:[[2,3,['E']]],path:restore==='backtrack'?[[2,3],[1,3],[2,3]]:[[2,3],[1,3]],restore,want:[[2,3,'E']],restored:true,mismatches:[{r:2,c:3,dir:'E',reason:'DANGLING_BOND'}]})),
 ];
+for (const element of ['F','Cl','Br','I','OH']) cases.push({name:'dangling arm cleanup preserves real bond to '+element,seed:[[2,2,['E'],element],[2,3,['N','E','S','W']]],path:[[1,3],[2,3]],want:[[1,3,'S'],[2,2,'E'],[2,3,'NW']],elements:['C',element,'C']});
 for (const element of ['F','Cl','Br','I','OH']) {
  cases.push(
   {name:element+' crossing replaces panel and preserves original carbon bond',seed:[[2,2,['E']],[2,3,['W'],element]],path:[[1,3],[2,3],[3,3]],want:[[1,3,'S'],[2,2,'E'],[2,3,'NSW'],[3,3,'N']],elements:['C','C','C','C']},
@@ -48,14 +56,15 @@ test('trace integration' , async t => {
   await serveApp(page,html);
   await page.goto('http://alkane.test/'); await ready(page); await page.evaluate(seed=>window.traceTest.seed(seed),scenario.seed);
   if (scenario.tap) { const [r,c]=scenario.tap; await page.locator(`.cell[data-row="${r}"][data-col="${c}"]`).click(); }
-  await drag(page,scenario.path);
+  await drag(page,scenario.path,scenario.restore==='cancel');
+  if (scenario.restore==='undo') await page.getByRole('button',{name:'盤面の操作を1つ戻す',exact:true}).click();
   await page.waitForTimeout(260);
   const actual=await page.evaluate(()=>window.traceTest.read());
   assert.deepEqual(actual.map(p=>[p.r,p.c,p.dirs.join('')]),scenario.want);
-  assert.ok(actual.filter(p=>p.element==='C' && !scenario.seed.some(([r,c,dirs,element])=>r===p.r&&c===p.c&&element&&element!=='C')).every(p=>p.same),'existing carbons must retain object identity');
+  if (scenario.restore!=='undo') assert.ok(actual.filter(p=>p.element==='C' && !scenario.seed.some(([r,c,dirs,element])=>r===p.r&&c===p.c&&element&&element!=='C')).every(p=>p.same),'existing carbons must retain object identity');
   if (scenario.elements) assert.deepEqual(actual.map(p=>p.element),scenario.elements);
-  if (scenario.restored) assert.ok(actual.every(p=>p.same),'backtrack must restore original panels');
-  assert.deepEqual(await page.evaluate(()=>window.traceTest.mismatches()),[]);
+  if (scenario.restored && scenario.restore!=='undo') assert.ok(actual.every(p=>p.same),'backtrack must restore original panels');
+  assert.deepEqual(await page.evaluate(()=>window.traceTest.mismatches()),scenario.mismatches||[]);
   await page.close();
  });
 });
