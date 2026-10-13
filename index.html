@@ -126,8 +126,9 @@
   .palette-row.with-undo .palette-card{width:100%;height:58px;display:grid;place-items:center;}
   .palette-row.with-undo .icon{width:min(52px,100%);height:auto;aspect-ratio:1;}
   .grid-undo{width:44px;height:44px;padding:6px;border:1.5px solid var(--border);border-radius:13px 11px 14px 12px;background:var(--paper);color:var(--accent-ink);box-shadow:1px 2px 0 var(--shadow);cursor:pointer;touch-action:manipulation;}
-  .grid-undo svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round;}
-  .grid-undo:disabled{opacity:.3;cursor:default;box-shadow:none;}
+  .grid-undo svg{display:block;width:100%;height:100%;fill:currentColor;}
+  .grid-undo:disabled{border-color:transparent;background:transparent;cursor:default;box-shadow:none;}
+  .grid-undo:disabled svg{opacity:.3;}
   .grid-undo:active:not(:disabled){transform:translate(1px,1px);box-shadow:none;}
   .grid-undo:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
   @media(max-width:340px){.palette-row.with-undo{gap:4px;}}
@@ -4028,7 +4029,7 @@
     undoButton.type = 'button';
     undoButton.title = '盤面の操作を1つ戻す';
     undoButton.setAttribute('aria-label', '盤面の操作を1つ戻す');
-    undoButton.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M23 27A13 13 0 1 0 11 27"/><path d="m7 21 4 6-7 2"/></svg>';
+    undoButton.innerHTML = '<svg viewBox="0 0 1000 936" aria-hidden="true"><path d="M416 835 A345 345 0 1 0 269 249" fill="none" stroke="currentColor" stroke-width="82" stroke-linecap="round"/><path d="M155 117 L70 462 L409 365 Z"/></svg>';
     undoButton.addEventListener('click', undoGridOperation);
     halogenRow.appendChild(undoButton);
     const halogenItems = ['F', 'Cl', 'Br', 'I'].map((element) => ({ kind: 'halogen', element }));
