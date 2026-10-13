@@ -121,6 +121,16 @@
     width:58px;text-align:center;padding:3px 2px;touch-action:none;cursor:grab;
     border-radius:12px;transition:transform .1s ease, background .1s ease;
   }
+  .palette-row.with-undo{display:grid;grid-template-columns:44px repeat(5,minmax(0,58px));align-items:center;width:100%;max-width:364px;}
+  .palette-row.with-undo.without-oh{grid-template-columns:44px repeat(4,minmax(0,58px));max-width:300px;}
+  .palette-row.with-undo .palette-card{width:100%;height:58px;display:grid;place-items:center;}
+  .palette-row.with-undo .icon{width:min(52px,100%);height:auto;aspect-ratio:1;}
+  .grid-undo{width:44px;height:44px;padding:6px;border:1.5px solid var(--border);border-radius:13px 11px 14px 12px;background:var(--paper);color:var(--accent-ink);box-shadow:1px 2px 0 var(--shadow);cursor:pointer;touch-action:manipulation;}
+  .grid-undo svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round;}
+  .grid-undo:disabled{opacity:.3;cursor:default;box-shadow:none;}
+  .grid-undo:active:not(:disabled){transform:translate(1px,1px);box-shadow:none;}
+  .grid-undo:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  @media(max-width:340px){.palette-row.with-undo{gap:4px;}}
   .palette-card:active{transform:scale(.9) rotate(-3deg);background:var(--accent-soft);}
   .palette-card.selected{
     background:var(--accent-soft);outline:2.5px solid var(--accent);outline-offset:-1px;border-radius:12px;
@@ -780,7 +790,7 @@
           </article>
         </div>
         <aside class="operation-tip"><strong>カード選択を解除するには</strong><ul><li>選択中のカードをもう一度タップ</li><li>同じグリッドマスを素早く2回タップ</li><li>隣接するマスへなぞると、選択を解除して炭素鎖を描けます</li></ul></aside>
-        <details class="operation-details"><summary>知っておくと便利な操作</summary><div class="operation-details-body"><ul><li>炭素鎖をなぞりながら1マス引き返すと、直前の1マスを取り消せます。</li><li>3マス以上なぞって始点へ戻ると、環状構造として閉じます。</li><li>配置済みカードを別のカードで上書きできます。どのパネルも長押しでつかみ、グリッド外で離すと削除できます。ハロゲンとOH基をなぞると炭素へ置き換わります。</li><li>ハロゲンとOH基は1・2タップでは回転せず、3タップで削除できます。</li><li>練習で正常な分子が複数あるときは、別の分子への最初のタップが分子選択になります。</li></ul></div></details>
+        <details class="operation-details"><summary>知っておくと便利な操作</summary><div class="operation-details-body"><ul><li>Fの左の円弧矢印で、配置・回転・移動・削除・クリアを1操作ずつ戻せます。なぞった炭素鎖は一筆ごと戻ります。次の問題や難易度・モード変更で履歴は消え、正解後は戻せません。</li><li>炭素鎖をなぞりながら1マス引き返すと、直前の1マスを取り消せます。</li><li>3マス以上なぞって始点へ戻ると、環状構造として閉じます。</li><li>配置済みカードを別のカードで上書きできます。どのパネルも長押しでつかみ、グリッド外で離すと削除できます。ハロゲンとOH基をなぞると炭素へ置き換わります。</li><li>ハロゲンとOH基は1・2タップでは回転せず、3タップで削除できます。</li><li>練習で正常な分子が複数あるときは、別の分子への最初のタップが分子選択になります。</li></ul></div></details>
       </section>
     </div>
 
@@ -2469,6 +2479,55 @@
   let answerTokens = [];
   let answerHistory = [];
 
+  // 盤面の確定操作だけを保存する。参照を共有せず、なぞりや回転で過去を変えない。
+  let gridUndoHistory = [];
+  function captureGridOperation() {
+    return {
+      grid: grid.map(row => row.map(panel => panel ? { ...panel } : null)),
+      wasStructureValid,
+      activeCells: practiceActiveCells ? new Set(practiceActiveCells) : null,
+      validSigs: new Set(practicePrevValidSigs),
+      moleculeOrder: new Map(practiceMoleculeOrder),
+      seqCounter: practiceSeqCounter,
+    };
+  }
+  function sameGrid(a, b) {
+    return a.every((row, r) => row.every((p, c) => {
+      const q = b[r][c];
+      return (!p && !q) || (!!p && !!q && p.type === q.type && p.rotation === q.rotation && (p.element || 'C') === (q.element || 'C'));
+    }));
+  }
+  function recordGridOperation(before) {
+    if (currentMode === 'game1' && game1Checked !== 'correct' && !sameGrid(before.grid, grid)) gridUndoHistory.push(before);
+    updateGridUndoButton();
+  }
+  function updateGridUndoButton() {
+    const button = document.getElementById('grid-undo');
+    if (button) button.disabled = gridUndoHistory.length === 0 || currentMode !== 'game1' || game1Checked === 'correct' || !!dragState || !!traceState;
+  }
+  function resetGridUndoHistory() {
+    gridUndoHistory = [];
+    updateGridUndoButton();
+  }
+  function undoGridOperation() {
+    if (!gridUndoHistory.length || currentMode !== 'game1' || game1Checked === 'correct' || dragState || traceState) return;
+    cancelGridInteractions();
+    cancelPendingPalettePlacements();
+    const before = gridUndoHistory.pop();
+    grid = before.grid;
+    wasStructureValid = before.wasStructureValid;
+    practiceActiveCells = before.activeCells;
+    practicePrevValidSigs = before.validSigs;
+    practiceMoleculeOrder = before.moleculeOrder;
+    practiceSeqCounter = before.seqCounter;
+    highlightCells = null;
+    highlightStartTime = 0;
+    stopHighlightAnimation();
+    suppressNextTraceValidSound = true; // 復元で完成音を重ねない。採点・連続正解は変更しない。
+    refreshAll();
+    playUndoSound();
+  }
+
   // ---- 問題ごとのマーキング ----
   const MARKUP_STYLES = {
     yellow: { color: 'rgba(255, 235, 0, .46)', width: 22.5 },
@@ -2659,6 +2718,7 @@
   resetBtn.textContent = 'クリア';
   resetBtn.addEventListener('click', () => {
     cancelGridInteractions();
+    const before = captureGridOperation();
     playClearSound();
     clearPaletteSelection();
     grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
@@ -2667,6 +2727,7 @@
     highlightCells = null;
     highlightStartTime = 0;
     stopHighlightAnimation();
+    recordGridOperation(before);
     refreshAll();
   });
 
@@ -3074,10 +3135,11 @@
   }
 
   function startTrace(e, startR, startC) {
+    const undoBefore = captureGridOperation();
     for (const cancel of cancelCellTaps) cancel();
     traceSnapshot = grid.map((row) => row.slice());
     traceState = {
-      path: [{ r: startR, c: startC }], closed: false,
+      path: [{ r: startR, c: startC }], closed: false, undoBefore,
       originalPanels: grid.flat().filter(Boolean).map(panel => ({ panel, type: panel.type, rotation: panel.rotation })),
       originalBonds: grid.map((row, r) => row.map((panel, c) => [...getBondDirections(grid, r, c)])),
     };
@@ -3146,8 +3208,10 @@
       }
       if (cancelled || traceGestureStartedWithAudioLocked) discardPendingTraceAudio();
       traceGestureStartedWithAudioLocked = false;
+      const undoBefore = traceState.undoBefore;
       traceState = null;
       traceSnapshot = null;
+      if (!cancelled) recordGridOperation(undoBefore);
       if (closedTrace && !cancelled) suppressNextTraceValidSound = true;
       refreshAll();
     };
@@ -3161,6 +3225,7 @@
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onCancel);
     window.addEventListener('blur', onCancel);
+    updateGridUndoButton();
     onMove(e); // 既存炭素からの開始では、移動閾値を越えた現在位置も経路へ含める
   }
 
@@ -3233,6 +3298,7 @@
   }
 
   function refreshAll() {
+    updateGridUndoButton();
     // アルカン並べで「不正解」スタンプ表示中にパネルを操作したら、スタンプを消してチェックボタンを再表示する
     if (currentMode === 'game1' && game1Checked === 'incorrect') {
       game1Checked = null;
@@ -3955,7 +4021,16 @@
     const carbonRow = document.createElement('div');
     carbonRow.className = 'palette-row';
     const halogenRow = document.createElement('div');
-    halogenRow.className = 'palette-row';
+    halogenRow.className = 'palette-row with-undo' + (alcoholEnabledForCurrentContext() ? '' : ' without-oh');
+    const undoButton = document.createElement('button');
+    undoButton.id = 'grid-undo';
+    undoButton.className = 'grid-undo';
+    undoButton.type = 'button';
+    undoButton.title = '盤面の操作を1つ戻す';
+    undoButton.setAttribute('aria-label', '盤面の操作を1つ戻す');
+    undoButton.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M23 27A13 13 0 1 0 11 27"/><path d="m7 21 4 6-7 2"/></svg>';
+    undoButton.addEventListener('click', undoGridOperation);
+    halogenRow.appendChild(undoButton);
     const halogenItems = ['F', 'Cl', 'Br', 'I'].map((element) => ({ kind: 'halogen', element }));
     if (alcoholEnabledForCurrentContext()) halogenItems.push({ kind: 'hydroxyl', element: HYDROXYL_ELEMENT });
     const groups = [
@@ -4002,6 +4077,7 @@
       }
       paletteEl.appendChild(row);
     }
+    updateGridUndoButton();
   }
 
   function moveGhost(ghost, x, y) {
@@ -4021,6 +4097,7 @@
     document.body.appendChild(ghost);
     moveGhost(ghost, e.clientX, e.clientY);
     dragState = { mode: 'new', type, element, ghost, rotation, pointerId: e.pointerId };
+    updateGridUndoButton();
     clearPaletteSelection(); // ドラッグ配置とクリック配置が同時に有効にならないようにする
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', onDragEnd);
@@ -4043,9 +4120,12 @@
     cardEl.classList.add('selected');
   }
 
-  function clearPaletteSelection() {
+  function cancelPendingPalettePlacements() {
     for (const pending of pendingPalettePlacements.values()) clearTimeout(pending.timer);
     pendingPalettePlacements.clear();
+  }
+  function clearPaletteSelection() {
+    cancelPendingPalettePlacements();
     if (selectedCardEl) selectedCardEl.classList.remove('selected');
     selectedCardEl = null;
     paletteSelection = null;
@@ -4054,7 +4134,9 @@
   function placeSelectedAt(r, c) {
     if (!isPlayableCell(r, c)) return;
     const { type, element, rotation } = paletteSelection;
+    const before = captureGridOperation();
     grid[r][c] = { type, rotation: rotation || 0, element }; // 既にパネルがあっても確認なしで上書き
+    recordGridOperation(before);
     playPlaceSound();
     refreshAll();
   }
@@ -4082,6 +4164,7 @@
 
   function onDragEnd(e) {
     if (!dragState || (e.pointerId !== undefined && e.pointerId !== dragState.pointerId)) return;
+    const before = dragState.mode === 'move' ? dragState.undoBefore : captureGridOperation();
     const cancelled = e.type === 'pointercancel' || e.type === 'blur';
     const target = cancelled ? null : document.elementFromPoint(e.clientX, e.clientY);
     let cellEl = target && target.closest('.cell');
@@ -4116,6 +4199,7 @@
     window.removeEventListener('blur', onDragEnd);
     gridGestureCancels.delete(cancelPanelDrag);
     dragState = null;
+    if (!cancelled) recordGridOperation(before);
     refreshAll();
   }
 
@@ -4338,7 +4422,9 @@
       if (tapCount >= 3) {
         tapCount = 0;
         if (grid[r][c] === panelAtTapTime) {
+          const before = captureGridOperation();
           grid[r][c] = null;
+          recordGridOperation(before);
           playDeleteSound();
           refreshAll();
         }
@@ -4354,8 +4440,10 @@
       pendingTimer = setTimeout(() => {
         const panel = grid[r][c];
         if (panel && panel === panelAtTapTime) {
+          const before = captureGridOperation();
           const delta = tapCount === 1 ? 90 : -90; // 1回=時計回り、2回=反時計回り
           panel.rotation = ((panel.rotation + delta) % 360 + 360) % 360;
+          recordGridOperation(before);
           if (delta === 90) playRotateCWSound(); else playRotateCCWSound();
           refreshAll();
         }
@@ -4366,6 +4454,7 @@
   }
 
   function beginMoveDrag(e, fromR, fromC) {
+    const undoBefore = captureGridOperation();
     for (const cancel of cancelCellTaps) cancel();
     const panel = grid[fromR][fromC];
     grid[fromR][fromC] = null;
@@ -4378,7 +4467,8 @@
     document.body.appendChild(ghost);
     moveGhost(ghost, e.clientX, e.clientY);
 
-    dragState = { mode: 'move', panel, fromR, fromC, ghost, pointerId: e.pointerId };
+    dragState = { mode: 'move', panel, fromR, fromC, ghost, pointerId: e.pointerId, undoBefore };
+    updateGridUndoButton();
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', onDragEnd);
     window.addEventListener('pointercancel', onDragEnd);
@@ -4630,6 +4720,7 @@
 
   function startGame1() {
     cancelGridInteractions();
+    resetGridUndoHistory();
     resetMarkupForQuestion();
     clearPaletteSelection();
     interactionsEnabled = true;
@@ -4653,6 +4744,7 @@
     const result = generateName(grid);
     game1Checked = (result.ok && result.name === targetName) ? 'correct' : 'incorrect';
     if (game1Checked === 'correct') {
+      resetGridUndoHistory();
       const streakCelebration = recordCorrectStreak('game1');
       const cornerBonus = clearedTenCarbonCornerChallenge();
       game1CorrectCelebration = {
@@ -4670,6 +4762,7 @@
       playIncorrectSound();
     }
     renderGame1Objective();
+    updateGridUndoButton();
   }
 
   function renderGame1Objective() {
@@ -5526,6 +5619,7 @@
   // アルカン並べ: 練習(お題なし・自由に組む)か、すいすい/まあまあ/そこそこ(お題を当てる)かで表示を切り替える
   function enterGame1Tier() {
     cancelGridInteractions();
+    resetGridUndoHistory();
     clearPaletteSelection();
     setupPalette();
     resetGame1LocantProfiles();
@@ -5551,6 +5645,7 @@
 
   function setMode(mode) {
     cancelGridInteractions();
+    resetGridUndoHistory();
     clearPaletteSelection();
     resetAllCorrectStreaks();
     resetGame2ReviewQueue();
