@@ -4,7 +4,7 @@ const common=typeof module!=='undefined'&&module.exports;
 const B=common?require('./tutorial-board.js'):root.TutorialBoard;
 const {steps}=common?require('./tutorial-steps.js'):root.TutorialSteps;
 function taskDone(task,g){
- if(task.kind==='place'){const[r,c]=task.cell;return g[r][c]?.element===task.element&&B.getBondDirections(g,r,c).size===1;}
+ if(task.kind==='place'||task.kind==='drag'){const[r,c]=task.cell;return g[r][c]?.element===task.element&&B.getBondDirections(g,r,c).size===1;}
  return task.route.every(([r,c],i)=>{if(!g[r][c]||(g[r][c].element||'C')!=='C')return false;return [task.route[i-1],task.route[i+1]].filter(Boolean).every(([nr,nc])=>{const d=Object.keys(B.DELTA).find(d=>r+B.DELTA[d][0]===nr&&c+B.DELTA[d][1]===nc);return d&&B.getBondDirections(g,r,c).has(d)&&B.getBondDirections(g,nr,nc).has(B.OPPOSITE[d]);});});
 }
 const crossPath=[[1,4],[2,4],[3,4]];
@@ -13,11 +13,12 @@ const rowsFor=i=>i===0?[2]:i===1?[0,1,2]:i<7?[1,2,3]:[0,1,2,3];
 class TutorialSession{
  constructor(){this.restart();}
  restart(){this.index=0;this.grid=B.emptyGrid();this.begin();}
- begin(){this.start=B.clone(this.grid);this.clearPending=!!steps[this.index].clear;this.initialClear=this.clearPending;this.recoverySuggested=false;this.exercise={cross:false,deleted:[false,false],redraw:false};this.history=[];}
+ begin(){this.start=B.clone(this.grid);this.clearPending=!!steps[this.index].clear;this.initialClear=this.clearPending;this.recoverySuggested=false;this.exercise={cross:false,deleted:[false,false],redraw:false};this.dragged=steps[this.index].tasks.map(()=>false);this.history=[];}
  get exerciseDone(){return [taskDone(steps[3].tasks[0],this.grid),taskDone(steps[3].tasks[1],this.grid),this.exercise.cross,...this.exercise.deleted,this.exercise.redraw];}
+ get taskProgress(){return this.index===3?this.exerciseDone:steps[this.index].tasks.map((t,i)=>t.kind==='drag'?this.dragged[i]:taskDone(t,this.grid));}
  get visibleRows(){return [...new Set([...rowsFor(this.index),...(this.clearPending&&this.index?rowsFor(this.index-1):[])])].sort((a,b)=>a-b);}
- get complete(){const s=steps[this.index];return !this.clearPending&&(this.index!==3||this.exerciseDone.every(Boolean))&&B.matches(this.grid,s.target)&&B.generateName(this.grid).name===s.name;}
- snapshot(){return{grid:B.clone(this.grid),clearPending:this.clearPending,recoverySuggested:this.recoverySuggested,exercise:structuredClone(this.exercise)};}
+ get complete(){const s=steps[this.index];return !this.clearPending&&this.taskProgress.every(Boolean)&&B.matches(this.grid,s.target)&&B.generateName(this.grid).name===s.name;}
+ snapshot(){return{grid:B.clone(this.grid),clearPending:this.clearPending,recoverySuggested:this.recoverySuggested,exercise:structuredClone(this.exercise),dragged:this.dragged.slice()};}
  edit(next,kind,operation={}){
   const before=this.snapshot(),ex=this.exercise;
   if(this.index===3&&!this.clearPending){
@@ -30,14 +31,15 @@ class TutorialSession{
     }
    }
   }
-  const changed=B.signature(next)!==B.signature(this.grid)||JSON.stringify(before.exercise)!==JSON.stringify(ex)||(kind==='clear'&&this.clearPending);
+  if(!this.clearPending&&kind==='place'&&operation.fromPalette){steps[this.index].tasks.forEach((task,i)=>{if(task.kind==='drag'&&operation.element===task.element&&samePoint(operation.target,task.cell)&&taskDone(task,next))this.dragged[i]=true;});}
+  const changed=JSON.stringify(before.dragged)!==JSON.stringify(this.dragged)||B.signature(next)!==B.signature(this.grid)||JSON.stringify(before.exercise)!==JSON.stringify(ex)||(kind==='clear'&&this.clearPending);
   if(!changed)return false;
   this.history.push(before);this.grid=B.clone(next);
   if(kind==='clear'){this.recoverySuggested=!this.clearPending&&!this.initialClear&&this.start.some(row=>row.some(Boolean));this.clearPending=false;}
   return true;
  }
  undo(){const previous=this.history.pop();if(previous)Object.assign(this,structuredClone(previous));}
- reset(){this.grid=B.clone(this.start);this.clearPending=this.initialClear;this.recoverySuggested=false;this.exercise={cross:false,deleted:[false,false],redraw:false};this.history=[];}
+ reset(){this.grid=B.clone(this.start);this.clearPending=this.initialClear;this.recoverySuggested=false;this.exercise={cross:false,deleted:[false,false],redraw:false};this.dragged=steps[this.index].tasks.map(()=>false);this.history=[];}
  next(){if(!this.complete||this.index===steps.length-1)return false;this.index++;this.begin();return true;}
 }
 if(common){module.exports={TutorialSession};return;}
@@ -50,9 +52,9 @@ const labels=['','末端の炭素','直線の炭素','角の炭素','枝分か�
 function guidance(g){
  const step=steps[session.index];if(session.clearPending)return{message:'「クリア」を押して、次の構造を描く準備をしよう。',count:'クリア待ち'};
  const tasks=session.index===3?exerciseTasks:step.tasks;
- const done=session.index===3?session.exerciseDone:tasks.map(t=>taskDone(t,g)),task=tasks[done.indexOf(false)];
+ const done=session.taskProgress,task=tasks[done.indexOf(false)];
  const count=`${session.index===3?'操作':step.count||'操作'}：${done.filter(Boolean).length} / ${tasks.length}`;
- if(!gesture&&!pending&&session.complete)return{message:session.index===10?'チュートリアル完了！ 練習でも描いてみよう。':'できた！ 名前と構造を見比べてから「次へ」。',count:'完成',complete:true};
+ if(!gesture&&!pending&&session.complete)return{message:session.index===10?'チュートリアル完了！ 練習でも描いてみよう。':'完成！ 名前と構造を見比べてから「次へ」。',count:'完成',complete:true};
  if(session.recoverySuggested)return{message:'「やり直す」で、元の構造に戻そう。',count:'構造を戻そう'};
  for(let r=0;r<5;r++)for(let c=0;c<7;c++){
   const p=g[r][c],target=step.target[r][c];if(!p)continue;
@@ -62,6 +64,7 @@ function guidance(g){
   const el=p.element||'C',old=session.start[r][c]?.element||'C';
   if(el!==(target.element||'C')&&el!==old)return{message:`この場所は${target.element||'炭素'}だよ。「戻す」で修正してみよう。`,count,task,error:[r,c]};
  }
+ if(task?.kind==='drag'){const moving=gesture?.mode==='new'&&gesture.panel?.element===task.element,hover=moving&&steps[session.index].tasks.some((t,i)=>!done[i]&&samePoint(t.cell,gesture.target));return{message:moving?(hover?'ここで指を離そう！':'そのまま青い枠まで運ぼう。'):g[task.cell[0]][task.cell[1]]?.element===task.element?'今度はIパネルを、同じ場所へドラッグしてみよう。':'Iパネルを押したまま、青く光るClへ運ぼう。',count,task,hover};}
  if(session.index===3&&task?.kind==='trace'&&task.route===crossPath&&taskDone(task,g))return{message:'上下を一度につなぐように、もう一度なぞろう。',count,task};
  if(task?.kind==='delete'&&!g[task.cell[0]][task.cell[1]])return{message:'「戻す」で枝を戻し、長押しで消そう。',count,task};
  if(!task)return{message:'足りない結合がないか、薄い見本と見比べよう。',count};
@@ -69,6 +72,7 @@ function guidance(g){
 }
 function render(){
  const step=steps[session.index],g=preview||session.grid,guide=guidance(g),active=new Set(),rows=session.visibleRows;
+ const validPaletteDrag=guide.task?.kind==='drag'&&gesture?.mode==='new'&&gesture.panel?.element===guide.task.element;
  $('board').style.setProperty('--rows',rows.length);
  $('route').setAttribute('viewBox',`0 0 700 ${rows.length*100}`);
  if(guide.task){if(guide.task.cell)active.add(guide.task.cell.join(','));else guide.task.route.forEach(p=>active.add(p.join(',')));}
@@ -79,34 +83,41 @@ function render(){
  $('undo').disabled=!session.history.length||!!gesture||!!pending;
  $('next').disabled=!session.complete||!!gesture||!!pending;$('next').hidden=session.index===10;
  $('restart').hidden=!(session.index===10&&session.complete);
+ $('next').classList.toggle('suggested',session.complete&&!gesture&&!pending&&session.index!==10);
+ $('restart').classList.toggle('suggested',session.complete&&!gesture&&!pending&&session.index===10);
  for(let r=0;r<5;r++)for(let c=0;c<7;c++){
   const el=cells[r][c],p=g[r][c],target=step.target[r][c],key=`${r},${c}`;
   el.hidden=!rows.includes(r);
-  el.className='cell'+(p?' filled':'')+(active.has(key)&&!session.clearPending?' guided':'')+(guide.error?.join(',')===key?' error':'');
+  const isTarget=guide.task?.kind==='drag'&&((active.has(key))||(validPaletteDrag&&step.tasks.some((t,i)=>!session.taskProgress[i]&&samePoint(t.cell,[r,c])&&samePoint(gesture.target,[r,c]))));
+  const pulse=guide.task?.route?samePoint(guide.task.route[0],[r,c]):guide.task?.kind==='delete'||guide.task?.kind==='place'&&selected?.element===guide.task.element;
+  el.className='cell'+(p?' filled':'')+(active.has(key)&&!session.clearPending&&!isTarget?' guided'+(pulse?' hint-pulse':''):'')+(isTarget?' drop-target':'')+(isTarget&&samePoint(gesture?.target,[r,c])&&validPaletteDrag?' drop-active':'')+(guide.error?.join(',')===key?' error':'');
+  el.dataset.dropLabel=isTarget&&samePoint(gesture?.target,[r,c])&&validPaletteDrag?'離す':'ここへ';
   el.innerHTML=(target&&!session.clearPending?`<span class="goal" aria-hidden="true">${B.icon(target,step.target,r,c)}</span>`:'')+(p?`<span class="actual" aria-hidden="true">${B.icon(p,g,r,c)}</span>`:'');
   el.setAttribute('aria-label',`${r+1}行${c+1}列 ${p?(p.element||'炭素'):'空欄'}`);
  }
  const overlay=$('route');overlay.replaceChildren();
  if(guide.task?.route&&!session.clearPending){const box=$('board').getBoundingClientRect();if(box.width>0&&box.height>0){const height=rows.length*100;const points=guide.task.route.map(([r,c])=>{const cell=cells[r][c].getBoundingClientRect();return[(cell.left+cell.width/2-box.left)*700/box.width,(cell.top+cell.height/2-box.top)*height/box.height];});overlay.innerHTML=`<polyline points="${points.map(p=>p.join(',')).join(' ')}"/><circle cx="${points[0][0]}" cy="${points[0][1]}" r="30"/><text x="${points[0][0]}" y="${points[0][1]+8}">始</text>`;}}
- paletteButtons.forEach(({button,panel})=>{button.setAttribute('aria-pressed',String(!!selected&&selected.type===panel.type&&selected.element===panel.element));button.classList.toggle('suggested',guide.task?.kind==='place'&&guide.task.element===panel.element&&selected?.element!==panel.element);});
+ paletteButtons.forEach(({button,panel})=>{button.setAttribute('aria-pressed',String(!!selected&&selected.type===panel.type&&selected.element===panel.element));button.classList.toggle('suggested',guide.task?.element===panel.element&&(guide.task.kind==='drag'?!validPaletteDrag:guide.task.kind==='place'&&selected?.element!==panel.element));});
 }
 function clearCelebration(){clearTimeout(celebrationTimer);$('celebration').replaceChildren();$('praise').className='praise';$('praise').textContent='';}
-function celebrate(message,big=false){
- clearCelebration();const text=$('praise');text.textContent=message;void text.offsetWidth;text.className='praise show'+(big?' big':'');
+function celebrate(message,big=false,points=[]){
+ clearCelebration();const text=$('praise');text.textContent=message;text.className='praise show'+(big?' big':'');
+ const box=$('board').getBoundingClientRect(),valid=points.filter(([r,c])=>cells[r]?.[c]&&!cells[r][c].hidden),anchor=valid.length?valid.map(([r,c])=>cells[r][c].getBoundingClientRect()).reduce((sum,b)=>({x:sum.x+b.left+b.width/2,y:sum.y+b.top+b.height/2}),{x:0,y:0}):null;
+ const origin=anchor?{x:anchor.x/valid.length,y:anchor.y/valid.length}:{x:box.left+box.width/2,y:box.top+box.height*.45};
  const colors=['#e9b541','#237f74','#e8767d','#84b9df','#b38dce'];
- for(let i=0;i<(big?38:16);i++){const p=document.createElement('span');p.className='particle'+(i%3===0?' star':'');const angle=i*2.39996,distance=(big?100:55)+(i%5)*13;p.style.setProperty('--dx',Math.cos(angle)*distance+'px');p.style.setProperty('--dy',(Math.sin(angle)*distance+(big?55:15))+'px');p.style.setProperty('--spin',(i%2?1:-1)*(120+i*23)+'deg');p.style.setProperty('--particle-color',colors[i%colors.length]);p.style.setProperty('--duration',big?'1.2s':'.8s');$('celebration').append(p);}
- celebrationTimer=setTimeout(clearCelebration,big?1250:850);
+ for(let i=0;i<(big?38:16);i++){const p=document.createElement('span');p.className='particle'+(i%3===0?' star':'');p.style.left=origin.x+'px';p.style.top=origin.y+'px';const angle=i*2.39996,distance=(big?100:55)+(i%5)*13;p.style.setProperty('--dx',Math.cos(angle)*distance+'px');p.style.setProperty('--dy',(Math.sin(angle)*distance+(big?55:15))+'px');p.style.setProperty('--spin',(i%2?1:-1)*(120+i*23)+'deg');p.style.setProperty('--particle-color',colors[i%colors.length]);p.style.setProperty('--duration',big?'1.2s':'.8s');$('celebration').append(p);}
+ celebrationTimer=setTimeout(()=>{if(big){$('celebration').replaceChildren();}else clearCelebration();},1500);
 }
-function progress(){return session.index===3?session.exerciseDone:steps[session.index].tasks.map(t=>taskDone(t,session.grid));}
+function progress(){return session.taskProgress;}
 function commit(g,kind,operation={}){
- const before=progress(),wasComplete=session.complete;preview=null;const changed=session.edit(g,kind,operation);render();
+ const before=progress(),wasComplete=session.complete;preview=null;const changed=session.edit(g,kind,operation);if(changed&&wasComplete&&!session.complete)clearCelebration();render();
  if(!changed||kind==='clear')return;
  if(kind==='move')audio[operation.target?'playMoveSound':'playDeleteSound']();
  else if(kind==='tap'||kind==='place'){if(operation.deleted)audio.playDeleteSound();else if(operation.rotation)audio[operation.rotation===270?'playRotateCCWSound':'playRotateCWSound']();else audio.playPlaceSound();}
- if(session.complete&&!wasComplete){audio.playCorrectSound({sparkle:session.index===10});celebrate(session.index===10?'全11課題、クリア！':session.index===3?'一筆で描き直せた！ 完成！':'完成！ よくできました！',true);}
- else if(!session.clearPending&&progress().some((v,i)=>v&&!before[i])){audio.playValidSound();celebrate(kind==='move'?'長押しでつかんで消せた！':session.index===3?'横のつながりを残して描けた！':kind==='trace'?'いいね！ つなげられた！':'上手に置き換えられた！');}
+ if(session.complete&&!wasComplete){audio.playCorrectSound({sparkle:session.index===10});celebrate(session.index===10?'全11課題、クリア！':session.index===3?'一筆で描き直せた！ 完成！':session.index===5?'2つとも置けた！ 完成！':'完成！ よくできました！',true);}
+ else if(!session.clearPending&&progress().some((v,i)=>v&&!before[i])){audio.playValidSound();const done=progress(),points=steps[session.index].tasks.filter((t,i)=>done[i]&&!before[i]).map(t=>t.cell||t.route.at(-1));celebrate(kind==='move'?'つかんで消せた！':session.index===5?'ドラッグで置けた！ あと1つ！':session.index===3?'一筆で枝ができた！':kind==='trace'?'いいね！ つながった！':operation.element==='OH'||selected?.element==='OH'?'OHに置き換えられた！':'上手に置き換えられた！',false,operation.target?[operation.target]:operation.source?[operation.source]:points);}
 }
-function cancel(){if(pending)clearTimeout(pending);pending=null;tapCount=0;tapKey='';if(gesture?.timer)clearTimeout(gesture.timer);gesture=null;preview=null;audio.clearPending();$('ghost').hidden=true;$('delete-hint').hidden=true;render();}
+function cancel(){if(pending)clearTimeout(pending);pending=null;tapCount=0;tapKey='';if(gesture?.timer)clearTimeout(gesture.timer);gesture=null;preview=null;clearCelebration();audio.clearPending();$('ghost').hidden=true;$('delete-hint').hidden=true;render();}
 function cellAt(x,y){const cell=document.elementFromPoint(x,y)?.closest('[data-cell]');return cell?[Number(cell.dataset.row),Number(cell.dataset.col)]:null;}
 function ghost(panel,x,y){const el=$('ghost');el.innerHTML=B.icon(panel);el.style.left=`${x}px`;el.style.top=`${y}px`;el.hidden=false;}
 function tap(r,c){
@@ -146,7 +157,8 @@ function extendTrace(g,target){
 function move(event){
  const g=gesture;if(!g||event.pointerId!==g.id)return;event.preventDefault();
  if(g.mode==='waiting'&&Math.hypot(event.clientX-g.x,event.clientY-g.y)>8){clearTimeout(g.timer);g.mode=g.source?'trace':'new';tapCount=0;tapKey='';if(g.mode==='trace')selected=null;}
- if(g.mode==='trace')extendTrace(g,cellAt(event.clientX,event.clientY));
+ g.target=cellAt(event.clientX,event.clientY);
+ if(g.mode==='trace')extendTrace(g,g.target);
  else if(g.mode==='move'||g.mode==='new'){ghost(g.panel,event.clientX,event.clientY);if(g.mode==='move'){const outside=!cellAt(event.clientX,event.clientY);$('delete-hint').textContent=outside?'離すと削除':'枠の外へ運んで離すと削除';$('delete-hint').classList.toggle('outside',outside);}}
  render();
 }
@@ -157,7 +169,7 @@ function finish(event){
  const target=cellAt(event.clientX,event.clientY),next=B.clone(g.base);
  if(g.mode==='move')next[g.source[0]][g.source[1]]=null;
  if(target)next[target[0]][target[1]]={...g.panel};
- commit(next,g.mode==='move'?'move':'place',{source:g.source,target});
+ commit(next,g.mode==='move'?'move':'place',{source:g.source,target,fromPalette:g.mode==='new',element:g.panel?.element});
 }
 for(let r=0;r<5;r++){cells[r]=[];for(let c=0;c<7;c++){
  const cell=document.createElement('button');cell.type='button';cell.className='cell';cell.dataset.cell='';cell.dataset.row=r;cell.dataset.col=c;
@@ -175,7 +187,7 @@ for(const panel of [...['F','Cl','Br','I','OH'].map(element=>({type:1,rotation:0
 window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',finish);
 window.addEventListener('resize',render);
 window.addEventListener('pointercancel',event=>{if(!gesture||event.pointerId===gesture.id)cancel();});window.addEventListener('blur',()=>{cancel();clearCelebration();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){cancel();clearCelebration();}});
+document.addEventListener('visibilitychange',()=>{document.documentElement.classList.toggle('page-hidden',document.hidden);if(document.hidden){cancel();clearCelebration();}});
 window.addEventListener('keydown',e=>{if(e.key==='Escape')cancel();});
 $('undo').addEventListener('click',()=>{cancel();session.undo();clearCelebration();audio.playUndoSound();render();});
 $('clear').addEventListener('click',()=>{cancel();selected=null;clearCelebration();audio.playClearSound();commit(B.emptyGrid(),'clear');});

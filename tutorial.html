@@ -6,17 +6,18 @@
 <meta name="theme-color" content="#faf8f0">
 <title>アルカンパズル 操作チュートリアル</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="tutorial.css">
+<link rel="stylesheet" href="tutorial.css?v=20261021-hints1">
 <script defer src="tutorial-board.js"></script>
-<script defer src="tutorial-steps.js"></script>
+<script defer src="tutorial-steps.js?v=20261021-hints1"></script>
 <script defer src="tutorial-audio.js"></script>
-<script defer src="tutorial.js"></script>
+<script defer src="tutorial.js?v=20261021-hints1"></script>
 </head>
 <body>
 <main>
  <header aria-label="操作チュートリアル"><div class="progress"><span id="step-number">1 / 11</span><span id="sub-progress"></span></div><button id="sound-toggle" class="sound-toggle" type="button" aria-label="効果音をオフにする" aria-pressed="true"></button><a href="index.html" class="exit">練習へ<span aria-hidden="true"> ↗</span></a></header>
  <section class="lesson" aria-labelledby="target-name">
   <h2 id="target-name">プロパン</h2>
+  <p id="praise" class="praise" role="status" aria-live="polite"></p>
   <div class="instruction-box"><p id="instruction" role="status" aria-live="polite"></p></div>
  </section>
  <div id="board" class="board"><div id="grid" class="grid" role="group" aria-label="分子を描く盤面"></div><svg id="route" class="route" viewBox="0 0 700 500" aria-hidden="true"></svg><div id="delete-hint" class="delete-hint" hidden aria-hidden="true"></div><div id="celebration" class="celebration" aria-hidden="true"></div></div>
@@ -27,7 +28,6 @@
  <nav class="actions" aria-label="チュートリアルの操作"><button id="clear" type="button">クリア</button><button id="reset" type="button">やり直す</button><button id="next" class="primary" type="button" disabled>次へ →</button><button id="restart" type="button" hidden>最初から</button></nav>
  <noscript>チュートリアルを使うにはJavaScriptを有効にしてください。</noscript>
 </main>
-<p id="praise" class="praise" role="status" aria-live="polite"></p>
 <div id="ghost" class="ghost" hidden aria-hidden="true"></div>
 </body>
 </html>
