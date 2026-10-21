@@ -48,6 +48,8 @@ const session=new TutorialSession(),$=id=>document.getElementById(id),audio=root
 let celebrationTimer;
 const exerciseTasks=[...steps[3].tasks.slice(0,2),{kind:'trace',route:crossPath,label:'上下を一筆でなぞろう。逆向きでもOK。'},{kind:'delete',cell:[1,4],label:'上の枝先を長押しし、枠の外で離そう。'},{kind:'delete',cell:[3,4],label:'下の枝先も長押しし、枠の外で離そう。'},{kind:'trace',route:crossPath,label:'もう一度、上下を一筆でつなごう！'}];
 const cells=[],paletteButtons=[];let selected=null,gesture=null,pending=null,tapCount=0,tapKey='',preview=null;
+const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+let swipeKey='',swipeAnimations=[],windowActive=true;
 const labels=['','末端の炭素','直線の炭素','角の炭素','枝分かれの炭素','四方向の炭素'];
 function guidance(g){
  const step=steps[session.index];if(session.clearPending)return{message:'「クリア」を押して、次の構造を描く準備をしよう。',count:'クリア待ち'};
@@ -70,6 +72,19 @@ function guidance(g){
  if(!task)return{message:'足りない結合がないか、薄い見本と見比べよう。',count};
  return{message:task.kind==='place'&&selected?.element!==task.element?`上のデッキで${task.element}を選ぼう。`:task.label,count,task};
 }
+// A shared timeline keeps every passed cell lit until the whole route resets.
+function syncSwipeHint(route,paused){
+ const key=route?JSON.stringify(route)+'/'+reducedMotion.matches:'';
+ if(key!==swipeKey){
+  swipeAnimations.forEach(a=>a.cancel());swipeAnimations=[];swipeKey=key;
+  if(route&&!reducedMotion.matches){
+   const points=route.filter((p,i)=>route.findIndex(q=>samePoint(p,q))===i),end=(points.length-1)*450+650,duration=end+500,start=document.timeline.currentTime;
+   const off={backgroundColor:'#fffdf6',borderColor:'#d8d3c0',boxShadow:'none'},on={backgroundColor:'#FFF44F',borderColor:'#8F7C00',boxShadow:'inset 0 0 0 2px #FFF44F, 0 0 7px #FFF44FAA'};
+   points.forEach(([r,c],i)=>{const frames=[...(i?[{...off,offset:0,easing:'steps(1,end)'}]:[]),{...on,offset:i*450/duration,easing:'steps(1,end)'},{...off,offset:end/duration,easing:'steps(1,end)'},{...off,offset:1}];const animation=cells[r][c].animate(frames,{duration,iterations:Infinity});animation.startTime=start;swipeAnimations.push(animation);});
+  }
+ }
+ swipeAnimations.forEach(a=>{if(paused&&a.playState!=='paused'){a.pause();a.currentTime=a.currentTime??0;}else if(!paused&&a.playState==='paused')a.play();});
+}
 function render(){
  const step=steps[session.index],g=preview||session.grid,guide=guidance(g),active=new Set(),rows=session.visibleRows;
  const validPaletteDrag=guide.task?.kind==='drag'&&gesture?.mode==='new'&&gesture.panel?.element===guide.task.element;
@@ -90,13 +105,13 @@ function render(){
   el.hidden=!rows.includes(r);
   const isTarget=guide.task?.kind==='drag'&&((active.has(key))||(validPaletteDrag&&step.tasks.some((t,i)=>!session.taskProgress[i]&&samePoint(t.cell,[r,c])&&samePoint(gesture.target,[r,c]))));
   const pulse=guide.task?.route?samePoint(guide.task.route[0],[r,c]):guide.task?.kind==='delete'||guide.task?.kind==='place'&&selected?.element===guide.task.element;
-  el.className='cell'+(p?' filled':'')+(active.has(key)&&!session.clearPending&&!isTarget?' guided'+(pulse?' hint-pulse':''):'')+(isTarget?' drop-target':'')+(isTarget&&samePoint(gesture?.target,[r,c])&&validPaletteDrag?' drop-active':'')+(guide.error?.join(',')===key?' error':'');
+  el.className='cell'+(p?' filled':'')+(active.has(key)&&!session.clearPending&&!isTarget?(guide.task?.route?' swipe-cue'+(samePoint(guide.task.route[0],[r,c])?' swipe-start':''):' guided'+(pulse?' hint-blink':'')):'')+(isTarget?' drop-target':'')+(isTarget&&samePoint(gesture?.target,[r,c])&&validPaletteDrag?' drop-active':'')+(guide.error?.join(',')===key?' error':'');
   el.dataset.dropLabel=isTarget&&samePoint(gesture?.target,[r,c])&&validPaletteDrag?'離す':'ここへ';
   el.innerHTML=(target&&!session.clearPending?`<span class="goal" aria-hidden="true">${B.icon(target,step.target,r,c)}</span>`:'')+(p?`<span class="actual" aria-hidden="true">${B.icon(p,g,r,c)}</span>`:'');
   el.setAttribute('aria-label',`${r+1}行${c+1}列 ${p?(p.element||'炭素'):'空欄'}`);
  }
  const overlay=$('route');overlay.replaceChildren();
- if(guide.task?.route&&!session.clearPending){const box=$('board').getBoundingClientRect();if(box.width>0&&box.height>0){const height=rows.length*100;const points=guide.task.route.map(([r,c])=>{const cell=cells[r][c].getBoundingClientRect();return[(cell.left+cell.width/2-box.left)*700/box.width,(cell.top+cell.height/2-box.top)*height/box.height];});overlay.innerHTML=`<polyline points="${points.map(p=>p.join(',')).join(' ')}"/><circle cx="${points[0][0]}" cy="${points[0][1]}" r="30"/><text x="${points[0][0]}" y="${points[0][1]+8}">始</text>`;}}
+ syncSwipeHint(guide.task?.route&&!session.clearPending?guide.task.route:null,!!gesture||!!pending||!windowActive||document.hidden);
  paletteButtons.forEach(({button,panel})=>{button.setAttribute('aria-pressed',String(!!selected&&selected.type===panel.type&&selected.element===panel.element));button.classList.toggle('suggested',guide.task?.element===panel.element&&(guide.task.kind==='drag'?!validPaletteDrag:guide.task.kind==='place'&&selected?.element!==panel.element));});
 }
 function clearCelebration(){clearTimeout(celebrationTimer);$('celebration').replaceChildren();$('praise').className='praise';$('praise').textContent='';}
@@ -186,8 +201,10 @@ for(const panel of [...['F','Cl','Br','I','OH'].map(element=>({type:1,rotation:0
 }
 window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',finish);
 window.addEventListener('resize',render);
-window.addEventListener('pointercancel',event=>{if(!gesture||event.pointerId===gesture.id)cancel();});window.addEventListener('blur',()=>{cancel();clearCelebration();});
-document.addEventListener('visibilitychange',()=>{document.documentElement.classList.toggle('page-hidden',document.hidden);if(document.hidden){cancel();clearCelebration();}});
+window.addEventListener('pointercancel',event=>{if(!gesture||event.pointerId===gesture.id)cancel();});window.addEventListener('blur',()=>{windowActive=false;cancel();clearCelebration();});
+window.addEventListener('focus',()=>{windowActive=true;render();});
+reducedMotion.addEventListener('change',render);
+document.addEventListener('visibilitychange',()=>{document.documentElement.classList.toggle('page-hidden',document.hidden);if(document.hidden){cancel();clearCelebration();}else render();});
 window.addEventListener('keydown',e=>{if(e.key==='Escape')cancel();});
 $('undo').addEventListener('click',()=>{cancel();session.undo();clearCelebration();audio.playUndoSound();render();});
 $('clear').addEventListener('click',()=>{cancel();selected=null;clearCelebration();audio.playClearSound();commit(B.emptyGrid(),'clear');});

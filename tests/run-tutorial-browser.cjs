@@ -7,5 +7,5 @@ const {chromium,webkit}=require('playwright');
  const engine=process.argv[2]||'chromium',origin=process.argv[3]||'http://127.0.0.1:8871';
  if(!['chromium','webkit'].includes(engine))throw Error('Use chromium or webkit');
  const browser=await ({chromium,webkit}[engine]).launch({headless:true,...(engine==='chromium'?{executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'}:{})});
- try{const page=await browser.newPage();await page.goto(origin+'/tutorial.html');for(const file of ['tutorial-browser.js','tutorial-pointer-browser.js','tutorial-audio-browser.js',...(engine==='chromium'?['tutorial-touch-browser.js']:[])]){const run=eval('('+fs.readFileSync(path.join(__dirname,file),'utf8')+')');console.log(JSON.stringify({engine,file,...await run(page)}));}}finally{await browser.close();}
+ try{const page=await browser.newPage();await page.goto(origin+'/tutorial.html');for(const file of ['tutorial-guidance-browser.js','tutorial-browser.js','tutorial-pointer-browser.js','tutorial-audio-browser.js',...(engine==='chromium'?['tutorial-touch-browser.js']:[])]){const run=eval('('+fs.readFileSync(path.join(__dirname,file),'utf8')+')');console.log(JSON.stringify({engine,file,...await run(page)}));}}finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
