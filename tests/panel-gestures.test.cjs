@@ -63,7 +63,7 @@ const scenarios = [
     const touch=(type,p)=>session.send('Input.dispatchTouchEvent',{type,touchPoints:p?[{...p,id:1}]:[]});
     for(const element of ['Cl','OH']) {
       await page.evaluate(element=>window.panelTest.seed([[2,3,1,0,element]]),element);
-      await page.locator('.palette-card').nth(1).click();
+      await page.locator('.palette-row:not(.with-undo) .palette-card').nth(1).click();
       await touch('touchStart',await point(page,2,3));
       await touch('touchMove',await point(page,1,3));
       await touch('touchEnd');
@@ -103,7 +103,7 @@ const scenarios = [
   ['eight pixel adjacent swipe starts tracing',async page=>{
     for(const selected of [false,true]) {
       await page.evaluate(()=>window.panelTest.seed([[2,3,1,0,'Cl']]));
-      if(selected)await page.locator('.palette-card').nth(1).click();
+      if(selected)await page.locator('.palette-row:not(.with-undo) .palette-card').nth(1).click();
       const b=await page.locator(selector(2,3)).boundingBox();
       const x=b.x+b.width-2,y=b.y+b.height/2;
       await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+8,y);await page.mouse.up();
@@ -122,7 +122,7 @@ const scenarios = [
   }],
   ['selected candidate draws from first cell when entering adjacent cell', async page => {
     await page.evaluate(() => window.panelTest.seed([]));
-    await page.locator('.palette-card').nth(1).click();
+    await page.locator('.palette-row:not(.with-undo) .palette-card').nth(1).click();
     await down(page); await move(page,1,3); await page.mouse.up();
     await page.waitForTimeout(260);
     assert.equal(await page.locator('.palette-card.selected').count(),0);
@@ -130,7 +130,7 @@ const scenarios = [
   }],
   ['second rapid tap can become a trace without delayed placement', async page => {
     await page.evaluate(() => window.panelTest.seed([]));
-    await page.locator('.palette-card').nth(1).click();
+    await page.locator('.palette-row:not(.with-undo) .palette-card').nth(1).click();
     await page.locator(selector(2,3)).click();
     await down(page); await move(page,1,3); await page.mouse.up();
     await page.waitForTimeout(260);
@@ -138,7 +138,7 @@ const scenarios = [
     assert.equal(await page.locator('.palette-card.selected').count(),0);
   }],
   ['moving within selected cell does not deselect or overwrite', async page => {
-    await page.locator('.palette-card').nth(1).click();
+    await page.locator('.palette-row:not(.with-undo) .palette-card').nth(1).click();
     const p=await point(page,2,3); await down(page); await page.mouse.move(p.x+12,p.y); await page.mouse.up();
     await page.waitForTimeout(480);
     assert.equal(await page.locator('.palette-card.selected').count(),1);
@@ -160,7 +160,7 @@ const scenarios = [
     for(const element of ['C','Cl','OH']){
       await page.evaluate(element=>window.panelTest.seed([[2,3,1,0,element]]),element);
       if(element==='C')await page.locator(selector(2,3)).click();
-      await page.locator('.palette-card').nth(1).click();
+      await page.locator('.palette-row:not(.with-undo) .palette-card').nth(1).click();
       await hold(page);await move(page,1,3);await page.mouse.up();
       assert.deepEqual(await read(page),[{r:1,c:3,type:1,rotation:0,element,origin:'2,3'}]);
       assert.equal(await page.locator('.palette-card.selected').count(),1);
@@ -170,7 +170,7 @@ const scenarios = [
       assert.equal((await read(page)).find(p=>p.r===1&&p.c===3).element,element);
       await hold(page,1,3);await page.mouse.move(10,10);await page.mouse.up();
       assert.equal((await read(page)).some(p=>p.r===1&&p.c===3),false);
-      await page.locator('.palette-card').nth(1).click();
+      await page.locator('.palette-row:not(.with-undo) .palette-card').nth(1).click();
     }
   }],
 
@@ -254,7 +254,7 @@ const scenarios = [
   }],
   ['palette drag still places one carbon panel', async page => {
     await page.evaluate(() => window.panelTest.seed([]));
-    const b = await page.locator('.palette-card').nth(1).boundingBox();
+    const b = await page.locator('.palette-row:not(.with-undo) .palette-card').nth(1).boundingBox();
     await page.mouse.move(b.x+b.width/2,b.y+b.height/2); await page.mouse.down();
     await move(page,2,3); await page.mouse.up();
     const panels = await read(page);

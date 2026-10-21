@@ -4040,8 +4040,8 @@
     const halogenItems = ['F', 'Cl', 'Br', 'I'].map((element) => ({ kind: 'halogen', element }));
     if (alcoholEnabledForCurrentContext()) halogenItems.push({ kind: 'hydroxyl', element: HYDROXYL_ELEMENT });
     const groups = [
-      { row: carbonRow, items: [1, 2, 3, 4, 5].map((type) => ({ kind: 'carbon', type })) },
       { row: halogenRow, items: halogenItems },
+      { row: carbonRow, items: [1, 2, 3, 4, 5].map((type) => ({ kind: 'carbon', type })) },
     ];
     for (const { row, items } of groups) {
       for (const item of items) {
