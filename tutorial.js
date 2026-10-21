@@ -67,7 +67,7 @@ function guidance(g){
   const el=p.element||'C',old=session.start[r][c]?.element||'C';
   if(el!==(target.element||'C')&&el!==old)return{message:`この場所は${target.element||'炭素'}だよ。「戻す」で修正してみよう。`,count,task,error:[r,c]};
  }
- if(task?.kind==='drag'){const moving=gesture?.mode==='new'&&gesture.panel?.element===task.element,hover=moving&&steps[session.index].tasks.some((t,i)=>!done[i]&&samePoint(t.cell,gesture.target));return{message:moving?(hover?'ここで指を離そう！':'そのまま青い枠まで運ぼう。'):g[task.cell[0]][task.cell[1]]?.element===task.element?'今度はIパネルを、同じ場所へドラッグしてみよう。':'Iパネルを押したまま、青く光るClへ運ぼう。',count,task,hover};}
+ if(task?.kind==='drag'){const moving=gesture?.mode==='new'&&gesture.panel?.element===task.element,hover=moving&&steps[session.index].tasks.some((t,i)=>!done[i]&&samePoint(t.cell,gesture.target));return{message:moving?(hover?'ここで指を離そう！':'そのまま青い枠まで運ぼう。'):g[task.cell[0]][task.cell[1]]?.element===task.element?`今度は${task.element}パネルを、同じ場所へドラッグしてみよう。`:`${task.element}パネルを押したまま、青く光る${g[task.cell[0]][task.cell[1]]?.element||'パネル'}へ運ぼう。`,count,task,hover};}
  if(session.index===3&&task?.kind==='trace'&&task.route===crossPath&&taskDone(task,g))return{message:'上下を一度につなぐように、もう一度なぞろう。',count,task};
  if(task?.kind==='delete'&&!g[task.cell[0]][task.cell[1]])return{message:'「戻す」で枝を戻し、長押しで消そう。',count,task};
  if(!task)return{message:'足りない結合がないか、薄い見本と見比べよう。',count};
@@ -78,12 +78,12 @@ function advanceHintClock(){const now=performance.now();if(!hintPaused)hintTime+
 function paintHints(){
  clearTimeout(hintTimer);hintTimer=null;advanceHintClock();let next=Infinity;
  if(hintRoute.length){
-  const end=(hintRoute.length-1)*450+650,cycle=end+500,phase=(hintTime-routeStart)%cycle;
-  const lit=phase<end?Math.min(hintRoute.length,Math.floor(phase/450)+1):0;
+  const end=(hintRoute.length-1)*320+500,cycle=end+400,phase=(hintTime-routeStart)%cycle;
+  const lit=phase<end?Math.min(hintRoute.length,Math.floor(phase/320)+1):0;
   hintRoute.forEach((cell,i)=>cell.classList.toggle('hint-lit',i<lit));
-  next=phase<end?Math.min(end,(Math.floor(phase/450)+1)*450)-phase:cycle-phase;
+  next=phase<end?Math.min(end,(Math.floor(phase/320)+1)*320)-phase:cycle-phase;
  }
- if(hintButtons.length){const phase=(hintTime-blinkStart)%2000;hintButtons.forEach(button=>button.classList.toggle('hint-lit',phase<1000));next=Math.min(next,(phase<1000?1000:2000)-phase);}
+ if(hintButtons.length){const phase=(hintTime-blinkStart)%1500;hintButtons.forEach(button=>button.classList.toggle('hint-lit',phase<750));next=Math.min(next,(phase<750?750:1500)-phase);}
  if(!hintPaused&&!document.hidden&&Number.isFinite(next))hintTimer=setTimeout(paintHints,Math.max(16,next));
 }
 function syncHints(route,paused){
@@ -138,8 +138,8 @@ function commit(g,kind,operation={}){
  if(!changed||kind==='clear')return;
  if(kind==='move')audio[operation.target?'playMoveSound':'playDeleteSound']();
  else if(kind==='tap'||kind==='place'){if(operation.deleted)audio.playDeleteSound();else if(operation.rotation)audio[operation.rotation===270?'playRotateCCWSound':'playRotateCWSound']();else audio.playPlaceSound();}
- if(session.complete&&!wasComplete){audio.playCorrectSound({sparkle:session.index===10});celebrate(session.index===10?'全11課題、クリア！':session.index===3?'一筆で描き直せた！ 完成！':session.index===5?'2つとも置けた！ 完成！':'完成！ よくできました！',true);}
- else if(!session.clearPending&&progress().some((v,i)=>v&&!before[i])){audio.playValidSound();const done=progress(),points=steps[session.index].tasks.filter((t,i)=>done[i]&&!before[i]).map(t=>t.cell||t.route.at(-1));celebrate(kind==='move'?'つかんで消せた！':session.index===5?'ドラッグで置けた！ あと1つ！':session.index===3?'一筆で枝ができた！':kind==='trace'?'いいね！ つながった！':operation.element==='OH'||selected?.element==='OH'?'OHに置き換えられた！':'上手に置き換えられた！',false,operation.target?[operation.target]:operation.source?[operation.source]:points);}
+ if(session.complete&&!wasComplete){audio.playCorrectSound({sparkle:session.index===10});celebrate(session.index===10?'全11課題、クリア！':session.index===3?'一筆で描き直せた！ 完成！':(session.index===5||session.index===6)?'2つとも置けた！ 完成！':'完成！ よくできました！',true);}
+ else if(!session.clearPending&&progress().some((v,i)=>v&&!before[i])){audio.playValidSound();const done=progress(),points=steps[session.index].tasks.filter((t,i)=>done[i]&&!before[i]).map(t=>t.cell||t.route.at(-1));celebrate(kind==='move'?'つかんで消せた！':(session.index===5||session.index===6)?'ドラッグで置けた！ あと1つ！':session.index===3?'一筆で枝ができた！':kind==='trace'?'いいね！ つながった！':operation.element==='OH'||selected?.element==='OH'?'OHに置き換えられた！':'上手に置き換えられた！',false,operation.target?[operation.target]:operation.source?[operation.source]:points);}
 }
 function cancel(){if(pending)clearTimeout(pending);pending=null;tapCount=0;tapKey='';if(gesture?.timer)clearTimeout(gesture.timer);gesture=null;preview=null;clearCelebration();audio.clearPending();$('ghost').hidden=true;$('delete-hint').hidden=true;render();}
 function cellAt(x,y){const cell=document.elementFromPoint(x,y)?.closest('[data-cell]');return cell?[Number(cell.dataset.row),Number(cell.dataset.col)]:null;}

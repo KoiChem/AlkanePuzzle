@@ -19,7 +19,7 @@ const steps=[
  {name:'2,2,5,5-テトラメチルヘキサン',paths:[hexane,...branches],tasks:branches.map(p=>draw(p,'光っている炭素から外へ1マスなぞって、枝を追加しよう。')),count:'枝'},
  {name:'2,2,5,5-テトラクロロヘキサン',paths:[hexane,...branches],atoms:replace(tips,['Cl','Cl','Cl','Cl']),tasks:tips.map(p=>atom(p,'Cl')),count:'Cl'},
  {name:'2,2-ジクロロ-5,5-ジヨードヘキサン',paths:[hexane,...branches],atoms:replace(tips,['Cl','Cl','I','I']),tasks:tips.slice(2).map(p=>({...atom(p,'I'),kind:'drag'})),count:'ドラッグ'},
- {name:'2-クロロ-5-ヨード-2,5-ヘキサンジオール',paths:[hexane,...branches],atoms:replace(tips,['OH','Cl','OH','I']),tasks:[atom(tips[0],'OH'),atom(tips[2],'OH')],count:'OH'},
+ {name:'2-クロロ-5-ヨード-2,5-ヘキサンジオール',paths:[hexane,...branches],atoms:replace(tips,['OH','Cl','OH','I']),tasks:[tips[0],tips[2]].map(p=>({...atom(p,'OH'),kind:'drag'})),count:'ドラッグ'},
  {name:'シクロヘキサン',clear:true,paths:[ring],tasks:[draw(ring,'点線をなぞり、最初の炭素に戻って環を閉じよう。')],note:'長方形に並んだ6個の炭素で、ひとつの環を作ります。'},
  {name:'1,2,3,4,5,6-ヘキサメチルシクロヘキサン',paths:[ring,...ringBranches],tasks:ringBranches.map(p=>draw(p,'環の炭素から外へ1マスなぞって、枝を追加しよう。')),count:'枝'},
  {name:'1,2,3,4,5,6-ヘキサクロロシクロヘキサン',paths:[ring,...ringBranches],atoms:replace(ringTips,Array(6).fill('Cl')),tasks:ringTips.map(p=>atom(p,'Cl')),count:'Cl'},

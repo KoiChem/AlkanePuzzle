@@ -51,6 +51,7 @@ h2{font-size:17px;line-height:1.4;overflow-wrap:anywhere;margin:0 0 4px;font-wei
 .actions .primary{margin-left:auto;background:var(--accent);color:white;border-color:var(--accent)}
 .actions .suggested{background:var(--paper);border-color:var(--border);color:#4A4000}
 .cell.guided:not(.hint-blink),.swipe-cue.hint-lit,.hint-blink.hint-lit,.suggested.hint-lit,.palette-card.suggested.hint-lit,.actions .suggested.hint-lit{background:#FFF9B0;border-color:#B4A655;outline-color:#FFF9B0;box-shadow:inset 0 0 0 1px #FFF5A0,0 0 4px #FFF9B066}
+.swipe-cue{transition:background-color 180ms ease-out,border-color 180ms ease-out,box-shadow 180ms ease-out}
 .ghost{position:fixed;z-index:10;width:52px;height:52px;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 4px 4px #3333);background:var(--paper);border:2px solid var(--accent);border-radius:8px}
 .delete-hint{position:absolute;z-index:4;left:50%;bottom:-4px;transform:translate(-50%,100%);padding:5px 9px;border:1px solid var(--accent);border-radius:9px;background:var(--paper);color:var(--accent);font-size:12px;white-space:nowrap;pointer-events:none;box-shadow:0 2px 8px #3332}
 .delete-hint.outside{background:var(--accent);color:white}
