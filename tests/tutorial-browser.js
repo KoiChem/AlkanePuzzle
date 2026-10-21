@@ -1,0 +1,31 @@
+async(page)=>{
+ const origin=new URL('.',page.url()).href.replace(/\/$/,'');
+ const errors=[],failed=[];page.on('pageerror',e=>errors.push(e.message));page.on('requestfailed',r=>failed.push(r.url()));
+ await page.setViewportSize({width:390,height:844});await page.goto(origin+'/tutorial.html');
+ const check=(value,msg)=>{if(!value)throw Error(msg);};
+ const cell=(r,c)=>page.locator(`[data-row="${r-1}"][data-col="${c-1}"]`);
+ async function draw(path){await page.locator('#board').scrollIntoViewIfNeeded();const pts=[];for(const[r,c]of path){const b=await cell(r,c).boundingBox();pts.push({x:b.x+b.width/2,y:b.y+b.height/2});}await page.mouse.move(pts[0].x,pts[0].y);await page.mouse.down();for(const p of pts.slice(1))await page.mouse.move(p.x,p.y,{steps:5});await page.mouse.up();}
+ async function replace(points,element){await page.getByRole('button',{name:element,exact:true}).click();for(const[r,c]of points){await cell(r,c).click();}await page.waitForTimeout(270);await page.getByRole('button',{name:element,exact:true}).click();}
+ async function next(n){check(await page.locator('#next').isEnabled(),'stage '+n+' not complete: '+await page.locator('#instruction').innerText());await page.locator('#next').click();check((await page.locator('#step-number').innerText()).startsWith((n+1)+' /'),'wrong stage');}
+ const line=(r,c,n)=>Array.from({length:n},(_,i)=>[r,c+i]),tips=[[2,2],[4,2],[2,5],[4,5]],rtips=[[1,3],[1,4],[1,5],[4,5],[4,4],[4,3]],roots=[[2,3],[2,4],[2,5],[3,5],[3,4],[3,3]];
+ // A two-tap rotates counterclockwise and a triple tap removes one atom.
+ await page.getByRole('button',{name:'末端の炭素',exact:true}).click();await cell(3,3).click();await page.waitForTimeout(270);await page.getByRole('button',{name:'末端の炭素',exact:true}).click();await cell(3,3).click({clickCount:2,delay:25});await page.waitForTimeout(270);check((await cell(3,3).locator('.actual .rotor').getAttribute('style')).includes('270deg'),'double-tap rotation');await cell(3,3).click({clickCount:3,delay:25});await page.waitForTimeout(270);check(await cell(3,3).locator('.actual').count()===0,'triple-tap deletion');await page.locator('#reset').click();
+ await page.getByRole('button',{name:'Cl',exact:true}).click();await cell(3,3).click();await cell(3,4).click();await page.waitForTimeout(270);check(await page.locator('#grid .actual').count()===2,'rapid placements dropped');await page.locator('#reset').click();
+ // Actual pointer tracing, including reversed and split paths.
+ await draw(line(3,3,3).reverse());await next(1);
+ check((await page.locator('#instruction').innerText()).includes('クリア'),'clear gate');check(await page.locator('#grid .actual').count()===3,'previous grid lost');await page.locator('#clear').click();await page.locator('#undo').click();check((await page.locator('#instruction').innerText()).includes('クリア'),'undo failed to restore gate');await page.locator('#reset').click();check(await page.locator('#grid .actual').count()===3,'restart snapshot');await page.locator('#clear').click();
+ await draw(line(3,2,5));await draw([[3,4],[2,4],[1,4]]);await next(2);
+ await page.locator('#clear').click();await draw(line(3,1,3));await draw(line(3,3,4));check(await page.locator('#next').isEnabled(),'split path');await page.locator('#undo').click();check(await page.locator('#next').isDisabled(),'undo completion');await draw(line(3,3,4));await next(3);
+ for(const[r,c]of [...tips].reverse())await draw([[3,c],[r,c]]);await next(4);await page.locator('#clear').click();check((await page.locator('#instruction').innerText()).includes('この段階をやり直す'),'unexpected clear recovery');await page.locator('#reset').click();
+ await replace(tips,'Cl');await next(5);await replace(tips.slice(2),'I');await next(6);await replace([tips[0],tips[2]],'OH');await next(7);
+ await page.locator('#clear').click();await draw([[2,3],[2,4],[2,5],[3,5]]);await draw([[3,5],[3,4],[3,3],[2,3]]);
+ check(await page.locator('#next').isEnabled(),'split ring closure');await draw([[2,4],[3,4]]);check(await page.locator('#next').isDisabled(),'extra bridge accepted');await page.locator('#undo').click();await next(8);
+ for(let i=5;i>=0;i--)await draw([roots[i],rtips[i]]);await next(9);
+ await replace(rtips,'Cl');await next(10);await replace([rtips[0],rtips[2],rtips[4]],'OH');
+ check((await page.locator('#instruction').innerText()).includes('チュートリアル完了'),'final completion');check(await page.locator('#restart').isVisible(),'restart unavailable');
+ const geometry=[];for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});const metrics=await page.evaluate(()=>{const rect=e=>e.getBoundingClientRect().toJSON();const all=[...document.querySelectorAll('.actions button,.palette-row button,#grid button')].filter(e=>!e.hidden).map(rect);return{overflow:document.documentElement.scrollWidth>innerWidth,rects:all,board:rect(document.getElementById('board'))};});check(!metrics.overflow,'overflow '+width);for(let i=0;i<metrics.rects.length;i++)for(let j=i+1;j<metrics.rects.length;j++){const a=metrics.rects[i],b=metrics.rects[j];check(a.right<b.left||b.right<a.left||a.bottom<b.top||b.bottom<a.top,'touching buttons '+width);}geometry.push({width,board:metrics.board});}
+ check(errors.length===0,errors.join('\n'));check(failed.length===0,failed.join('\n'));
+ await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(100);await page.screenshot({path:'/private/tmp/tutorial-final-390.png',fullPage:true});
+ await page.locator('#restart').click();check((await page.locator('#step-number').innerText()).startsWith('1 /'),'restart index');check(await page.locator('#grid .actual').count()===0,'restart grid');
+ return {stages:11,reverseAndSplitTrace:true,clearUndo:true,undoCompletion:true,extraRingBondRejected:true,doubleAndTripleTap:true,geometry,errors,failed};
+}
