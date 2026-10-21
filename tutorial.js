@@ -49,7 +49,8 @@ let celebrationTimer;
 const exerciseTasks=[...steps[3].tasks.slice(0,2),{kind:'trace',route:crossPath,label:'上下を一筆でなぞろう。逆向きでもOK。'},{kind:'delete',cell:[1,4],label:'上の枝先を長押しし、枠の外で離そう。'},{kind:'delete',cell:[3,4],label:'下の枝先も長押しし、枠の外で離そう。'},{kind:'trace',route:crossPath,label:'もう一度、上下を一筆でつなごう！'}];
 const cells=[],paletteButtons=[];let selected=null,gesture=null,pending=null,tapCount=0,tapKey='',preview=null;
 const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
-let swipeKey='',swipeAnimations=[],windowActive=true;
+let hintKey='',hintRoute=[],hintButtons=[],hintTimer=null;
+let hintTime=0,hintStamp=performance.now(),hintPaused=false,routeStart=0,blinkStart=0;
 const labels=['','末端の炭素','直線の炭素','角の炭素','枝分かれの炭素','四方向の炭素'];
 function guidance(g){
  const step=steps[session.index];if(session.clearPending)return{message:'「クリア」を押して、次の構造を描く準備をしよう。',count:'クリア待ち'};
@@ -72,18 +73,26 @@ function guidance(g){
  if(!task)return{message:'足りない結合がないか、薄い見本と見比べよう。',count};
  return{message:task.kind==='place'&&selected?.element!==task.element?`上のデッキで${task.element}を選ぼう。`:task.label,count,task};
 }
-// A shared timeline keeps every passed cell lit until the whole route resets.
-function syncSwipeHint(route,paused){
- const key=route?JSON.stringify(route)+'/'+reducedMotion.matches:'';
- if(key!==swipeKey){
-  swipeAnimations.forEach(a=>a.cancel());swipeAnimations=[];swipeKey=key;
-  if(route&&!reducedMotion.matches){
-   const points=route.filter((p,i)=>route.findIndex(q=>samePoint(p,q))===i),end=(points.length-1)*450+650,duration=end+500,start=document.timeline.currentTime;
-   const off={backgroundColor:'#fffdf6',borderColor:'#d8d3c0',boxShadow:'none'},on={backgroundColor:'#FFF44F',borderColor:'#8F7C00',boxShadow:'inset 0 0 0 2px #FFF44F, 0 0 7px #FFF44FAA'};
-   points.forEach(([r,c],i)=>{const frames=[...(i?[{...off,offset:0,easing:'steps(1,end)'}]:[]),{...on,offset:i*450/duration,easing:'steps(1,end)'},{...off,offset:end/duration,easing:'steps(1,end)'},{...off,offset:1}];const animation=cells[r][c].animate(frames,{duration,iterations:Infinity});animation.startTime=start;swipeAnimations.push(animation);});
-  }
+// Essential color cues use one clock, independently of decorative motion settings.
+function advanceHintClock(){const now=performance.now();if(!hintPaused)hintTime+=now-hintStamp;hintStamp=now;}
+function paintHints(){
+ clearTimeout(hintTimer);hintTimer=null;advanceHintClock();let next=Infinity;
+ if(hintRoute.length){
+  const end=(hintRoute.length-1)*450+650,cycle=end+500,phase=(hintTime-routeStart)%cycle;
+  const lit=phase<end?Math.min(hintRoute.length,Math.floor(phase/450)+1):0;
+  hintRoute.forEach((cell,i)=>cell.classList.toggle('hint-lit',i<lit));
+  next=phase<end?Math.min(end,(Math.floor(phase/450)+1)*450)-phase:cycle-phase;
  }
- swipeAnimations.forEach(a=>{if(paused&&a.playState!=='paused'){a.pause();a.currentTime=a.currentTime??0;}else if(!paused&&a.playState==='paused')a.play();});
+ if(hintButtons.length){const phase=(hintTime-blinkStart)%2000;hintButtons.forEach(button=>button.classList.toggle('hint-lit',phase<1000));next=Math.min(next,(phase<1000?1000:2000)-phase);}
+ if(!hintPaused&&!document.hidden&&Number.isFinite(next))hintTimer=setTimeout(paintHints,Math.max(16,next));
+}
+function syncHints(route,paused){
+ advanceHintClock();hintPaused=paused;
+ const key=route?JSON.stringify(route):'';
+ if(key!==hintKey){hintRoute.forEach(cell=>cell.classList.remove('hint-lit'));hintKey=key;hintRoute=route?route.filter((p,i)=>route.findIndex(q=>samePoint(p,q))===i).map(([r,c])=>cells[r][c]):[];routeStart=hintTime;}
+ const buttons=[...document.querySelectorAll('.hint-blink,.suggested')].filter(e=>!e.hidden&&!e.disabled);
+ if(buttons.length!==hintButtons.length||buttons.some((e,i)=>e!==hintButtons[i])){hintButtons.forEach(e=>e.classList.remove('hint-lit'));hintButtons=buttons;blinkStart=hintTime;}
+ paintHints();
 }
 function render(){
  const step=steps[session.index],g=preview||session.grid,guide=guidance(g),active=new Set(),rows=session.visibleRows;
@@ -111,8 +120,8 @@ function render(){
   el.setAttribute('aria-label',`${r+1}行${c+1}列 ${p?(p.element||'炭素'):'空欄'}`);
  }
  const overlay=$('route');overlay.replaceChildren();
- syncSwipeHint(guide.task?.route&&!session.clearPending?guide.task.route:null,!!gesture||!!pending||!windowActive||document.hidden);
  paletteButtons.forEach(({button,panel})=>{button.setAttribute('aria-pressed',String(!!selected&&selected.type===panel.type&&selected.element===panel.element));button.classList.toggle('suggested',guide.task?.element===panel.element&&(guide.task.kind==='drag'?!validPaletteDrag:guide.task.kind==='place'&&selected?.element!==panel.element));});
+ syncHints(guide.task?.route&&!session.clearPending?guide.task.route:null,!!gesture||!!pending||document.hidden);
 }
 function clearCelebration(){clearTimeout(celebrationTimer);$('celebration').replaceChildren();$('praise').className='praise';$('praise').textContent='';}
 function celebrate(message,big=false,points=[]){
@@ -201,9 +210,10 @@ for(const panel of [...['F','Cl','Br','I','OH'].map(element=>({type:1,rotation:0
 }
 window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',finish);
 window.addEventListener('resize',render);
-window.addEventListener('pointercancel',event=>{if(!gesture||event.pointerId===gesture.id)cancel();});window.addEventListener('blur',()=>{windowActive=false;cancel();clearCelebration();});
-window.addEventListener('focus',()=>{windowActive=true;render();});
+window.addEventListener('pointercancel',event=>{if(!gesture||event.pointerId===gesture.id)cancel();});window.addEventListener('blur',()=>{cancel();clearCelebration();});
+window.addEventListener('focus',render);
 reducedMotion.addEventListener('change',render);
+window.addEventListener('pageshow',render);
 document.addEventListener('visibilitychange',()=>{document.documentElement.classList.toggle('page-hidden',document.hidden);if(document.hidden){cancel();clearCelebration();}else render();});
 window.addEventListener('keydown',e=>{if(e.key==='Escape')cancel();});
 $('undo').addEventListener('click',()=>{cancel();session.undo();clearCelebration();audio.playUndoSound();render();});
