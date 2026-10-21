@@ -290,6 +290,11 @@
     background:var(--surface);color:var(--text-muted);
     box-shadow:1px 2px 0 var(--shadow);transition:transform .08s ease, box-shadow .08s ease;
   }
+  .diff-tabs.arrange-tabs{flex-wrap:wrap;align-items:center;}
+  .tutorial-link{display:inline-flex;align-items:center;justify-content:center;flex:0 0 36px;width:36px;height:36px;box-sizing:border-box;padding:4px;border:2px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:1px 2px 0 var(--shadow);}
+  .tutorial-link[hidden]{display:none;}
+  .tutorial-link svg{width:24px;height:26px;}
+  .tutorial-link:focus-visible{outline:3px solid var(--accent);outline-offset:3px;}
   .diff-tab:active{transform:translate(1px,2px);box-shadow:0 0 0 var(--shadow);}
   .diff-tab.active{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft);font-weight:800;}
   /* 命名ルールは幅が足りない画面だけ ? ボタンにして、難易度タブの横並びを保つ */
@@ -302,6 +307,7 @@
     #naming-rules-btn{flex:0 0 32px;width:32px;height:32px;padding:0;box-sizing:border-box;font-size:0;}
     #naming-rules-btn::before{content:'?';font-size:18px;line-height:1;}
   }
+  @media(max-width:360px){.diff-tabs.arrange-tabs{gap:6px;}.arrange-tabs .diff-tab{padding-inline:4px;}}
   .rules-content{font-family:var(--font-hand);}
   .rules-section{margin-bottom:16px;}
   .rules-section:last-child{margin-bottom:0;}
@@ -677,7 +683,8 @@
     <button id="markup-toggle" class="markup-toggle" type="button" aria-pressed="false" title="マーキングペンを表示" aria-label="マーキングペンを表示">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19.5l4.1-1 10-10a2.1 2.1 0 0 0-3-3l-10 10-1.1 4Z"/><path d="m13.8 7.3 3 3M8.6 18.5l-3-3"/></svg>
     </button>
-    <div class="diff-tabs" id="diff-tabs">
+    <div class="diff-tabs arrange-tabs" id="diff-tabs">
+      <a id="tutorial-link" class="tutorial-link" href="tutorial.html?v=20261022-tempo1" title="操作チュートリアル" aria-label="操作チュートリアルを開く"><svg viewBox="0 0 24 28" aria-hidden="true"><path d="M12 7 3 2v17l9 7Z" fill="#F7E55B"/><path d="m12 7 9-5v17l-9 7Z" fill="#52A96B"/><path d="M12 7 3 2v17l9 7 9-7V2l-9 5v19" fill="none" stroke="#44694D" stroke-width="1.5" stroke-linejoin="round"/></svg></a>
       <button class="diff-tab active" data-diff="practice">練習</button>
       <button class="diff-tab" data-diff="easy">すいすい</button>
       <button class="diff-tab" data-diff="medium">まあまあ</button>
@@ -5584,6 +5591,8 @@
 
   function refreshDiffTabsUI() {
     document.querySelectorAll('.diff-tab[data-diff]').forEach((b) => b.classList.toggle('active', b.dataset.diff === difficulty));
+    document.getElementById('tutorial-link').hidden = currentMode !== 'game1';
+    document.getElementById('diff-tabs').classList.toggle('arrange-tabs', currentMode === 'game1');
     const practiceBtn = document.querySelector('.diff-tab[data-diff="practice"]');
     if (practiceBtn) practiceBtn.style.display = currentMode === 'game1' ? '' : 'none';
     const rulesBtn = document.getElementById('naming-rules-btn');
