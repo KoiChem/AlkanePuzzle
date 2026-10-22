@@ -3,7 +3,7 @@ async(page)=>{
  const cdp=await page.context().newCDPSession(page);
  await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
  try{
-  await page.setViewportSize({width:390,height:664});await page.goto(origin+'/tutorial.html?v=20261022-stars1');
+  await page.setViewportSize({width:390,height:664});await page.goto(origin+'/tutorial.html?v=20261022-edge1');
   const point=async el=>{const b=await el.boundingBox();return{x:b.x+b.width/2,y:b.y+b.height/2};},cell=(r,c)=>page.locator(`[data-row="${r-1}"][data-col="${c-1}"]`);
   const touch=(type,p)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:p?[{...p,id:1,radiusX:2,radiusY:2,force:.5}]:[]});
   async function tap(el){const p=await point(el);await touch('touchStart',p);await touch('touchEnd');}

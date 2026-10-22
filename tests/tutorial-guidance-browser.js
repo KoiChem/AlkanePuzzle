@@ -6,7 +6,7 @@ async(page)=>{
  const waitLights=pattern=>page.waitForFunction(({pattern,color})=>{const cells=[...document.querySelectorAll('.swipe-cue')];return cells.length===pattern.length&&cells.every((e,i)=>(getComputedStyle(e).backgroundColor===color)===pattern[i]);},{pattern,color},{timeout:7000});
  const point=async el=>{const b=await el.boundingBox();return{x:b.x+b.width/2,y:b.y+b.height/2};};
  for(const mode of ['reduce','no-preference']){
-  await page.emulateMedia({reducedMotion:mode});await page.setViewportSize({width:390,height:664});await page.goto(base+'/tutorial.html?v=20261022-stars1');
+  await page.emulateMedia({reducedMotion:mode});await page.setViewportSize({width:390,height:664});await page.goto(base+'/tutorial.html?v=20261022-edge1');
   await page.addStyleTag({content:'*{animation:none!important;transition:none!important}'});
   check(await page.locator('.swipe-cue').count()===3,'three-cell guide absent');check(await page.locator('#route text,#route circle').count()===0,'start badge remains');
   await waitLights([true,false,false]);await waitLights([true,true,false]);await page.screenshot({path:'.playwright-mcp/pale-guide-'+mode+'.png'});await waitLights([true,true,true]);await waitLights([false,false,false]);await waitLights([true,false,false]);
@@ -18,7 +18,7 @@ async(page)=>{
   await page.waitForFunction(color=>[...document.querySelectorAll('.swipe-cue')].filter(e=>getComputedStyle(e).backgroundColor===color).length===2,color);const beforeBlur=await states();await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.waitForTimeout(500);check(JSON.stringify(await states())!==JSON.stringify(beforeBlur),'visible page frozen by blur');await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));});const hiddenState=await states();await page.waitForTimeout(550);check(JSON.stringify(await states())===JSON.stringify(hiddenState),'hidden page still ticking');await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'));});await page.waitForTimeout(500);check(JSON.stringify(await states())!==JSON.stringify(hiddenState),'visibility return did not resume');await page.evaluate(()=>{delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));});
  }
- await page.emulateMedia({reducedMotion:'no-preference'});await page.goto(base+'/tutorial.html?v=20261022-stars1');
+ await page.emulateMedia({reducedMotion:'no-preference'});await page.goto(base+'/tutorial.html?v=20261022-edge1');
  await page.waitForFunction(()=>document.querySelectorAll('.swipe-cue')[1].classList.contains('hint-lit'));await page.waitForTimeout(40);const mid=await page.locator('.swipe-cue').nth(1).evaluate(e=>getComputedStyle(e).backgroundColor);await page.waitForTimeout(220);const end=await page.locator('.swipe-cue').nth(1).evaluate(e=>getComputedStyle(e).backgroundColor);check(mid!==end&&end===color,'smooth illumination missing');
  return{paleYellow:true,smoothIllumination:true,directStateChanges:true,cumulativeAndRepeat:true,bothMotionSettings:true,withoutCSSOrWAAPI:true,buttonBlink:true,buttonTimingMeasured:true,pauseDuringTouch:true,noBlurFreeze:true,visibilityResume:true};
 }

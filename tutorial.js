@@ -45,6 +45,7 @@ class TutorialSession{
 if(common){module.exports={TutorialSession};return;}
 root.TutorialSession=TutorialSession;
 const session=new TutorialSession(),$=id=>document.getElementById(id),audio=root.TutorialAudio;
+root.installGridEdgeSwipeGuard($('board'),()=>true);
 let celebrationTimer;
 const exerciseTasks=[...steps[3].tasks.slice(0,2),{kind:'trace',route:crossPath,label:'上下を一筆でなぞろう。逆向きでもOK。'},{kind:'delete',cell:[1,4],label:'上の枝先を長押しし、枠の外で離そう。'},{kind:'delete',cell:[3,4],label:'下の枝先も長押しし、枠の外で離そう。'},{kind:'trace',route:crossPath,label:'もう一度、上下を一筆でつなごう！'}];
 const cells=[],paletteButtons=[];let selected=null,gesture=null,pending=null,tapCount=0,tapKey='',preview=null;

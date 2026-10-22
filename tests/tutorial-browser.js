@@ -1,7 +1,7 @@
 async(page)=>{
  const origin=new URL('.',page.url()).href.replace(/\/$/,'');
  const errors=[],failed=[];page.on('pageerror',e=>errors.push(e.message));page.on('requestfailed',r=>failed.push(r.url()));
- await page.setViewportSize({width:390,height:844});await page.goto(origin+'/tutorial.html?v=20261022-stars1');
+ await page.setViewportSize({width:390,height:844});await page.goto(origin+'/tutorial.html?v=20261022-edge1');
  const check=(value,msg)=>{if(!value)throw Error(msg);};
  const cell=(r,c)=>page.locator(`[data-row="${r-1}"][data-col="${c-1}"]`);
  async function draw(path){await page.locator('#board').scrollIntoViewIfNeeded();const pts=[];for(const[r,c]of path){const b=await cell(r,c).boundingBox();pts.push({x:b.x+b.width/2,y:b.y+b.height/2});}await page.mouse.move(pts[0].x,pts[0].y);await page.mouse.down();for(const p of pts.slice(1))await page.mouse.move(p.x,p.y,{steps:5});await page.mouse.up();}
