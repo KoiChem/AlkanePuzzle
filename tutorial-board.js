@@ -740,16 +740,19 @@ function signature(g){return g.map((row,r)=>row.map((p,c)=>p?`${p.element||'C'}:
 function matches(a,b){return signature(a)===signature(b)&&checkMismatches(a).length===0;}
 // Like applyTraceToGrid: preserve existing reciprocal bonds and merge route bonds.
 function applyTrace(original,route){
- const g=clone(original),path=route.map(p=>p.slice());
- const closed=path.length>2&&path[0][0]===path.at(-1)[0]&&path[0][1]===path.at(-1)[1];
- if(closed)path.pop();if(path.length<2)return g;
- path.forEach(([r,c],i)=>{
-  const dirs=new Set();
+ const g=clone(original),bonds=new Map();
+ for(let i=1;i<route.length;i++){
+  const previous=route[i-1],current=route[i],dir=directionBetween(previous,current);
+  for(const [point,direction] of [[previous,dir],[current,OPPOSITE[dir]]]){
+   const key=point.join(',');if(!bonds.has(key))bonds.set(key,{point,dirs:new Set()});
+   bonds.get(key).dirs.add(direction);
+  }
+ }
+ for(const {point:[r,c],dirs} of bonds.values()){
   for(const d of getBondDirections(original,r,c)){const[dr,dc]=DELTA[d],n=original[r+dr]?.[c+dc];if(n&&getBondDirections(original,r+dr,c+dc).has(OPPOSITE[d]))dirs.add(d);}
-  if(i>0)dirs.add(directionBetween(path[i],path[i-1]));else if(closed)dirs.add(directionBetween(path[i],path.at(-1)));
-  if(i+1<path.length)dirs.add(directionBetween(path[i],path[i+1]));else if(closed)dirs.add(directionBetween(path[i],path[0]));
   g[r][c]=panelForDirections([...dirs]);
- });return g;
+ }
+ return g;
 }
 function icon(panel,g,r,c){if(!panel)return '';const element=panel.element||'C';return `<span class="rotor" style="transform:rotate(${element==='C'?panel.rotation:0}deg)">${svgIcon(panel.type,null,panel.rotation,0,element,g?getBondDirections(g,r,c):null)}</span>`;}
 const api={ROWS,COLS,DELTA,OPPOSITE,emptyGrid,clone,signature,matches,applyTrace,generateName,panelForDirections,getBondDirections,checkMismatches,icon};

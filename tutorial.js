@@ -9,16 +9,24 @@ function taskDone(task,g){
 }
 const crossPath=[[1,4],[2,4],[3,4]];
 const samePoint=(a,b)=>!!a&&!!b&&a[0]===b[0]&&a[1]===b[1];
+// Keep repeated visits in the route so the light can pass through the same carbon again.
+function traceHintFrame(route,elapsed,trail=0){
+ if(!route.length)return{points:[],delay:Infinity};
+ const end=(route.length-1)*320+500,cycle=end+400,phase=elapsed%cycle,tick=Math.floor(phase/320),head=Math.min(route.length-1,tick);
+ let points=phase<end?route.slice(trail?Math.max(0,head-trail+1):0,head+1):[];
+ if(!trail&&samePoint(route[0],route.at(-1))&&head>=3&&head<route.length-1)points=points.slice(1);
+ return{points,delay:phase<end?Math.min(end,(tick+1)*320)-phase:cycle-phase};
+}
 const rowsFor=i=>i===0?[2]:i===1?[0,1,2]:i<7?[1,2,3]:[0,1,2,3];
 class TutorialSession{
  constructor(){this.restart();}
  restart(){this.index=0;this.grid=B.emptyGrid();this.begin();}
- begin(){this.start=B.clone(this.grid);this.clearPending=!!steps[this.index].clear;this.initialClear=this.clearPending;this.recoverySuggested=false;this.exercise={cross:false,deleted:[false,false],redraw:false};this.dragged=steps[this.index].tasks.map(()=>false);this.history=[];}
+ begin(){this.start=B.clone(this.grid);this.clearPending=!!steps[this.index].clear;this.initialClear=this.clearPending;this.singleStroke=false;this.recoverySuggested=false;this.exercise={cross:false,deleted:[false,false],redraw:false};this.dragged=steps[this.index].tasks.map(()=>false);this.history=[];}
  get exerciseDone(){return [taskDone(steps[3].tasks[0],this.grid),taskDone(steps[3].tasks[1],this.grid),this.exercise.cross,...this.exercise.deleted,this.exercise.redraw];}
- get taskProgress(){return this.index===3?this.exerciseDone:steps[this.index].tasks.map((t,i)=>t.kind==='drag'?this.dragged[i]:taskDone(t,this.grid));}
+ get taskProgress(){return this.index===3?this.exerciseDone:steps[this.index].tasks.map((t,i)=>t.kind==='drag'?this.dragged[i]:taskDone(t,this.grid)&&(!steps[this.index].singleStroke||this.singleStroke));}
  get visibleRows(){return [...new Set([...rowsFor(this.index),...(this.clearPending&&this.index?rowsFor(this.index-1):[])])].sort((a,b)=>a-b);}
  get complete(){const s=steps[this.index];return !this.clearPending&&this.taskProgress.every(Boolean)&&B.matches(this.grid,s.target)&&B.generateName(this.grid).name===s.name;}
- snapshot(){return{grid:B.clone(this.grid),clearPending:this.clearPending,recoverySuggested:this.recoverySuggested,exercise:structuredClone(this.exercise),dragged:this.dragged.slice()};}
+ snapshot(){return{grid:B.clone(this.grid),clearPending:this.clearPending,singleStroke:this.singleStroke,recoverySuggested:this.recoverySuggested,exercise:structuredClone(this.exercise),dragged:this.dragged.slice()};}
  edit(next,kind,operation={}){
   const before=this.snapshot(),ex=this.exercise;
   if(this.index===3&&!this.clearPending){
@@ -31,18 +39,22 @@ class TutorialSession{
     }
    }
   }
+  if(steps[this.index].singleStroke&&!this.clearPending&&kind==='trace'&&this.grid.every(row=>row.every(p=>!p))){
+   const path=operation.path||[];
+   if(path.length>1&&B.matches(B.applyTrace(this.grid,path),steps[this.index].target)&&B.matches(next,steps[this.index].target))this.singleStroke=true;
+  }
   if(!this.clearPending&&kind==='place'&&operation.fromPalette){steps[this.index].tasks.forEach((task,i)=>{if(task.kind==='drag'&&operation.element===task.element&&samePoint(operation.target,task.cell)&&taskDone(task,next))this.dragged[i]=true;});}
   const changed=JSON.stringify(before.dragged)!==JSON.stringify(this.dragged)||B.signature(next)!==B.signature(this.grid)||JSON.stringify(before.exercise)!==JSON.stringify(ex)||(kind==='clear'&&this.clearPending);
   if(!changed)return false;
   this.history.push(before);this.grid=B.clone(next);
-  if(kind==='clear'){this.recoverySuggested=!this.clearPending&&!this.initialClear&&this.start.some(row=>row.some(Boolean));this.clearPending=false;}
+  if(kind==='clear'){this.singleStroke=false;this.recoverySuggested=!this.clearPending&&!this.initialClear&&this.start.some(row=>row.some(Boolean));this.clearPending=false;}
   return true;
  }
  undo(){const previous=this.history.pop();if(previous)Object.assign(this,structuredClone(previous));}
- reset(){this.grid=B.clone(this.start);this.clearPending=this.initialClear;this.recoverySuggested=false;this.exercise={cross:false,deleted:[false,false],redraw:false};this.dragged=steps[this.index].tasks.map(()=>false);this.history=[];}
+ reset(){this.grid=B.clone(this.start);this.clearPending=this.initialClear;this.singleStroke=false;this.recoverySuggested=false;this.exercise={cross:false,deleted:[false,false],redraw:false};this.dragged=steps[this.index].tasks.map(()=>false);this.history=[];}
  next(){if(!this.complete||this.index===steps.length-1)return false;this.index++;this.begin();return true;}
 }
-if(common){module.exports={TutorialSession};return;}
+if(common){module.exports={TutorialSession,traceHintFrame};return;}
 root.TutorialSession=TutorialSession;
 const session=new TutorialSession(),$=id=>document.getElementById(id),audio=root.TutorialAudio;
 root.installGridEdgeSwipeGuard($('board'),()=>true);
@@ -50,7 +62,7 @@ let celebrationTimer;
 const exerciseTasks=[...steps[3].tasks.slice(0,2),{kind:'trace',route:crossPath,label:'上下を一筆でなぞろう。逆向きでもOK。'},{kind:'delete',cell:[1,4],label:'上の枝先を長押しし、枠の外で離そう。'},{kind:'delete',cell:[3,4],label:'下の枝先も長押しし、枠の外で離そう。'},{kind:'trace',route:crossPath,label:'もう一度、上下を一筆でつなごう！'}];
 const cells=[],paletteButtons=[];let selected=null,gesture=null,pending=null,tapCount=0,tapKey='',preview=null;
 const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
-let hintKey='',hintRoute=[],hintButtons=[],hintTimer=null;
+let hintKey='',hintRoute=[],hintTrail=0,hintButtons=[],hintTimer=null;
 let hintTime=0,hintStamp=performance.now(),hintPaused=false,routeStart=0,blinkStart=0;
 const labels=['','末端の炭素','直線の炭素','角の炭素','枝分かれの炭素','四方向の炭素'];
 function guidance(g){
@@ -58,7 +70,7 @@ function guidance(g){
  const tasks=session.index===3?exerciseTasks:step.tasks;
  const done=session.taskProgress,task=tasks[done.indexOf(false)];
  const count=`${session.index===3?'操作':step.count||'操作'}：${done.filter(Boolean).length} / ${tasks.length}`;
- if(!gesture&&!pending&&session.complete)return{message:session.index===10?'チュートリアル完了！ 練習でも描いてみよう。':'完成！ 名前と構造を見比べてから「次へ」。',count:'完成',complete:true};
+ if(!gesture&&!pending&&session.complete)return{message:session.index===steps.length-1?'チュートリアル完了！ 練習でも描いてみよう。':'完成！ 名前と構造を見比べてから「次へ」。',count:'完成',complete:true};
  if(session.recoverySuggested)return{message:'「やり直す」で、元の構造に戻そう。',count:'構造を戻そう'};
  for(let r=0;r<5;r++)for(let c=0;c<7;c++){
   const p=g[r][c],target=step.target[r][c];if(!p)continue;
@@ -70,6 +82,7 @@ function guidance(g){
  }
  if(task?.kind==='drag'){const moving=gesture?.mode==='new'&&gesture.panel?.element===task.element,hover=moving&&steps[session.index].tasks.some((t,i)=>!done[i]&&samePoint(t.cell,gesture.target));return{message:moving?(hover?'ここで指を離そう！':'そのまま青い枠まで運ぼう。'):g[task.cell[0]][task.cell[1]]?.element===task.element?`今度は${task.element}パネルを、同じ場所へドラッグしてみよう。`:`${task.element}パネルを押したまま、青く光る${g[task.cell[0]][task.cell[1]]?.element||'パネル'}へ運ぼう。`,count,task,hover};}
  if(session.index===3&&task?.kind==='trace'&&task.route===crossPath&&taskDone(task,g))return{message:'上下を一度につなぐように、もう一度なぞろう。',count,task};
+ if(step.singleStroke&&!gesture&&!session.singleStroke&&session.grid.some(row=>row.some(Boolean)))return{message:'指を離さず一筆で描こう。「クリア」で消して、もう一度！',count,task};
  if(task?.kind==='delete'&&!g[task.cell[0]][task.cell[1]])return{message:'「戻す」で枝を戻し、長押しで消そう。',count,task};
  if(!task)return{message:'足りない結合がないか、薄い見本と見比べよう。',count};
  return{message:task.kind==='place'&&selected?.element!==task.element?`上のデッキで${task.element}を選ぼう。`:task.label,count,task};
@@ -79,19 +92,17 @@ function advanceHintClock(){const now=performance.now();if(!hintPaused)hintTime+
 function paintHints(){
  clearTimeout(hintTimer);hintTimer=null;advanceHintClock();let next=Infinity;
  if(hintRoute.length){
-  const closing=session.index===7&&hintRoute.length===6;
-  const end=(hintRoute.length-1+(closing?1:0))*320+500,cycle=end+400,phase=(hintTime-routeStart)%cycle;
-  const lit=phase<end?Math.min(hintRoute.length,Math.floor(phase/320)+1):0;
-  hintRoute.forEach((cell,i)=>cell.classList.toggle('hint-lit',i<lit&&(!closing||i!==0||phase<960||phase>=1920)));
-  next=phase<end?Math.min(end,(Math.floor(phase/320)+1)*320)-phase:cycle-phase;
+  const frame=traceHintFrame(hintRoute,hintTime-routeStart,hintTrail),lit=new Set(frame.points.map(p=>p.join(',')));
+  hintRoute.forEach(([r,c])=>cells[r][c].classList.toggle('hint-lit',lit.has(`${r},${c}`)));
+  next=frame.delay;
  }
  if(hintButtons.length){const phase=(hintTime-blinkStart)%1500;hintButtons.forEach(button=>button.classList.toggle('hint-lit',phase<750));next=Math.min(next,(phase<750?750:1500)-phase);}
  if(!hintPaused&&!document.hidden&&Number.isFinite(next))hintTimer=setTimeout(paintHints,Math.max(16,next));
 }
 function syncHints(route,paused){
  advanceHintClock();hintPaused=paused;
- const key=route?JSON.stringify(route):'';
- if(key!==hintKey){hintRoute.forEach(cell=>cell.classList.remove('hint-lit'));hintKey=key;hintRoute=route?route.filter((p,i)=>route.findIndex(q=>samePoint(p,q))===i).map(([r,c])=>cells[r][c]):[];routeStart=hintTime;}
+ const trail=steps[session.index].singleStroke?3:0,key=route?JSON.stringify([route,trail]):'';
+ if(key!==hintKey){hintRoute.forEach(([r,c])=>cells[r][c].classList.remove('hint-lit'));hintKey=key;hintRoute=route?route.map(p=>p.slice()):[];hintTrail=trail;routeStart=hintTime;}
  const buttons=[...document.querySelectorAll('.hint-blink,.suggested')].filter(e=>!e.hidden&&!e.disabled);
  if(buttons.length!==hintButtons.length||buttons.some((e,i)=>e!==hintButtons[i])){hintButtons.forEach(e=>e.classList.remove('hint-lit'));hintButtons=buttons;blinkStart=hintTime;}
  paintHints();
@@ -102,15 +113,15 @@ function render(){
  $('board').style.setProperty('--rows',rows.length);
  $('route').setAttribute('viewBox',`0 0 700 ${rows.length*100}`);
  if(guide.task){if(guide.task.cell)active.add(guide.task.cell.join(','));else guide.task.route.forEach(p=>active.add(p.join(',')));}
- $('step-number').textContent=`${session.index+1} / 11`;$('target-name').textContent=step.name;
+ $('step-number').textContent=`${session.index+1} / ${steps.length}`;$('target-name').textContent=step.name;
  $('instruction').textContent=guide.message;$('sub-progress').textContent=guide.count;
  $('instruction').classList.toggle('success',!!guide.complete);
  $('clear').classList.toggle('suggested',session.clearPending);
  $('undo').disabled=!session.history.length||!!gesture||!!pending;
- $('next').disabled=!session.complete||!!gesture||!!pending;$('next').hidden=session.index===10;
- $('restart').hidden=!(session.index===10&&session.complete);
- $('next').classList.toggle('suggested',session.complete&&!gesture&&!pending&&session.index!==10);
- $('restart').classList.toggle('suggested',session.complete&&!gesture&&!pending&&session.index===10);
+ $('next').disabled=!session.complete||!!gesture||!!pending;$('next').hidden=session.index===steps.length-1;
+ $('restart').hidden=!(session.index===steps.length-1&&session.complete);
+ $('next').classList.toggle('suggested',session.complete&&!gesture&&!pending&&session.index!==steps.length-1);
+ $('restart').classList.toggle('suggested',session.complete&&!gesture&&!pending&&session.index===steps.length-1);
  for(let r=0;r<5;r++)for(let c=0;c<7;c++){
   const el=cells[r][c],p=g[r][c],target=step.target[r][c],key=`${r},${c}`;
   el.hidden=!rows.includes(r);
@@ -140,7 +151,7 @@ function commit(g,kind,operation={}){
  if(!changed||kind==='clear')return;
  if(kind==='move')audio[operation.target?'playMoveSound':'playDeleteSound']();
  else if(kind==='tap'||kind==='place'){if(operation.deleted)audio.playDeleteSound();else if(operation.rotation)audio[operation.rotation===270?'playRotateCCWSound':'playRotateCWSound']();else audio.playPlaceSound();}
- if(session.complete&&!wasComplete){audio.playCorrectSound({sparkle:session.index===10});celebrate(session.index===10?'全11課題、クリア！':session.index===3?'一筆で描き直せた！ 完成！':(session.index===5||session.index===6)?'2つとも置けた！ 完成！':'完成！ よくできました！',true);}
+ if(session.complete&&!wasComplete){audio.playCorrectSound({sparkle:session.index===steps.length-1});celebrate(session.index===steps.length-1?`全${steps.length}課題、クリア！`:session.index===3?'一筆で描き直せた！ 完成！':(session.index===5||session.index===6)?'2つとも置けた！ 完成！':'完成！ よくできました！',true);}
  else if(!session.clearPending&&progress().some((v,i)=>v&&!before[i])){audio.playValidSound();const done=progress(),points=steps[session.index].tasks.filter((t,i)=>done[i]&&!before[i]).map(t=>t.cell||t.route.at(-1));celebrate(kind==='move'?'つかんで消せた！':(session.index===5||session.index===6)?'ドラッグで置けた！ あと1つ！':session.index===3?'一筆で枝ができた！':kind==='trace'?'いいね！ つながった！':operation.element==='OH'||selected?.element==='OH'?'OHに置き換えられた！':'上手に置き換えられた！',false,operation.target?[operation.target]:operation.source?[operation.source]:points);}
 }
 function cancel(){if(pending)clearTimeout(pending);pending=null;tapCount=0;tapKey='';if(gesture?.timer)clearTimeout(gesture.timer);gesture=null;preview=null;clearCelebration();audio.clearPending();$('ghost').hidden=true;$('delete-hint').hidden=true;render();}
@@ -169,14 +180,19 @@ function start(event,source,panel){
  render();
 }
 function extendTrace(g,target){
- if(!target||g.closed)return;let last=g.path.at(-1);if(last[0]===target[0]&&last[1]===target[1])return;
+ if(!target)return;let last=g.path.at(-1);if(last[0]===target[0]&&last[1]===target[1])return;
  if(last[0]!==target[0]&&last[1]!==target[1])return;
  const dr=Math.sign(target[0]-last[0]),dc=Math.sign(target[1]-last[1]);
  while(last[0]!==target[0]||last[1]!==target[1]){
   const previousLength=g.path.length;
-  const next=[last[0]+dr,last[1]+dc],index=g.path.findIndex(p=>p[0]===next[0]&&p[1]===next[1]);
-  if(index===0&&g.path.length>=4){g.path.push(next);g.closed=true;audio.trace(g.path,previousLength,true);break;}
-  if(index>=0)g.path=g.path.slice(0,index+1);else g.path.push(next);audio.trace(g.path,previousLength,false);last=g.path.at(-1);
+  const next=[last[0]+dr,last[1]+dc];
+  if(samePoint(next,g.path.at(-2))){g.path.pop();audio.trace(g.path,previousLength,false);}
+  else{
+   const revisited=g.path.some(point=>samePoint(point,next));
+   const repeatedBond=g.path.some((point,i)=>i>0&&((samePoint(point,last)&&samePoint(g.path[i-1],next))||(samePoint(point,next)&&samePoint(g.path[i-1],last))));
+   g.path.push(next);audio.trace(g.path,previousLength,revisited&&!repeatedBond);
+  }
+  last=g.path.at(-1);
  }
  preview=B.applyTrace(g.base,g.path);
 }

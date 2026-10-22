@@ -1,7 +1,7 @@
 async(page)=>{
  const origin=new URL('.',page.url()).href.replace(/\/$/,'');
  const errors=[],failed=[];page.on('pageerror',e=>errors.push(e.message));page.on('requestfailed',r=>failed.push(r.url()));
- await page.setViewportSize({width:390,height:844});await page.goto(origin+'/tutorial.html?v=20261022-edge1');
+ await page.setViewportSize({width:390,height:844});await page.goto(origin+'/tutorial.html?v=20261023-cyclic1');
  const check=(value,msg)=>{if(!value)throw Error(msg);};
  const cell=(r,c)=>page.locator(`[data-row="${r-1}"][data-col="${c-1}"]`);
  async function draw(path){await page.locator('#board').scrollIntoViewIfNeeded();const pts=[];for(const[r,c]of path){const b=await cell(r,c).boundingBox();pts.push({x:b.x+b.width/2,y:b.y+b.height/2});}await page.mouse.move(pts[0].x,pts[0].y);await page.mouse.down();for(const p of pts.slice(1))await page.mouse.move(p.x,p.y,{steps:5});await page.mouse.up();}
@@ -34,18 +34,35 @@ async(page)=>{
  const boardY=await page.locator('#board').evaluate(e=>e.getBoundingClientRect().y);await dragTo(4,5,{screenshot:true});check((await page.locator('#sub-progress').innerText()).includes('1 / 2'),'bottom drag not counted');check((await page.locator('#praise').innerText()).includes('あと1つ'),'drag praise missing');const particle=await page.locator('.particle').first().evaluate(e=>({x:parseFloat(e.style.left),y:parseFloat(e.style.top)})),targetBox=await cell(4,5).boundingBox();check(Math.abs(particle.x-targetBox.x-targetBox.width/2)<1&&Math.abs(particle.y-targetBox.y-targetBox.height/2)<1,'particle not at operation target');await page.waitForTimeout(1000);check((await page.locator('#praise').innerText()).includes('あと1つ'),'praise too brief');await page.waitForTimeout(600);check(await page.locator('#praise').innerText()==='','small praise did not expire');check(await page.locator('#board').evaluate(e=>e.getBoundingClientRect().y)===boardY,'praise shifted board');
  await page.locator('#undo').click();check((await page.locator('#sub-progress').innerText()).includes('0 / 2'),'same-grid drag undo');check(await cell(4,5).getAttribute('aria-label')==='4行5列 I','same-grid undo changed shape');await dragTo(4,5);await dragTo(2,5);check((await page.locator('#praise').innerText()).includes('2つとも'),'two drag completion praise');await page.waitForTimeout(1600);check((await page.locator('#praise').innerText()).includes('完成'),'completed praise disappeared');await next(6);await replace([tips[0],tips[2]],'OH');check(await page.locator('#next').isDisabled(),'tap OH skipped drag practice');check((await page.locator('#instruction').innerText()).includes('OHパネル'),'OH recovery instruction');await dragTo(...tips[0],{element:'OH'});check((await page.locator('#sub-progress').innerText()).includes('1 / 2'),'OH first drag not counted');await dragTo(...tips[2],{element:'OH'});await next(7);
  await page.locator('#clear').click();
- const ringOrder=[[1,2],[1,3],[1,4],[2,4],[2,3],[2,2]];await page.waitForFunction(points=>points.every(([r,c],i)=>(getComputedStyle(document.querySelector(`[data-row="${r}"][data-col="${c}"]`)).backgroundColor==='rgb(255, 249, 176)')===(i===0)),ringOrder,{timeout:7000});await page.waitForFunction(points=>points.every(([r,c],i)=>(getComputedStyle(document.querySelector(`[data-row="${r}"][data-col="${c}"]`)).backgroundColor==='rgb(255, 249, 176)')===(i>0&&i<4)),ringOrder,{timeout:7000});
- await page.waitForFunction(points=>points.every(([r,c],i)=>document.querySelector(`[data-row="${r}"][data-col="${c}"]`).classList.contains('hint-lit')===(i>0)),ringOrder,{timeout:7000});
- await page.waitForFunction(points=>points.every(([r,c])=>getComputedStyle(document.querySelector(`[data-row="${r}"][data-col="${c}"]`)).backgroundColor==='rgb(255, 249, 176)'),ringOrder,{timeout:7000});
- await draw([[2,3],[2,4],[2,5],[3,5]]);await draw([[3,5],[3,4],[3,3],[2,3]]);
- check(await page.locator('#next').isEnabled(),'split ring closure');await draw([[2,4],[3,4]]);check(await page.locator('#next').isDisabled(),'extra bridge accepted');await page.locator('#undo').click();await next(8);
- for(let i=5;i>=0;i--)await draw([roots[i],rtips[i]]);await next(9);
- await replace(rtips,'Cl');await next(10);await replace([rtips[0],rtips[2],rtips[4]],'OH');
+ const ringOrder=[[0,2],[0,3],[0,4],[1,4],[2,4],[2,3],[2,2],[1,2]];
+ async function lights(expected){await page.waitForFunction(expected=>{const lit=[...document.querySelectorAll('#grid .hint-lit')];return lit.length===expected.length&&expected.every(([r,c])=>document.querySelector(`[data-row="${r}"][data-col="${c}"]`).classList.contains('hint-lit'));},expected,{timeout:7000});}
+ await lights([ringOrder[0]]);await lights(ringOrder.slice(1,4));await lights(ringOrder.slice(1));await lights(ringOrder);
+ await draw([[1,3],[1,4],[1,5],[2,5],[3,5]]);await draw([[3,5],[3,4],[3,3],[2,3],[1,3]]);
+ check(await page.locator('#next').isEnabled(),'split octane closure');await draw([[1,4],[2,4],[3,4]]);check(await page.locator('#next').isDisabled(),'extra bridge accepted');await page.locator('#undo').click();await next(8);
+ check((await page.locator('#instruction').innerText()).includes('クリア'),'dimethyl clear gate');check(await page.locator('#grid .actual').count()===8,'octane not retained');await page.locator('#clear').click();await page.locator('#undo').click();check((await page.locator('#instruction').innerText()).includes('クリア'),'dimethyl clear Undo');await page.locator('#clear').click();
+ const dimethyl=[[1,3],[2,3],[2,4],[2,5],[3,5],[3,4],[3,3],[2,3],[2,4],[2,5],[1,5]],zero=dimethyl.map(([r,c])=>[r-1,c-1]);
+ // Check every light window, including revisits, on the actual DOM clock.
+ for(let i=0;i<zero.length;i++)await lights(zero.slice(Math.max(0,i-2),i+1));
+ await lights([]);await lights([zero[0]]);await lights(zero.slice(1,4));await page.waitForTimeout(180);await page.screenshot({path:'/private/tmp/tutorial-three-cell-guide.png',fullPage:true});
+ await draw([[2,3],[2,4],[2,5],[3,5],[3,4],[3,3],[2,3]]);await draw([[2,3],[1,3]]);await draw([[2,5],[1,5]]);
+ check(await page.locator('#next').isDisabled(),'split dimethyl accepted');check((await page.locator('#instruction').innerText()).includes('一筆'),'one-stroke recovery missing');
+ await draw(dimethyl);check(await page.locator('#next').isDisabled(),'retrace on a nonempty board accepted');await page.locator('#clear').click();
+ const first=await cell(...dimethyl[0]).boundingBox(),second=await cell(...dimethyl[1]).boundingBox();await page.mouse.move(first.x+first.width/2,first.y+first.height/2);await page.mouse.down();await page.mouse.move(second.x+second.width/2,second.y+second.height/2);await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointercancel',{pointerId:1})));await page.mouse.up();check(await page.locator('#grid .actual').count()===0,'cancelled one stroke leaked');check(await page.locator('#next').isDisabled(),'cancelled one stroke accepted');
+ await draw(dimethyl);check(await page.locator('#next').isEnabled(),'dimethyl one stroke incomplete');await page.locator('#undo').click();check(await page.locator('#grid .actual').count()===0,'one-stroke Undo not empty');check(await page.locator('#next').isDisabled(),'one-stroke Undo retained achievement');
+ await draw(dimethyl.slice().reverse());check(await page.locator('#next').isEnabled(),'reverse dimethyl incomplete');await page.locator('#undo').click();
+ let nativeCyclic=false;
+ if(page.context().browser().browserType().name()==='chromium'){
+  const session=await page.context().newCDPSession(page),point=async(r,c)=>{const b=await cell(r,c).boundingBox();return{x:b.x+b.width/2,y:b.y+b.height/2,id:1};};
+  try{await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[await point(...dimethyl[0])]});for(const p of dimethyl.slice(1))await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[await point(...p)]});await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});check(await page.locator('#next').isEnabled(),'native cyclic trace incomplete');nativeCyclic=true;}finally{await session.detach();}
+ }else await draw(dimethyl);
+ await next(9);check((await page.locator('#sub-progress').innerText()).includes('0 / 4'),'remaining branch count');
+ for(const i of [5,4,3,1])await draw([roots[i],rtips[i]]);await next(10);
+ await replace(rtips,'Cl');await next(11);await replace([rtips[0],rtips[2],rtips[4]],'OH');
  check((await page.locator('#instruction').innerText()).includes('チュートリアル完了'),'final completion');check(await page.locator('#restart').isVisible(),'restart unavailable');
  await layout('final');
  const geometry=[];for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});const metrics=await page.evaluate(()=>{const rect=e=>e.getBoundingClientRect().toJSON();const all=[...document.querySelectorAll('.actions button,.palette-row button,#grid button')].filter(e=>e.getClientRects().length).map(rect);return{overflow:document.documentElement.scrollWidth>innerWidth,rects:all,board:rect(document.getElementById('board'))};});check(!metrics.overflow,'overflow '+width);for(let i=0;i<metrics.rects.length;i++)for(let j=i+1;j<metrics.rects.length;j++){const a=metrics.rects[i],b=metrics.rects[j];check(a.right<b.left||b.right<a.left||a.bottom<b.top||b.bottom<a.top,'touching buttons '+width);}geometry.push({width,board:metrics.board});}
  check(errors.length===0,errors.join('\n'));check(failed.length===0,failed.join('\n'));
  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(100);await page.screenshot({path:'/private/tmp/tutorial-final-390.png',fullPage:true});
  await page.locator('#restart').click();check((await page.locator('#step-number').innerText()).startsWith('1 /'),'restart index');check(await page.locator('#grid .actual').count()===0,'restart grid');
- return {stages:11,reverseAndSplitTrace:true,clearUndo:true,undoCompletion:true,extraRingBondRejected:true,doubleAndTripleTap:true,paletteDragEvidence:true,ringGuideOrder:true,ringStartRelights:true,sameGridDragUndo:true,anchoredStars:true,praiseDuration:true,geometry,errors,failed};
+ return {stages:12,threeCellTrail:true,revisitedGuide:true,oneStrokeEvidence:true,reverseCyclic:true,nativeCyclic,reverseAndSplitTrace:true,clearUndo:true,undoCompletion:true,extraRingBondRejected:true,doubleAndTripleTap:true,paletteDragEvidence:true,ringGuideOrder:true,ringStartRelights:true,sameGridDragUndo:true,anchoredStars:true,praiseDuration:true,geometry,errors,failed};
 }
