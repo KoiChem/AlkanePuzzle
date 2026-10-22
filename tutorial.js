@@ -78,9 +78,10 @@ function advanceHintClock(){const now=performance.now();if(!hintPaused)hintTime+
 function paintHints(){
  clearTimeout(hintTimer);hintTimer=null;advanceHintClock();let next=Infinity;
  if(hintRoute.length){
-  const end=(hintRoute.length-1)*320+500,cycle=end+400,phase=(hintTime-routeStart)%cycle;
+  const closing=session.index===7&&hintRoute.length===6;
+  const end=(hintRoute.length-1+(closing?1:0))*320+500,cycle=end+400,phase=(hintTime-routeStart)%cycle;
   const lit=phase<end?Math.min(hintRoute.length,Math.floor(phase/320)+1):0;
-  hintRoute.forEach((cell,i)=>cell.classList.toggle('hint-lit',i<lit));
+  hintRoute.forEach((cell,i)=>cell.classList.toggle('hint-lit',i<lit&&(!closing||i!==0||phase<960||phase>=1920)));
   next=phase<end?Math.min(end,(Math.floor(phase/320)+1)*320)-phase:cycle-phase;
  }
  if(hintButtons.length){const phase=(hintTime-blinkStart)%1500;hintButtons.forEach(button=>button.classList.toggle('hint-lit',phase<750));next=Math.min(next,(phase<750?750:1500)-phase);}

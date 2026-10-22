@@ -1,6 +1,6 @@
 async(page)=>{
  const origin=new URL('.',page.url()).href.replace(/\/$/,''),check=(v,m)=>{if(!v)throw Error(m);};
- await page.setViewportSize({width:390,height:844});await page.goto(origin+'/tutorial.html?v=20261022-tempo1');
+ await page.setViewportSize({width:390,height:844});await page.goto(origin+'/tutorial.html?v=20261022-ring1');
  const cell=(r,c)=>page.locator(`[data-row="${r}"][data-col="${c}"]`),point=async el=>{const b=await el.boundingBox();return{x:b.x+b.width/2,y:b.y+b.height/2};};
  await page.locator('#palette').scrollIntoViewIfNeeded();
  const from=await point(page.getByRole('button',{name:'Cl',exact:true})),to=await point(cell(2,2));

@@ -6,7 +6,7 @@ async(page)=>{
   if(Native){function Observed(...args){const ctx=new Native(...args);audioEvidence.contexts.push(ctx);for(const [name,key]of [['createOscillator','oscillators'],['createBufferSource','buffers']]){const original=ctx[name].bind(ctx);ctx[name]=(...args)=>{audioEvidence[key]++;return original(...args);};}return ctx;}Observed.prototype=Native.prototype;window.AudioContext=Observed;}
   for(const name of ['getItem','setItem']){const original=Storage.prototype[name];Storage.prototype[name]=function(key,...args){audioEvidence.storage.push({name,key});return original.call(this,key,...args);};}
  });
- await page.setViewportSize({width:390,height:664});await page.goto(origin+'/tutorial.html?v=20261022-tempo1');
+ await page.setViewportSize({width:390,height:664});await page.goto(origin+'/tutorial.html?v=20261022-ring1');
  check(await page.locator('#sound-toggle').getAttribute('aria-pressed')==='true','default sound off');
  await page.getByRole('button',{name:'Cl',exact:true}).click();await page.waitForTimeout(200);
  const initial=await page.evaluate(()=>({osc:audioEvidence.oscillators,buffers:audioEvidence.buffers,running:audioEvidence.contexts.some(ctx=>ctx.state==='running')}));check(initial.osc>0&&initial.buffers>0&&initial.running,'audio nodes not running');
