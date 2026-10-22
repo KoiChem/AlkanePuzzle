@@ -63,4 +63,8 @@ h2{font-size:17px;line-height:1.4;overflow-wrap:anywhere;margin:0 0 4px;font-wei
 .particle.star{width:15px;height:15px;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 94%,50% 72%,21% 94%,32% 57%,2% 35%,39% 35%)}
 @keyframes burst{0%{opacity:1;transform:translate(0,0) scale(.4)}70%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--spin)) scale(1)}}
 @media(min-width:600px){main{gap:10px;padding-top:18px}.lesson{padding:10px 12px}h2{font-size:20px}.instruction-box{min-height:50px}#instruction{font-size:14px}.palette-card{height:52px}}
-@media(prefers-reduced-motion:reduce){.particle{display:none;animation:none!important}}
+@keyframes star-fade{0%{opacity:0}20%,65%{opacity:1}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){
+ .particle{width:15px;height:15px;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 94%,50% 72%,21% 94%,32% 57%,2% 35%,39% 35%);transform:translate(var(--dx),var(--dy));animation:star-fade 1.2s ease-out both;}
+ .particle:nth-child(n+9){display:none;}
+}
