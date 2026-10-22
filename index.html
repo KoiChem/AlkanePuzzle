@@ -2475,7 +2475,7 @@
   const gridGestureCancels = new Set(); // 盤面を切り替える前に進行中の操作を終了する
   const cancelCellTaps = []; // なぞり開始時に全マスの保留中の回転・連続タップを解除する
   const pendingPalettePlacements = new Map(); // 同じマスのダブルタップで選択解除できるよう、配置を短時間だけ保留する
-  let traceState = null; // なぞって描く操作の進行状態: null | { path:[{r,c},...], closed:boolean }
+  let traceState = null; // なぞって描く操作の進行状態: null | { path:[{r,c},...], closedLoop:boolean }
   let traceSnapshot = null; // なぞり開始前のgridの退避(取り消し・キャンセル用)
   let traceGestureStartedWithAudioLocked = false; // 初回スワイプ音を次の操作へ持ち越さないための判定
   let suppressNextTraceValidSound = false; // 環を閉じた直後だけ、締め音と通常の正常構造音を重ねない
@@ -3103,31 +3103,31 @@
   // なぞって描く(アルカン並べ専用): 空きマスまたは既存パネルからドラッグを始め、
   // 通ったマス順に炭素をつなげて主鎖(または環)を描く。
   // ============================================================
-  // pathの位置iにおける、隣接パネルへの活性方向を求める(closed=trueなら始点と終点も繋がっているとみなす)
-  function computeTraceDirs(path, i, closed) {
-    const n = path.length;
-    const cur = [path[i].r, path[i].c];
-    const dirs = [];
-    if (i > 0) dirs.push(directionBetween(cur, [path[i - 1].r, path[i - 1].c]));
-    else if (closed && n > 1) dirs.push(directionBetween(cur, [path[n - 1].r, path[n - 1].c]));
-    if (i < n - 1) dirs.push(directionBetween(cur, [path[i + 1].r, path[i + 1].c]));
-    else if (closed && n > 1) dirs.push(directionBetween(cur, [path[0].r, path[0].c]));
-    return dirs;
+  // 同じ炭素を複数回通る経路も、各マスの結合方向をまとめてから反映する。
+  function computeTraceBonds(path) {
+    const bonds = new Map();
+    for (let i = 1; i < path.length; i++) {
+      const previous = path[i - 1], current = path[i];
+      const dir = directionBetween([previous.r, previous.c], [current.r, current.c]);
+      for (const [point, direction] of [[previous, dir], [current, OPPOSITE[dir]]]) {
+        const key = `${point.r},${point.c}`;
+        if (!bonds.has(key)) bonds.set(key, { ...point, dirs: new Set() });
+        bonds.get(key).dirs.add(direction);
+      }
+    }
+    return bonds.values();
   }
 
   // 開始時のパネルへ戻してから、相手のいる結合と経路の結合だけを残す。
   // 相手のいない方向は水素に戻し、引き返したマスは元のパネルへ復元する。
   function applyTraceToGrid() {
     const g = traceSnapshot.map((row) => row.slice());
-    const { path, closed, originalPanels, originalBonds } = traceState;
+    const { path, originalPanels, originalBonds } = traceState;
     for (const { panel, type, rotation } of originalPanels) {
       panel.type = type;
       panel.rotation = rotation;
     }
-    for (let i = 0; i < path.length; i++) {
-      const { r, c } = path[i];
-      const dirs = computeTraceDirs(path, i, closed);
-      if (dirs.length === 0) continue; // 経路が1マスだけ(まだ動いていない)ときは何も置かない
+    for (const { r, c, dirs } of computeTraceBonds(path)) {
       const panel = g[r][c];
       if (isHalogenPanel(panel)) {
         // 自動結合していた方向を保持し、元パネルには触れず炭素へ置き換える。
@@ -3148,7 +3148,7 @@
     for (const cancel of cancelCellTaps) cancel();
     traceSnapshot = grid.map((row) => row.slice());
     traceState = {
-      path: [{ r: startR, c: startC }], closed: false, undoBefore,
+      path: [{ r: startR, c: startC }], closedLoop: false, undoBefore,
       originalPanels: grid.flat().filter(Boolean).map(panel => ({ panel, type: panel.type, rotation: panel.rotation })),
       // 開始時に成立していた結合だけを保存する。プレビューで変化した向きは使わない。
       originalBonds: grid.map((row, r) => row.map((panel, c) => [...getBondDirections(grid, r, c)].filter(dir => {
@@ -3160,7 +3160,7 @@
     traceGestureStartedWithAudioLocked = !audioCtx || audioCtx.state !== 'running';
 
     const processStep = (nr, nc) => {
-      if (!traceState || traceState.closed) return;
+      if (!traceState) return;
       const path = traceState.path;
       const last = path[path.length - 1];
       if (nr === last.r && nc === last.c) return; // 同じマスのまま
@@ -3173,6 +3173,7 @@
         const prev = path[path.length - 2];
         if (nr === prev.r && nc === prev.c) {
           path.pop();
+          traceState.closedLoop = false;
           playTraceBacktrackSound();
           applyTraceToGrid();
           refreshAll();
@@ -3180,26 +3181,28 @@
         }
       }
 
-      // 始点に戻ってきたら環として閉じる(最低3マス移動している場合のみ)
-      const start = path[0];
-      if (path.length >= 3 && nr === start.r && nc === start.c) {
-        traceState.closed = true;
-        playTraceCloseSound(path.length);
-        applyTraceToGrid();
-        refreshAll();
-        return;
+      // 既に通った炭素へ新しい結合で戻れば環になる。環を閉じても描画は続ける。
+      let lastVisit = -1;
+      let bondAlreadyTraced = false;
+      for (let i = 0; i < path.length; i++) {
+        const point = path[i], previous = path[i - 1];
+        if (point.r === nr && point.c === nc) lastVisit = i;
+        if (previous && (
+          (previous.r === last.r && previous.c === last.c && point.r === nr && point.c === nc)
+          || (point.r === last.r && point.c === last.c && previous.r === nr && previous.c === nc)
+        )) bondAlreadyTraced = true;
       }
-      // 経路上に既にあるマス(始点以外)には進めない(自己交差回避)
-      if (path.some((p) => p.r === nr && p.c === nc)) return;
-
+      traceState.closedLoop = lastVisit >= 0 && !bondAlreadyTraced;
+      const loopSize = path.length - lastVisit;
       path.push({ r: nr, c: nc });
-      playTraceStepSound(path.length);
+      if (traceState.closedLoop) playTraceCloseSound(loopSize);
+      else playTraceStepSound(path.length);
       applyTraceToGrid();
       refreshAll();
     };
 
     const onMove = (ev) => {
-      if (ev.pointerId !== e.pointerId || !traceState || traceState.closed) return;
+      if (ev.pointerId !== e.pointerId || !traceState) return;
       const target = document.elementFromPoint(ev.clientX, ev.clientY);
       const cellEl = target && target.closest('.cell');
       if (!cellEl) return;
@@ -3212,10 +3215,10 @@
       window.removeEventListener('pointercancel', onCancel);
       window.removeEventListener('blur', onCancel);
       const path = traceState ? traceState.path : [];
-      const closedTrace = !!traceState?.closed;
+      const closedTrace = !!traceState?.closedLoop;
       if (cancelled) {
         traceState.path = [];
-        traceState.closed = false;
+        traceState.closedLoop = false;
         applyTraceToGrid(); // 元の炭素の向きと、置換前のCl・OHも復元する。
       } else if (path.length < 2) {
         applyTraceToGrid(); // 実質タップのみ = 開始時の状態に戻す
@@ -3254,8 +3257,8 @@
     let cls = 'cell filled' + hiddenCls + challengeCls;
     if (mismatchMap.has(key)) cls += ' mismatch';
     if (traceState?.path.length) {
-      const traceMarker = traceState.closed ? traceState.path[0] : traceState.path[traceState.path.length - 1];
-      if (traceMarker.r === r && traceMarker.c === c) cls += traceState.closed ? ' trace-closed' : ' trace-tip';
+      const traceMarker = traceState.path[traceState.path.length - 1];
+      if (traceMarker.r === r && traceMarker.c === c) cls += traceState.closedLoop ? ' trace-closed' : ' trace-tip';
     }
     cellEl.className = cls;
 
