@@ -17,14 +17,14 @@ function traceHintFrame(route,elapsed,trail=0){
  if(!trail&&samePoint(route[0],route.at(-1))&&head>=3&&head<route.length-1)points=points.slice(1);
  return{points,delay:phase<end?Math.min(end,(tick+1)*320)-phase:cycle-phase};
 }
-const rowsFor=i=>i===0?[2]:i===1?[0,1,2]:i<7?[1,2,3]:[0,1,2,3];
+
 class TutorialSession{
  constructor(){this.restart();}
  restart(){this.index=0;this.grid=B.emptyGrid();this.begin();}
  begin(){this.start=B.clone(this.grid);this.clearPending=!!steps[this.index].clear;this.initialClear=this.clearPending;this.singleStroke=false;this.recoverySuggested=false;this.exercise={cross:false,deleted:[false,false],redraw:false};this.dragged=steps[this.index].tasks.map(()=>false);this.history=[];}
  get exerciseDone(){return [taskDone(steps[3].tasks[0],this.grid),taskDone(steps[3].tasks[1],this.grid),this.exercise.cross,...this.exercise.deleted,this.exercise.redraw];}
  get taskProgress(){return this.index===3?this.exerciseDone:steps[this.index].tasks.map((t,i)=>t.kind==='drag'?this.dragged[i]:taskDone(t,this.grid)&&(!steps[this.index].singleStroke||this.singleStroke));}
- get visibleRows(){return [...new Set([...rowsFor(this.index),...(this.clearPending&&this.index?rowsFor(this.index-1):[])])].sort((a,b)=>a-b);}
+ get visibleRows(){return [0,1,2,3];}
  get complete(){const s=steps[this.index];return !this.clearPending&&this.taskProgress.every(Boolean)&&B.matches(this.grid,s.target)&&B.generateName(this.grid).name===s.name;}
  snapshot(){return{grid:B.clone(this.grid),clearPending:this.clearPending,singleStroke:this.singleStroke,recoverySuggested:this.recoverySuggested,exercise:structuredClone(this.exercise),dragged:this.dragged.slice()};}
  edit(next,kind,operation={}){
@@ -58,7 +58,13 @@ if(common){module.exports={TutorialSession,traceHintFrame};return;}
 root.TutorialSession=TutorialSession;
 const session=new TutorialSession(),$=id=>document.getElementById(id),audio=root.TutorialAudio;
 root.installGridEdgeSwipeGuard($('board'),()=>true);
-let celebrationTimer;
+let celebrationTimer,advanceTimer=null;
+function advanceLesson(){clearTimeout(advanceTimer);advanceTimer=null;cancel();selected=null;session.next();clearCelebration();render();}
+function syncAdvance(){
+ const ready=session.complete&&!gesture&&!pending&&!document.hidden&&session.index<steps.length-1;
+ if(!ready){clearTimeout(advanceTimer);advanceTimer=null;return;}
+ if(advanceTimer===null)advanceTimer=setTimeout(()=>{advanceTimer=null;if(session.complete&&!gesture&&!pending&&!document.hidden)advanceLesson();},1500);
+}
 const exerciseTasks=[...steps[3].tasks.slice(0,2),{kind:'trace',route:crossPath,label:'上下を一筆でなぞろう。逆向きでもOK。'},{kind:'delete',cell:[1,4],label:'上の枝先を長押しし、枠の外で離そう。'},{kind:'delete',cell:[3,4],label:'下の枝先も長押しし、枠の外で離そう。'},{kind:'trace',route:crossPath,label:'もう一度、上下を一筆でつなごう！'}];
 const cells=[],paletteButtons=[];let selected=null,gesture=null,pending=null,tapCount=0,tapKey='',preview=null;
 const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -70,7 +76,7 @@ function guidance(g){
  const tasks=session.index===3?exerciseTasks:step.tasks;
  const done=session.taskProgress,task=tasks[done.indexOf(false)];
  const count=`${session.index===3?'操作':step.count||'操作'}：${done.filter(Boolean).length} / ${tasks.length}`;
- if(!gesture&&!pending&&session.complete)return{message:session.index===steps.length-1?'チュートリアル完了！ 練習でも描いてみよう。':'完成！ 名前と構造を見比べてから「次へ」。',count:'完成',complete:true};
+ if(!gesture&&!pending&&session.complete)return{message:session.index===steps.length-1?'チュートリアル完了！ 練習でも描いてみよう。':'完成！ 名前と構造を見比べよう。まもなく次の課題へ。',count:'完成',complete:true};
  if(session.recoverySuggested)return{message:'「やり直す」で、元の構造に戻そう。',count:'構造を戻そう'};
  for(let r=0;r<5;r++)for(let c=0;c<7;c++){
   const p=g[r][c],target=step.target[r][c];if(!p)continue;
@@ -118,7 +124,7 @@ function render(){
  $('instruction').classList.toggle('success',!!guide.complete);
  $('clear').classList.toggle('suggested',session.clearPending);
  $('undo').disabled=!session.history.length||!!gesture||!!pending;
- $('next').disabled=!session.complete||!!gesture||!!pending;$('next').hidden=session.index===steps.length-1;
+ $('next').disabled=!session.complete||!!gesture||!!pending;$('next').hidden=session.index===steps.length-1||!session.complete;
  $('restart').hidden=!(session.index===steps.length-1&&session.complete);
  $('next').classList.toggle('suggested',session.complete&&!gesture&&!pending&&session.index!==steps.length-1);
  $('restart').classList.toggle('suggested',session.complete&&!gesture&&!pending&&session.index===steps.length-1);
@@ -135,6 +141,7 @@ function render(){
  const overlay=$('route');overlay.replaceChildren();
  paletteButtons.forEach(({button,panel})=>{button.setAttribute('aria-pressed',String(!!selected&&selected.type===panel.type&&selected.element===panel.element));button.classList.toggle('suggested',guide.task?.element===panel.element&&(guide.task.kind==='drag'?!validPaletteDrag:guide.task.kind==='place'&&selected?.element!==panel.element));});
  syncHints(guide.task?.route&&!session.clearPending?guide.task.route:null,!!gesture||!!pending||document.hidden);
+ syncAdvance();
 }
 function clearCelebration(){clearTimeout(celebrationTimer);$('celebration').replaceChildren();$('praise').className='praise';$('praise').textContent='';}
 function celebrate(message,big=false,points=[]){
@@ -237,7 +244,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape')cancel();});
 $('undo').addEventListener('click',()=>{cancel();session.undo();clearCelebration();audio.playUndoSound();render();});
 $('clear').addEventListener('click',()=>{cancel();selected=null;clearCelebration();audio.playClearSound();commit(B.emptyGrid(),'clear');});
 $('reset').addEventListener('click',()=>{cancel();selected=null;session.reset();clearCelebration();audio.playUiClickSound();render();});
-$('next').addEventListener('click',()=>{cancel();selected=null;session.next();clearCelebration();audio.playUiClickSound();render();});
+$('next').addEventListener('click',()=>{if(!session.complete)return;audio.playUiClickSound();advanceLesson();});
 $('restart').addEventListener('click',()=>{cancel();selected=null;session.restart();clearCelebration();audio.playUiClickSound();render();});
 audio.render();$('sound-toggle').addEventListener('click',event=>audio.toggle(event));
 $('board').addEventListener('contextmenu',e=>e.preventDefault());

@@ -1,0 +1,13 @@
+async(page)=>{
+ const base=new URL('.',page.url()).href.replace(/\/$/,''),check=(v,m)=>{if(!v)throw Error(m);};
+ await page.setViewportSize({width:390,height:664});await page.goto(base+'/tutorial.html?v=20261023-four1');
+ const stage=()=>page.locator('#step-number').innerText(),empty=()=>page.locator('#grid .actual').count();
+ const point=async(r,c)=>{const b=await page.locator(`[data-row="${r}"][data-col="${c}"]`).boundingBox();return{x:b.x+b.width/2,y:b.y+b.height/2};};
+ async function draw(){const a=await point(2,2),b=await point(2,4);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:10});await page.mouse.up();}
+ check(await page.locator('#next').isHidden(),'incomplete stage shows next');await draw();await page.waitForTimeout(850);check((await stage()).startsWith('1 /'),'advanced before success could be seen');await page.locator('#undo').click();await page.waitForTimeout(950);check((await stage()).startsWith('1 /')&&await empty()===0,'Undo did not cancel old advance');
+ await draw();await page.waitForTimeout(750);await page.locator('#reset').click();await page.waitForTimeout(900);check((await stage()).startsWith('1 /')&&await empty()===0,'reset did not cancel old advance');
+ await draw();await page.waitForTimeout(650);const a=await point(2,2);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.waitForTimeout(1100);check((await stage()).startsWith('1 /'),'advanced while holding panel');await page.evaluate(()=>window.dispatchEvent(new PointerEvent('pointercancel',{pointerId:1})));await page.mouse.up();
+ await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));});await page.waitForTimeout(1700);check((await stage()).startsWith('1 /'),'advanced in hidden page');await page.evaluate(()=>{delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));});await page.waitForTimeout(650);check((await stage()).startsWith('1 /'),'visibility resume skipped success delay');
+ await page.waitForFunction(()=>document.getElementById('step-number').textContent.startsWith('2 /'));check(await empty()===3,'automatic advance erased previous molecule');check((await page.locator('#instruction').innerText()).includes('クリア'),'automatic advance skipped clear gate');await page.waitForTimeout(1700);check((await stage()).startsWith('2 /'),'clear gate auto advanced');await page.locator('#clear').click();check(await empty()===0,'manual clear failed');
+ return{autoAdvance:true,delay:true,undoCancels:true,resetCancels:true,inputPauses:true,hiddenPauses:true,manualClearRequired:true};
+}

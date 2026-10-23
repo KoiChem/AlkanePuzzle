@@ -6,22 +6,22 @@
 <meta name="theme-color" content="#faf8f0">
 <title>アルカンパズル 操作チュートリアル</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="tutorial.css?v=20261022-edge1">
-<script defer src="grid-edge-swipe.js?v=20261022-edge1"></script>
-<script defer src="tutorial-board.js?v=20261023-cyclic1"></script>
-<script defer src="tutorial-steps.js?v=20261023-cyclic1"></script>
+<link rel="stylesheet" href="tutorial.css?v=20261023-four1">
+<script defer src="grid-edge-swipe.js?v=20261023-four1"></script>
+<script defer src="tutorial-board.js?v=20261023-four1"></script>
+<script defer src="tutorial-steps.js?v=20261023-four1"></script>
 <script defer src="tutorial-audio.js"></script>
-<script defer src="tutorial.js?v=20261023-cyclic1"></script>
+<script defer src="tutorial.js?v=20261023-four1"></script>
 </head>
 <body>
 <main>
- <header aria-label="操作チュートリアル"><div class="progress"><span id="step-number">1 / 12</span><span id="sub-progress"></span></div><button id="sound-toggle" class="sound-toggle" type="button" aria-label="効果音をオフにする" aria-pressed="true"></button><a href="index.html" class="exit">練習へ<span aria-hidden="true"> ↗</span></a></header>
+ <header aria-label="操作チュートリアル"><div class="progress"><span id="step-number">1 / 11</span><span id="sub-progress"></span></div><button id="sound-toggle" class="sound-toggle" type="button" aria-label="効果音をオフにする" aria-pressed="true"></button><a href="index.html" class="exit">練習へ<span aria-hidden="true"> ↗</span></a></header>
  <section class="lesson" aria-labelledby="target-name">
   <h2 id="target-name">プロパン</h2>
   <p id="praise" class="praise" role="status" aria-live="polite"></p>
   <div class="instruction-box"><p id="instruction" role="status" aria-live="polite"></p></div>
  </section>
- <div id="board" class="board"><div id="grid" class="grid" role="group" aria-label="分子を描く盤面"></div><svg id="route" class="route" viewBox="0 0 700 500" aria-hidden="true"></svg><div id="delete-hint" class="delete-hint" hidden aria-hidden="true"></div><div id="celebration" class="celebration" aria-hidden="true"></div></div>
+ <div id="board" class="board"><div id="grid" class="grid" role="group" aria-label="分子を描く盤面"></div><svg id="route" class="route" viewBox="0 0 700 400" aria-hidden="true"></svg><div id="delete-hint" class="delete-hint" hidden aria-hidden="true"></div><div id="celebration" class="celebration" aria-hidden="true"></div></div>
  <div id="palette" class="palette" role="group" aria-label="パネルデッキ">
   <div id="atom-row" class="palette-row atom-row"><button id="undo" class="undo" type="button" aria-label="盤面の操作を1つ戻す" title="盤面の操作を1つ戻す" disabled><svg viewBox="0 0 1000 936" aria-hidden="true"><path d="M416 835 A345 345 0 1 0 269 249" fill="none" stroke="currentColor" stroke-width="82" stroke-linecap="round"/><path d="M155 117 L70 462 L409 365 Z" fill="currentColor"/></svg></button></div>
   <div id="carbon-row" class="palette-row carbon-row"></div>

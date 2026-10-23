@@ -12,7 +12,7 @@ async(page)=>{
   return{edge,continued,released,outside,middle,multi,noncancelable};
  });}
  for(const path of ['index.html','tutorial.html']){
-  await page.goto(base+'/'+path+'?v=20261022-edge1');if(path==='index.html')await page.waitForSelector('#app:not([inert])');const v=await probe('#grid');check(v.edge&&v.continued,'left grid edge not blocked: '+path);check(!v.released&&!v.outside&&!v.middle&&!v.multi&&!v.noncancelable,'overbroad guard: '+JSON.stringify(v));
+  await page.goto(base+'/'+path+'?v=20261023-four1');if(path==='index.html')await page.waitForSelector('#app:not([inert])');const v=await probe('#grid');check(v.edge&&v.continued,'left grid edge not blocked: '+path);check(!v.released&&!v.outside&&!v.middle&&!v.multi&&!v.noncancelable,'overbroad guard: '+JSON.stringify(v));
   await page.evaluate(()=>{const overlay=document.createElement('div');overlay.id='edge-test-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:99999';document.body.append(overlay);});check(!(await probe('#grid')).edge,'dialog overlay blocked');await page.locator('#edge-test-overlay').evaluate(e=>e.remove());
   if(path==='index.html'){await page.getByRole('button',{name:'名付ける',exact:true}).click();check(!(await probe('#grid')).edge,'naming mode blocked');await page.getByRole('button',{name:'並べる',exact:true}).click();}
   results.push({path,...v});
