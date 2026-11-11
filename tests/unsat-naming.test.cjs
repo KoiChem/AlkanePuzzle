@@ -1,0 +1,8 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+const ctx={window:{}};vm.runInNewContext(fs.readFileSync('unsat-naming.js','utf8'),ctx);const api=ctx.window.UnsatNaming;
+const name=s=>api.name(api.fromSmiles(s),()=>[]);
+test('representative compounds, carbonyls, acids and esters',()=>{for(const [s,n] of Object.entries({'C=C':'エチレン','CC=C':'プロピレン','C#CC':'プロピン','CC#CC':'2-ブチン','C=O':'ホルムアルデヒド','CC=O':'アセトアルデヒド','CCC=O':'プロパナール','CC(=O)C':'アセトン','CCC(=O)C':'2-ブタノン','O=C(O)':'ギ酸','CC(=O)O':'酢酸','O=C(O)C(=O)O':'シュウ酸','CC(=O)OC':'酢酸メチル','CCOC(=O)C':'酢酸エチル','COC=O':'ギ酸メチル','C=C(C)C=C':'イソプレン','CCO':'エタノール'}))assert.equal(name(s),n,s)});
+test('unbranched alkenes and alkynes through C35',()=>{assert.equal(name('C'.repeat(34)+'=C'),'1-ペンタトリアコンテン');assert.equal(name('C'.repeat(34)+'#C'),'1-ペンタトリアコンチン');assert.equal(name('CC=CCC'),'2-ペンテン');assert.equal(name('CC(=O)CC'),'2-ブタノン')});
+function layout(){const atoms={'0,0':{e:'C'},'0,1':{e:'C'},'0,2':{e:'C'},'0,3':{e:'C'}},bonds={'0,0|0,1':1,'0,1|0,2':2,'0,2|0,3':1};return api.graph(atoms,bonds)}
+test('cis trans from H, including axial H fallback; isomeric SMILES differs',()=>{const g=layout(),cis=k=>['N'],trans=k=>[k==='0,1'?'S':'N'];assert.equal(api.name(g,cis),'シス-2-ブテン');assert.equal(api.name(g,trans),'トランス-2-ブテン');assert.notEqual(api.smiles(g,cis),api.smiles(g,trans));const c=api.smiles(g,cis),t=api.smiles(g,trans);assert.match(c,/=/);assert.match(t,/=/);assert.match(c,/[\/\\]/);assert.match(t,/[\/\\]/)});
+test('unsupported graphs retain multiple and ring bonds in SMILES',()=>{const g=api.fromSmiles('CC(C)(C)C=O');assert.equal(api.name(g,()=>[]),null);assert.match(api.smiles(g,()=>[]),/=O/);assert.equal(name('CC(O)C=O'),null)});

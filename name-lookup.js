@@ -46,7 +46,7 @@
     const result = {name, source}; cache.set(smiles, result); return result;
   }
   window.NameLookup = {smiles, lookup, attach(container, graph) {
-    const key = smiles(graph), area = document.createElement('div');
+    const key = graph.smiles || smiles(graph), area = document.createElement('div');
     area.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:12px;margin:12px 0';
     const button = document.createElement('button'); button.type = 'button'; button.textContent = '名前を調べる';
     const output = document.createElement('div'); output.setAttribute('aria-live','polite');
